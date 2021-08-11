@@ -4,8 +4,15 @@ import siteMetadata from '@/data/siteMetadata'
 import { useState } from 'react'
 import Pagination from '@/components/Pagination'
 import formatDate from '@/lib/utils/formatDate'
+import kebabCase from '@/lib/utils/kebabCase'
 
-export default function ListLayout({ posts, title, initialDisplayPosts = [], pagination }) {
+export default function BlogListLayout({
+  posts,
+  title,
+  initialDisplayPosts = [],
+  pagination,
+  tags = [],
+}) {
   const [searchValue, setSearchValue] = useState('')
   const filteredBlogPosts = posts.filter((frontMatter) => {
     const searchContent = frontMatter.title + frontMatter.summary + frontMatter.tags.join(' ')
@@ -46,6 +53,15 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
               />
             </svg>
           </div>
+          <div className="flex flex-wrap">
+            {tags.map((t) => {
+              return (
+                <div key={t} className="mt-2 mb-2 mr-5">
+                  <Tag text={t} />
+                </div>
+              )
+            })}
+          </div>
         </div>
         <ul>
           {!filteredBlogPosts.length && 'No posts found.'}
@@ -67,7 +83,7 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
                           {title}
                         </Link>
                       </h3>
-                      <div className="flex flex-wrap">
+                      <div className="flex flex-wrap space-x-3">
                         {tags.map((tag) => (
                           <Tag key={tag} text={tag} />
                         ))}
