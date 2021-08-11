@@ -5,6 +5,8 @@ import siteMetadata from '@/data/siteMetadata'
 import { getAllFilesFrontMatter } from '@/lib/mdx'
 import formatDate from '@/lib/utils/formatDate'
 import Image from '@/components/Image'
+import MediaCard from '@/components/MediaCard'
+import TopTracks from '@/components/TopTracks'
 
 const MAX_DISPLAY = 3
 
@@ -30,11 +32,14 @@ export default function Home({ posts }) {
           </header>
         </section>
         <section>
-          <div className="pb-8">
-            <h1 className="text-3xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:leading-10 md:leading-14">
+          <div className="pt-6 pb-8">
+            <h1 className="text-2xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:leading-10 md:leading-14">
               Recent Blog Posts
             </h1>
             <p className="text-lg leading-7 text-gray-500 dark:text-gray-400">
+              <span role="img" aria-label="blogPosts">
+                ✍️
+              </span>{' '}
               Check out what I've been working on with these posts
             </p>
           </div>
@@ -100,6 +105,55 @@ export default function Home({ posts }) {
               </Link>
             </div>
           )}
+        </section>
+        <section>
+          <div className="pt-6 pb-8">
+            <h1 className="text-2xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:leading-10 md:leading-14">
+              Tools
+            </h1>
+            <p className="text-lg leading-7 text-gray-500 dark:text-gray-400">
+              <span role="img" aria-label="Tools">
+                ⚒️
+              </span>{' '}
+              The tools of the trade that I use most frequently
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-8 xl:grid-cols-4">
+            <Link href="/coffee">
+              <a>
+                <MediaCard src="/static/images/coffee.jpg" subtext="Rating ⭐⭐⭐⭐" />
+              </a>
+            </Link>
+            <Link href="https://bear.app">
+              <a>
+                <MediaCard src="/static/images/bear.png" subtext="Rating ⭐⭐⭐" />
+              </a>
+            </Link>
+            <Link href="https://notion.so">
+              <a>
+                <MediaCard src="/static/images/notion.png" subtext="Rating ⭐⭐⭐⭐⭐" />
+              </a>
+            </Link>
+            <Link href="https://www.jetbrains.com/idea/">
+              <a>
+                <MediaCard src="/static/images/intellij.png" subtext="Rating ⭐⭐⭐⭐⭐" />
+              </a>
+            </Link>
+          </div>
+        </section>
+        <section>
+          <div className="pt-6 pb-8">
+            <h1 className="text-2xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:leading-10 md:leading-14">
+              Media
+            </h1>
+            <p className="text-lg leading-7 text-gray-500 dark:text-gray-400">
+              <span role="img" aria-label="Headphones">
+                🎧
+              </span>{' '}
+              What's mostly going on inside my head
+            </p>
+          </div>
+          <TopTracks />
         </section>
       </div>
     </>
