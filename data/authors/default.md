@@ -1,16 +1,16 @@
 ---
-name: Tails Azimuth
-avatar: /static/images/avatar.png
-occupation: Professor of Atmospheric Science
-company: Stanford University
-email: address@yoursite.com
-twitter: https://twitter.com/Twitter
-linkedin: https://www.linkedin.com
-github: https://github.com
+name: Shariq Hirani
+avatar: /static/images/avatar.jpg
+occupation: Senior Manager
+company: Cognizant
+email: shariqhirani@utexas.ed
+twitter: https://twitter.com/ShariqHirani
+linkedin: https://www.linkedin.com/in/shariqhirani
+github: https://github.com/shariq
 ---
 
-Tails Azimuth is a professor of atmospheric sciences at the Stanford AI Lab. His research interests includes complexity modelling of tailwinds, headwinds and crosswinds.
+Other than a horrible plant trimmer, I am also the host of a podcast called [Changelog](https://open.spotify.com/show/29kRN9P3A5dljJmYr3zPsF?si=1bf1d98e982c4dc8), a [photographer](https://www.shariqhirani.com), and I attempt to write a [blog](/blog).
 
-He leads the clean energy group which develops 3D air pollution-climate models, writes differential equation solvers, and manufactures titanium plated air ballons. In his free time he bakes raspberry pi.
+Full time, I am cloud native architect with eleven years of experience in microservice architecture, development, and CI/CD. I usually build on Kubernetes, utilizing GKE and the power of GCP. I guess you could say that this is my specialty.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed neque elit, tristique placerat feugiat ac, facilisis vitae arcu. Proin eget egestas augue. Praesent ut sem nec arcu pellentesque aliquet. Duis dapibus diam vel metus tempus vulputate.
+Lately I have been focusing on Next.js and TailwindCSS to create websites. The goal is to always learn something new, and maybe I can use it to change the world. But as we have seen over these past few year, change does not come so easily. My other, less known goal, is to break my addiction to coffee. Seriously, I dedicated a [whole webpage](/coffee) to it ☕.
