@@ -4,7 +4,7 @@ const siteMetadata = {
   headerTitle: 'Shariq Hirani',
   description: 'My blog created with Next.js and Tailwind.css',
   language: 'en-us',
-  siteUrl: 'https://tailwind-nextjs-starter-blog.vercel.app',
+  siteUrl: 'https://shariq.dev',
   siteRepo: 'https://github.com/shariqh/blog-site',
   siteLogo: '',
   image: '/static/images/avatar.jpg',
