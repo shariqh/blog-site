@@ -9,7 +9,7 @@ linkedin: https://www.linkedin.com/in/shariqhirani
 github: https://github.com/shariq
 ---
 
-Shariq is a software architect and media buff. In his free time he gives bad haircuts to his plants - check them out on his [Instagram](https://instagram.com/shariqhiraniphoto). He's a huge fan of [Plex](https://plex.tv/) and containerizes everything. Take a look at his media server's [Docker build repo](https://github.com/shariqh/home-server-docker-compose).
+Shariq is a software architect, media buff, and overall dabbler in all things technology. In his free time he gives bad haircuts to his plants - check them out on his [Instagram](https://instagram.com/shariqhiraniphoto). He's a huge fan of [Plex](https://plex.tv/) and containerizes everything. Take a look at his media server's [Docker build repo](https://github.com/shariqh/home-server-docker-compose).
 
 Other than a horrible plant trimmer, he is also the host of his own podcast named [Changelog](https://open.spotify.com/show/29kRN9P3A5dljJmYr3zPsF?si=1bf1d98e982c4dc8), a [photographer](https://www.shariqhirani.com), and he attempts to write a [blog](/blog).
 
