@@ -1,12 +1,14 @@
 /* eslint-disable react/display-name */
 import { useMemo } from 'react'
 import { getMDXComponent } from 'mdx-bundler/client'
+import Callout from './Callout'
 import Image from './Image'
 import CustomLink from './Link'
 import TOCInline from './TOCInline'
 import Pre from './Pre'
 
 export const MDXComponents = {
+  Callout,
   Image,
   TOCInline,
   a: CustomLink,
