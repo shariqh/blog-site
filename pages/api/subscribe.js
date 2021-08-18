@@ -10,7 +10,6 @@ export default async function handler(req, res) {
     const response = await fetch(`https://api.buttondown.email/v1/subscribers`, {
       body: JSON.stringify({
         email,
-        tags: ['leerob.io'],
       }),
       headers: {
         Authorization: `Token ${API_KEY}`,

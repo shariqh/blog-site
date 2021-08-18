@@ -11,7 +11,6 @@ export default function Subscribe() {
   const [form, setForm] = useState(false)
   const inputEl = useRef(null)
   const { data } = useSWR('/api/subscribers', fetcher)
-  const subscriberCount = new Number(data?.count)
 
   const subscribe = async (e) => {
     e.preventDefault()
@@ -44,12 +43,13 @@ export default function Subscribe() {
   }
 
   return (
-    <div className="border border-blue-200 rounded p-6 my-4 w-full dark:border-gray-800 bg-blue-50 dark:bg-blue-opaque">
+    <div className="rounded-xl p-6 my-4 w-full bg-gray-50 dark:bg-gray-700">
       <p className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
-        Subscribe to the newsletter
+        Want more from me?
       </p>
       <p className="my-1 text-gray-800 dark:text-gray-200">
-        Get emails from me about web development, tech, and early access to new articles.
+        Subscribe to my newsletter and get emails about leadership, tech, and early access to new
+        articles.
       </p>
       <form className="relative my-4" onSubmit={subscribe}>
         <input
@@ -59,10 +59,10 @@ export default function Subscribe() {
           type="email"
           autoComplete="email"
           required
-          className="px-4 py-2 mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full border-gray-300 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+          className="px-4 py-2 mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full border-gray-300 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         />
         <button
-          className="flex items-center justify-center absolute right-1 top-1 px-4 font-bold h-8 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded w-28"
+          className="flex items-center justify-center absolute right-1 top-1 px-4 font-bold h-8 bg-gray-100 dark:bg-gray-700 focus:bg-primary-200 text-gray-900 dark:text-gray-100 rounded w-28"
           type="submit"
         >
           {form.state === 'loading' ? <LoadingSpinner /> : 'Subscribe'}
@@ -72,14 +72,7 @@ export default function Subscribe() {
         <ErrorMessage>{form.message}</ErrorMessage>
       ) : form.state === 'success' ? (
         <SuccessMessage>{form.message}</SuccessMessage>
-      ) : (
-        <p className="text-sm text-gray-800 dark:text-gray-200">
-          {`${subscriberCount > 0 ? subscriberCount.toLocaleString() : '-'} subscribers – `}
-          <Link href="/newsletter">
-            <a>31 issues</a>
-          </Link>
-        </p>
-      )}
+      ) : null}
     </div>
   )
 }
