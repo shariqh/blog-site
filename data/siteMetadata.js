@@ -2,7 +2,7 @@ const siteMetadata = {
   title: "Shariq Hirani's Blog Site",
   author: 'Shariq Hirani',
   headerTitle: 'Shariq Hirani',
-  description: 'My blog created with Next.js and Tailwind.css',
+  description: "Shariq Hirani's Blog on Leadership and Technology",
   language: 'en-us',
   siteUrl: 'https://shariq.dev',
   siteRepo: 'https://github.com/shariqh/blog-site',
