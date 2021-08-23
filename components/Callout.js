@@ -1,11 +1,11 @@
 import Link from '@/components/Link'
 
-export default function Callout({ text, linkText, link }) {
+export default function Callout({ text, linkText, link, postLinkText }) {
   return (
-    <div className="flex p-2 border dark:border-gray-500 bg-gray-50 dark:bg-gray-600 rounded-xl">
+    <div className="flex p-2 border bg-gray-50 rounded-xl">
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="h-6 w-6 text-primary-500"
+        className="flex-shrink-0 pr-1 h-6 w-6 text-primary-500"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -18,8 +18,9 @@ export default function Callout({ text, linkText, link }) {
         />
       </svg>
       <span>
-        &nbsp;{text}&nbsp;
+        {text}&nbsp;
         <Link href={link}>{linkText}</Link>
+        {postLinkText}
       </span>
     </div>
   )
