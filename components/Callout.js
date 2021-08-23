@@ -5,7 +5,7 @@ export default function Callout({ text, linkText, link, postLinkText }) {
     <div className="flex p-2 border bg-gray-50 rounded-xl">
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="flex-shrink-0 pr-1 h-6 w-6 text-primary-500"
+        className="flex-shrink-0 mt-[2px] pr-1 h-6 w-6 text-primary-500"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
