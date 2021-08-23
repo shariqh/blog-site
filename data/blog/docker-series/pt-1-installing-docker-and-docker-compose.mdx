@@ -1,0 +1,308 @@
+---
+title: Installing Docker and Docker Compose
+date: '2021-08-19'
+tags: ['docker']
+draft: false
+summary: 'We take a look at how to install Docker and Docker Compose on Ubuntu, macOS, and Windows with WSL2.'
+---
+
+<head>
+  <title>How To Install Docker and Docker Compose</title>
+  <link
+    rel="canonical"
+    href="https://www.bundleapps.io/blog/docker-series/pt-1-installing-docker-and-docker-compose"
+  />
+</head>
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/banner.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={'/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/banner.png'}
+  width={1200}
+  height={600}
+/>
+
+## Pick Your Operating System
+
+You came here to ask, "how do I install Docker?" The answer can be straightforward if you're willing to accept my way, but the steps differ based on which operating system is utilized. To make things more complicated, there are a few ways to install Docker on your OS that are largely based on preference. Today I'm going to walk you through *my preferred method*. This isn't the only way, but I've found it to be the best way to get up and running with ease. For Ubuntu, we'll be setting up the Docker Engine. For Windows and macOS, we'll be using Docker Desktop.
+
+Click on any of the links below to get started with installing Docker.
+
+<TOCInline
+  toc={props.toc}
+  exclude={['Pick Your Operating System', 'More Questions or Need Help']}
+  toHeading={2}
+/>
+
+## Installing Docker on Ubuntu
+
+For Ubuntu, we're going to install Docker Engine and Docker Compose using the Docker and Compose repositories. This also happens to be the recommended approach by Docker.
+
+### Set Up
+
+1. Delete any prior versions if you had installed them.
+
+```bash
+sudo apt-get remove docker docker-engine docker.io containerd runc
+```
+
+2. Update your system and install the necessary dependencies.
+
+```bash
+sudo apt-get update
+sudo apt-get install apt-transport-https ca-certificates curl gnupg lsb-release
+```
+
+3. For security purposes, add Docker's official GPG key. Read more about that [here](https://unix.stackexchange.com/questions/96951/why-do-i-need-to-add-a-gpg-key-with-apt-key-before-adding-url-to-sources-list-an).
+
+```bash
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+```
+
+4. Set up the stable repository.
+
+```bash
+echo \
+  "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+That's quite a few steps, but if you followed along exactly, you should be ready to install Docker!
+
+### Installation
+
+1. Install the _latest_ version of Docker, along with its dependencies.
+
+```bash
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io
+```
+
+2. Verify your install by running your first image.
+
+```bash
+sudo docker run hello-world
+```
+
+3. Add your user as an admin to the Docker user group.
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+Doing this last step means you no longer have to append `sudo` to run Docker commands!
+
+### Uninstall
+
+Fed up with Docker on your Ubuntu box? Uninstall and remove the configuration files with the following commands.
+
+```bash
+sudo apt-get purge docker-ce docker-ce-cli containerd.io
+sudo rm -rf /var/lib/docker
+sudo rm -rf /var/lib/containerd
+```
+
+## Installing Docker Compose on Ubuntu
+
+### Install
+
+You must have completed the installation of Docker Engine in the steps above before you can install Docker Compose. Assuming you've done so without any errors, let's continue on!
+
+1. Download the stable release of Docker compose.
+
+```bash
+sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+```
+
+Unlike the installation for Docker Engine where it automatically installs the latest version, Docker Compose has to have the version manually specified. At the time of writing, the latest version is `1.29.2`. The latest version can be viewed at the [Compose repository release page on GitHub](https://github.com/docker/compose/releases). Feel free to substitute the version in the command above as needed.
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/docker-compose-github.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/docker-compose-github.png'
+  }
+  width={1227}
+  height={495}
+/>
+
+2. Make the downloaded binary executable.
+
+```bash
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+### Uninstall
+
+To remove Docker Compose, utilize the following command (assuming you installed with `curl` as we did above).
+
+```bash
+sudo rm /usr/local/bin/docker-compose
+```
+
+## Installing Docker Desktop on macOS
+
+Note that Docker Desktop comes pre-equipped with Docker Engine, Docker Compose, Kubernetes, and a [few other goodies](https://docs.docker.com/desktop/mac/install/#whats-included-in-the-installer).
+
+### Installation
+
+### Intel or Apple Silicon
+
+Depending on which chipset you have on your Mac, you'll need to install one of two versions of the Docker Desktop application. As this is a GUI application, there's not much needed other than navigating to the correct site and installing the .dmg file. Just drag and drop the Docker icon into your `Applications` directory.
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/macos-install.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/macos-install.png'
+  }
+  width={1200}
+  height={569}
+/>
+
+### Docker for macOS with Intel
+
+The official link for installing Docker Desktop for macOS with an Intel chipset can be found [here](https://desktop.docker.com/mac/stable/amd64/Docker.dmg?utm_source=docker&utm_medium=webreferral&utm_campaign=docs-driven-download-mac-amd64).
+
+### Apple Silicon
+
+We'll also need to take a few prior steps to get Docker Desktop running with Apple Silicon. Namely, you'll need to install Rosetta 2 with the following command.
+
+```bash
+softwareupdate --install-rosetta
+```
+
+Afterward, install Docker Desktop for macOS with an Apple Silicon chipset from [here](https://desktop.docker.com/mac/stable/arm64/Docker.dmg?utm_source=docker&utm_medium=webreferral&utm_campaign=docs-driven-download-mac-arm64).
+
+### Uninstall
+
+Within the Docker Desktop toolbar item, navigate to the menu > `Troubleshoot` > `Uninstall`. See the screenshot below.
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/macos-uninstall.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/macos-uninstall.png'
+  }
+  width={1200}
+  height={601}
+/>
+
+## Installing Docker Desktop on Windows and WSL2
+
+Note that Docker Desktop comes pre-equipped with Docker Engine, Docker Compose, Kubernetes, and a [few other goodies](https://docs.docker.com/desktop/windows/install/#whats-included-in-the-installer). Firstly, you will need Docker Desktop even if you want Docker to only run on WSL. This is due to the sandboxed nature of WSL.
+
+### Installation
+
+### Windows
+
+1. First, you'll need to ensure that virtualization is enabled for your CPU in the BIOS. This differs amongst motherboard manufacturers and chipsets (namely Intel and AMD). A quick Google search will get you going though.
+2. The executable for Docker Desktop for Windows can be found [here](https://desktop.docker.com/win/stable/amd64/Docker%20Desktop%20Installer.exe). It can also be found on [Docker Hub](https://hub.docker.com/editions/community/docker-ce-desktop-windows/). Click the installer, follow the prompts and wait for it to be downloaded.
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/windows-install.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/windows-install.png'
+  }
+  width={699}
+  height={483}
+/>
+
+3. During the process, be sure to allow the prompts for `Enable Hyper-V Windows Features` and the `Install required Windows components for WSL 2`.
+
+### WSL2
+
+You'll need to complete the steps for installing Docker Desktop on Windows **before** you can utilize WSL2. However, once you've completed it, feel free to come back to this section.
+
+1. Enable `Use the WSL2 based engine` in the Docker Desktop for Windows settings and `Apply & Restart`.
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/wsl2-general.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/wsl2-general.png'
+  }
+  width={1239}
+  height={713}
+/>
+
+2. Be sure that WSL2 is set as your default and current distribution.
+
+Check the current WSL mode.
+
+```powershell
+wsl.exe -l -v
+```
+
+If not set to v2, upgrade your existing Linux.
+
+```powershell
+wsl.exe --set-version (distro name) 2
+```
+
+Set v2 as the default version.
+
+```powershell
+wsl.exe --set-default-version 2
+```
+
+3. Navigate to `WSL Integration` and make sure `Enable Integration with my default WSL distro` is checked.
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/wsl2-resources.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/wsl2-resources.png'
+  }
+  width={1225}
+  height={708}
+/>
+
+### Uninstall
+
+Docker Desktop can be uninstalled from the Apps & features system settings. Just search for `Docker Desktop` and select `Uninstall`. Follow the prompts.
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/windows-uninstall.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={
+    '/static/images/blog/docker-series/pt-1-installing-docker-and-docker-compose/windows-uninstall.png'
+  }
+  width={1140}
+  height={740}
+/>
+
+## More Questions or Need Help
+
+Be sure to check out the official documentation for [Docker Engine](https://docs.docker.com/engine/) and [Docker Desktop](https://docs.docker.com/desktop/) and if you have more questions, feel free to send a message with any of the media icons below!
+
+<Callout
+  text="This article was originally published on"
+  linkText="bundleapps.io"
+  link="https://www.bundleapps.io/blog/docker-series/pt-1-installing-docker-and-docker-compose"
+/>
