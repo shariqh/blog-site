@@ -21,7 +21,7 @@ export default function Home({ posts }) {
               <Image
                 className="rounded-full object-contain"
                 placeholder="blur"
-                blurDataURL="static/images/placeholder.png"
+                blurDataURL={siteMetadata.image}
                 src={siteMetadata.image}
                 alt=""
                 layout="fill"
