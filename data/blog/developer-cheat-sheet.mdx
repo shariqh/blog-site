@@ -1,0 +1,37 @@
+---
+title: Developer Cheat Sheet
+date: '2021-08-26'
+tags: ['engineering']
+draft: false
+summary: 'My personal developer cheat sheet with shortcuts for common tasks.'
+---
+
+<Callout text="This post will be a living document and updated as I find more commands" />
+
+## Delete all local branches that don't have a remote, excluding stable
+
+```
+git branch --merged master --no-color | grep -v "master\|stable\|main" | xargs git branch -d
+```
+
+## Find and kill a process running on a specific application
+
+```
+sudo kill -9 `sudo lsof -t -i:<PORT>`
+```
+
+`lsof` list of files (also used to list related processes)
+
+`-t` show only process IDs
+
+`-i` show only internet connection related process
+
+`:<PORT>` show only processes on this port number (e.g. 3000)
+
+`kill` command to kill the process
+
+`-9` forcefully
+
+`sudo` execute command with admin privileges
+
+<Callout text="Use the social icons in the footer if there's a command you believe should be added to the list!" />
