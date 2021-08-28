@@ -1,0 +1,172 @@
+---
+title: Launching A SonarQube Docker Container
+date: '2021-08-28'
+tags: ['docker', 'architecture']
+draft: false
+summary: 'Lets cover the basics of getting SonarQube running as a Docker container, along with some of its advantage.'
+---
+
+<Image
+  placeholder="blur"
+  blurDataURL={'/static/images/blog/sonarqube-docker-guide/banner.png'}
+  alt={'code of ethical behavior'}
+  src={'/static/images/blog/sonarqube-docker-guide/banner.png'}
+  width={1200}
+  height={600}
+/>
+
+<TOCInline toc={props.toc} toHeading={2} />
+
+## What Is SonarQube
+
+SonarQube, before 2013 known as Sonar, is a tool for inspecting code quality with static analysis, bug detection, code smells, and security vulnerabilities. It's best to run these scans at build time with your CI/CD tools such as Jenkins or GitLab CI/CD. There are plenty of tools with which SonarQube can integrate seamlessly.
+
+### Why Should I Use SonarQube
+
+SonarQube has a few advantages over its alternatives. Namely, it has a long history as it's been continuously developed since 2008 as an open-source tool. Additionally, if you are integrating SonarQube within your CI/CD pipelines, you can automatically stop build and deployments if any of the analyses run don't meet your pre-defined thresholds. It supports over 25 programming languages, including Java, Swift, JavaScript, and C#. The full list can be [found here](https://www.sonarqube.org/features/multi-languages/).
+
+TL;DR It's basically free automated code review for every single push, merge, and deployment!
+
+## Why Docker
+
+For most use cases, a Docker container running SonarQube will be ample for testing if you want to bring a SAST tool into your main production pipelines. Docker makes it easy to build and destroy images with minimal impact on your systems.
+
+## Installation
+
+<Callout
+  linkText="Installing Docker and Docker Compose"
+  link="/blog/docker-series/pt-1-installing-docker-and-docker-compose"
+/>
+
+Be sure to have Docker installed and running on your system. See the guide tagged above for help!
+
+I'll cover the installation steps for a bare minimum test instance and also a more reliable solution that can be torn down and rebuilt with no data loss (well you still can lose data if you wipe the database and volumes).
+
+### Test Instance
+
+To pull the [official SonarQube Docker image](https://hub.docker.com/_/sonarqube/), run the following command.
+
+```bash
+docker run -d \
+	--name sonarqube \
+	-e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true \
+	-p 9000:9000 \
+	sonarqube:latest
+```
+
+### Somewhat Reliable Test Instance
+
+1. You need a running instance of one of the [supported databases](https://docs.sonarqube.org/latest/requirements/requirements/). I opted for PostgreSQL.
+2. Then you'll need to create three new Docker volumes.
+
+```bash
+docker volume create --name sonarqube_data
+docker volume create --name sonarqube_logs
+docker volume create --name sonarqube_extensions
+```
+
+Now pull the image and bind to the database and volumes.
+
+<Callout
+  text="If using Oracle will have to install the extension first. Find it"
+  linkText="here"
+  link="https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html"
+  postLinkText=". Download it and and move it to the `sonarqube_extensions/jdbc-driver/oracle` location."
+/>
+
+```bash
+docker run -d \
+	--name sonarqube \
+	-e SONAR_JDBC_URL={INSERT JDBC URL} \
+    -e SONAR_JDBC_USERNAME={INSERT JDBC USERNAME} \
+    -e SONAR_JDBC_PASSWORD={INSERT JDBC PASSWORD} \
+	-v sonarqube_data:/opt/sonarqube/data \
+	-v sonarqube_extensions:/opt/sonarqube/extensions \
+	-v sonarqube_logs:/opt/sonarqube/logs \
+	-p 9000:9000 \
+	sonarqube:latest
+```
+
+<Callout text="Don't include the curly braces." />
+
+### Breakdown
+
+I'll dissect each of the Docker commands and flags above if you're new to this.
+
+<Callout text="Docker cheat sheet coming soon that will have these and more." />
+
+`docker` simply invokes the Docker daemon that you have installed.
+
+`run` has three use cases:
+
+1. Pull the image from Docker Hub. You can specify other locations from Docker Hub, but that's not for this tutorial.
+2. Create a container based on the image. Think of the image as a class and the container as an instance of that class i.e. an object.
+3. Start the container based on the parameters provided as flags to Docker.
+
+`-d` is shorthand for detached. This will keep your terminal on its current instance instead of porting you into a new container's terminal instance.
+
+`--name sonarqube` is, well, the name you want to assign the container. If you don't include it, Docker will assign it a random name like jubilant_powerwasher. In this case, it will be sonarqube. Much better.
+
+`-e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true` is adding and setting the environment variable `SONAR_ES_BOOTSTRAP_CHECKS_DISABLE`. This will disable some checks that a production level SonarQube determines are necessary with its ElasticSearch integration and could otherwise break your build. Generally, these are memory checks to make sure there's enough available for smooth operation.
+
+<Callout
+  text="When using an external database, this setting will be ignored. Bootstrap checks will run every time and probably fail your build. Check the"
+  linkText="troubleshooting steps"
+  link="#troubleshooting"
+  postLinkText=" for how to configure your system for an external database."
+/>
+
+`-p 9000:9000` binds the [localhost](http://localhost)'s port 9000 to the Docker container's port of 9000. The localhost port (the first number) can be changed to any open port you have, but the container port (the second number, after the colon) is pre-determined by whoever created the image. Do not change the second port number.
+
+`sonarqube:latest` is the final parameter passed. It tells Docker which image to pull and what version (identified as tags after the colon). In this case, it's pulling the latest version, which at the time of writing this article is `9.0.1-community`. You could replace the `latest` tag with this explicit version or `lts` which is `8.9.2-community`.
+
+## Final Steps
+
+You can now navigate to `http://localhost:9000` in your web browser and be presented with the login screen. The default log-in credentials for SonarQube are username: admin and password: admin.
+
+### A Note About Databases
+
+SonarQube runs with an embedded H2 instance for its database on initial creation after these specific steps. This is okay for the actual testing of SonarQube but bad in a real-world scenario. Be sure to bind it to a persistent relational database. Support exists for Oracle, Microsoft SQL Server, and PostgreSQL.
+
+## Troubleshooting
+
+To see the logs for your container, run the following. This section of the document will be updated as I find more errors (or readers tell me about them!)
+
+```bash
+docker logs sonarqube
+```
+
+### Bootstrap checks failed
+
+If you're getting this or a similar error message, follow the below steps.
+
+```bash
+ERROR: [1] bootstrap checks failed. You must address the points described in the following [1] lines before starting Elasticsearch.
+bootstrap check failure [1] of [1]: max virtual memory areas vm.max_map_count [65530] is too low, increase to at least [262144]
+```
+
+You will need to increase the memory areas available. However, be sure to understand the [risks associated with doing so](https://www.suse.com/support/kb/doc/?id=000016692).
+
+```bash
+sudo vim /etc/sysctl.conf
+```
+
+Add the following line.
+
+```bash
+vm.max_map_count=262144
+```
+
+Source the new settings.
+
+```bash
+sysctl --system
+```
+
+### Everything Docker is frozen
+
+Restart the Docker daemon. Worst case, restart the machine. With volumes and databases set up, you shouldn't lose any data.
+
+```bash
+sudo service docker restart
+```
