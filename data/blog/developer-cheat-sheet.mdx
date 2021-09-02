@@ -14,7 +14,7 @@ summary: 'My personal developer cheat sheet with shortcuts for common tasks.'
 git branch --merged master --no-color | grep -v "master\|stable\|main" | xargs git branch -d
 ```
 
-## Find and kill a process running on a specific application
+## Find and kill a process running on a specific port
 
 ```
 sudo kill -9 `sudo lsof -t -i:<PORT>`

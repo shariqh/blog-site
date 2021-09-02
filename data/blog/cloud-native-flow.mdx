@@ -1,0 +1,103 @@
+---
+title: 'A Cloud Native CI/CD Flow'
+date: '2021-09-02'
+tags: ['architecture']
+draft: false
+summary: 'CI CD is considered a tenet of software engineering, but continuous deployment is often ignored. Combined with the power of cloud native architecture, we examine tooling to achieve CI CD CD.'
+---
+
+<Image
+  placeholder="blur"
+  blurDataURL={'/static/images/blog/cloud-native-flow/banner.png'}
+  alt={'tailwind typography plugin banner'}
+  src={'/static/images/blog/cloud-native-flow/banner.png'}
+  width={1200}
+  height={630}
+/>
+
+## CI/CD/CD
+
+Continuous integration, continuous development, and ANOTHER CD. As expected in DevOps fashion, the two CDs are often treated interchangeably. In reality, they need to be set apart as their own processes. If organizations want to be bleeding edge and match the productivity of large corporations like Amazon, Facebook, and Google - hopefully not their arguably unethical coding practices - they need to embrace all three facets. The final CD is seen as somewhat of a unicorn in the industry as of now. However, it is gaining levels of normalization at select firms.
+
+So what are all three tenets?
+
+**Continuous Integration, Continuous Development, Continuous Delivery**
+
+We will walk through each step and their implementations with specific open-source tools and their respective use-cases.
+
+## Continuous Integration
+
+**Tools**
+
+- Git
+- Gradle/Maven
+- Jenkins
+- Docker
+- SonarQube
+
+### What is Continuous Integration (CI)
+
+CI is the practice of integrating multiple branches and features of code into a single, golden, pre-production repository branch referred to as the develop branch. This branch needs to be free of too many mistakes. Developers should aim to mitigate any problems before they reach this branch through manual code review and some automated tooling that will be explored here.
+
+### How To Use The Tools
+
+Organizations need to utilize source code management (SCM) services such as git to push, merge, and store code. This removes the burden of developers having to locally merge and update multiple feature branches (manually managing code is archaic, but I am laying it out for posterity). Developers should always merge the develop branch down to their feature branches before pushing.
+
+Gradle or Maven can be utilized to create or override tasks that will help automate the testing and build flow. For example, we can build projects, generate test reports, and even using custom plugins to validate that feature branches have integrated the latest commits from the develop branch.
+
+SonarQube should, at a minimum, be utilized to validate test coverage and check for code smells. It provides a few other features that should be integrated by a team as they find them necessary.
+
+Docker is brilliant for supporting continuous integration with its ability to take pre-created images and run them on any hardware where the docker engine is installed. Think of it as a bunch of mini-VMs that can be spun up and down with little consequence. If a developer needs to test that service A is correctly calling service B, they can spin them up locally and test across localhost. Additionally, they can spin up local database instances with seed data or even run a development environment solely with Docker containers.
+
+Jenkins is the master puppeteer of this whole process. All the tools above would still require one to run each step manually if a tool like Jenkins was not utilized. It can run Gradle commands, stop pipelines from merging upon test failures or reports from Sonar, and even create and deploy Docker containers (which will be covered in the continuous deployment section).
+
+## Continuous Development
+
+**Tools**
+
+- Git
+- Gradle
+- IDE
+- Shortcut
+
+### What is Continuous Development (CD)
+
+To promote effective development in the CI/CD<sup>2</sup> model, an environment that allows ownership of tasks and awards self-sufficiency should be implemented. In short, continuous development is being in an environment that allows developers to take on tasks continuously, without being blocked by other developers, technical roadblocks, etc.
+
+### How to use the tools
+
+Any git tooling can be utilized to have repositories easily clone-able and branch-able for any developer on the team. Additionally, developers should commit and push code often to the feature branches and save and have easily accessible code review tools.
+
+Gradle can be used to run tests locally and when merge requests are created (with the help of Jenkins as stated in the CI section) and ensure projects are building correctly, even before a merge is needed.
+
+The necessity and use case of an IDE should be obvious here, but it works well if every developer on the team tries to keep the project settings agnostic of the IDE. This would allow other team members to not be tied into specific tooling. I always recommend IDEA IntelliJ as my IDE of choice as the community edition offers more than enough functionality.
+
+[Shortcut](http://shortcut.com/) (formerly [Clubhouse](http://clubhouse.io/)) will be the bread and butter of continuous development, and it has a very liberal free plan for small teams. If developers can self-manage tasks, adding Shortcut to an organization's agile strategy will find efficiency increases. Shortcut is used to break down stories and tasks and see a very powerful but simple kanban dashboard that can be easily managed by folks who are even new to the program. Tasks should be created to be as simple as possible, non-blocking of other tasks (easier said than done), and motivating to developers. Holistically, tasks should be built so that they can be easily picked up by a developer as they complete others. Code review can be a big blocker here as well- it’s much better if organizations can use paired programming to avoid it, but that topic would warrant its own blog post.
+
+## Continuous Deployment or Delivery
+
+**Tools**
+
+- Git
+- Gradle
+- Jenkins
+- Docker
+- Kubernetes
+
+### What is Continuous Deployment or Delivery (CD)
+
+The final CD is somewhat of a unicorn to achieve. Was I a betting man, I would wager that less than 10% of production apps have true continuous deployment. In a perfect world, this would necessitate eliminating change management meetings and review boards. Instead of application changes being approved at some scheduled rate, the organization would instead trust that the developers and their teams have done the due diligence to deploy code - not just to the development or QA environment but all the way to production. _shudders_.
+
+### How to use the tools
+
+Git, Gradle, Jenkins, and Docker's use cases have been identified in the above sections and still apply to this section.
+
+Kubernetes, on the other hand, is a game-changer as a component of continuous deployment. It hosts a plethora of in-built functionality that will make organizations question why they ever deployed apps manually. Kubernetes's abilities allow architects to deploy new applications and updated features, re-deploy failed applications, set automatic scaling, and auto-heal containers without manual intervention. This is great in a production environment but might be overkill in a development or QA environment wherever something simpler like Docker Compose can be utilized with much less cost.
+
+## Bringing It All Together
+
+There is an overarching theme across all three stages of continuous integration, development, and deployment. Developing, deploying, and maintaining applications at scale for enterprise architecture is more involved than an individual developer may be able to contribute. Fortunately, with the maturation of the CI/CD<sup>2</sup> cycle, the tools discussed in this post can be used to create a system built on automation that decreases developer overhead and can allow them to spend more time creating great applications and writing excellent code.
+
+### Automation
+
+For truly achieving a CI/CD<sup>2</sup> flow, automation must be implemented across the whole toolchain of integration, development, and deployment (i.e. delivery). The tools and use cases above are only examples of what organizations can do with the right tools - especially open-source ones. This article can be taken further with more recent toolings such as Rancher, Terraform, and Ansible. Bringing these environment-level tools into an organization's strategy can allow the creation and deployment of not just individual applications, but complete ecosystems of application architecture, agnostic of the cloud provider.
