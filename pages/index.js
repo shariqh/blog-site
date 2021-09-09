@@ -1,5 +1,5 @@
 import Link from '@/components/Link'
-import { PageSeo } from '@/components/SEO'
+import { PageSEO } from '@/components/SEO'
 import Tag from '@/components/Tag'
 import siteMetadata from '@/data/siteMetadata'
 import { getAllFilesFrontMatter } from '@/lib/mdx'
@@ -10,10 +10,16 @@ import TopTracks from '@/components/TopTracks'
 
 const MAX_DISPLAY = 3
 
+export async function getStaticProps() {
+  const posts = await getAllFilesFrontMatter('blog')
+
+  return { props: { posts } }
+}
+
 export default function Home({ posts }) {
   return (
     <>
-      <PageSeo title={siteMetadata.title} description={siteMetadata.description} />
+      <PageSEO title={siteMetadata.title} description={siteMetadata.description} />
       <div className="divide-y divide-gray-200 dark:divide-gray-700 space-y-8">
         <section>
           <header className="text-center">
@@ -158,10 +164,4 @@ export default function Home({ posts }) {
       </div>
     </>
   )
-}
-
-export async function getStaticProps() {
-  const posts = await getAllFilesFrontMatter('blog')
-
-  return { props: { posts } }
 }
