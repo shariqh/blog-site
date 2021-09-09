@@ -4,7 +4,7 @@ const siteMetadata = {
   headerTitle: 'Shariq Hirani',
   description: 'Musings on Leadership and Technology',
   language: 'en-us',
-  siteUrl: 'https://shariq.dev',
+  siteUrl: 'https://www.shariq.dev',
   siteRepo: 'https://github.com/shariqh/blog-site',
   siteLogo: '',
   image: '/static/images/avatar.jpg',

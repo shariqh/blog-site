@@ -11,6 +11,12 @@ summary: 'Lets cover the basics of getting SonarQube running as a Docker contain
   <link rel="canonical" href="https://www.bundleapps.io/blog/sonarqube-docker-guide" />
 </head>
 
+<Callout
+  text="This article was originally published on"
+  linkText="bundleapps.io"
+  link="https://www.bundleapps.io/blog/sonarqube-docker-guide"
+/>
+
 <Image
   placeholder="blur"
   blurDataURL={'/static/images/blog/sonarqube-docker-guide/banner.png'}
@@ -73,7 +79,7 @@ docker volume create --name sonarqube_extensions
 Now pull the image and bind to the database and volumes.
 
 <Callout
-  text="If using Oracle will have to install the extension first. Find it"
+  text="If using Oracle, you will have to install the JDBC driver extension first. Find it"
   linkText="here"
   link="https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html"
   postLinkText=". Download it and and move it to the `sonarqube_extensions/jdbc-driver/oracle` location."
@@ -175,9 +181,3 @@ Restart the Docker daemon. Worst case, restart the machine. With volumes and dat
 ```bash
 sudo service docker restart
 ```
-
-<Callout
-  text="This article was originally published on"
-  linkText="bundleapps.io"
-  link="https://www.bundleapps.io/blog/sonarqube-docker-guide"
-/>
