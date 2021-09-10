@@ -10,7 +10,7 @@ import Subscribe from '@/components/Subscribe'
 const postDateTemplate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
 
 export default function PostLayout({ frontMatter, authorDetails, next, prev, children }) {
-  const { slug, fileName, date, title, tags } = frontMatter
+  const { slug, fileName, date, lastmod, title, tags } = frontMatter
 
   return (
     <SectionContainer>
@@ -30,6 +30,17 @@ export default function PostLayout({ frontMatter, authorDetails, next, prev, chi
                     <time dateTime={date}>
                       {new Date(date).toLocaleDateString(siteMetadata.locale, postDateTemplate)}
                     </time>
+                    {lastmod && (
+                      <div className="italic">
+                        Updated on&nbsp;
+                        <time dateTime={lastmod}>
+                          {new Date(lastmod).toLocaleDateString(
+                            siteMetadata.locale,
+                            postDateTemplate
+                          )}
+                        </time>
+                      </div>
+                    )}
                   </dd>
                 </div>
               </dl>
