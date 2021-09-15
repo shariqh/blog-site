@@ -9,8 +9,6 @@ linkedin: https://www.linkedin.com/in/shariqhirani
 github: https://github.com/shariq
 ---
 
-# Shariq Hirani
-
 Shariq is a software architect, media buff, and overall dabbler in all things technology. In his free time, he gives bad
 haircuts to his plants - check them out on his [Instagram](https://instagram.com/shariqhiraniphoto). He's a huge fan
 of [Plex](https://plex.tv/) and containerizes everything. Take a look at his media
@@ -31,7 +29,7 @@ easily. His other less known goal is to break his addiction to coffee. Seriously
 
 ---
 
-# Shoutouts 📢
+# Shout-outs 📢
 
 [**Braydon Coyer**](https://braydoncoyer.dev/) for his guidance and motivation.
 
