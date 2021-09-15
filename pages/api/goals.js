@@ -46,9 +46,5 @@ export default async (_, res) => {
     updatedDate: goal.last_edited_time,
   }))
 
-  console.log(goals)
-
   return res.status(200).json({ goals })
-
-  // console.log(results[0].properties.Name.title[0].plain_text)
 }
