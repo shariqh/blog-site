@@ -24,5 +24,15 @@ specialty.
 
 Lately, he has been focusing on Next.js and TailwindCSS to create websites. His goal is to always learn something new,
 and maybe he can use it to change the world. But as we have seen over these past few years, change does not come so
-easily. His other less known goal is to break his addiction to coffee. Seriously, he dedicated
-a [whole webpage](/coffee) to it ☕.
+easily. His other less known goal is to break his addiction to coffee. Seriously, he's dedicating a
+[whole webpage](/coffee) to it ☕.
+
+---
+
+# Shout-outs 📢
+
+[**Braydon Coyer**](https://braydoncoyer.dev/) for his guidance and motivation.
+
+[**Lee Robinson**](https://leerob.io/) for great tutorials and the willingness to share.
+
+[**Timothy Lin**](https://www.timlrx.com/) for the awesome [template](https://github.com/timlrx/tailwind-nextjs-starter-blog) and being a contributor to amazing open source.
