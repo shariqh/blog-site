@@ -7,6 +7,7 @@ import formatDate from '@/lib/utils/formatDate'
 import Image from '@/components/Image'
 import MediaCard from '@/components/MediaCard'
 import TopTracks from '@/components/TopTracks'
+import Timeline from '@/components/Timeline'
 
 const MAX_DISPLAY = 3
 
@@ -154,12 +155,12 @@ export default function Home({ posts }) {
             </h1>
             <p className="text-lg leading-7 text-gray-500 dark:text-gray-400">
               <span role="img" aria-label="Headphones">
-                🎧
+                ✔️
               </span>{' '}
-              What's mostly going on inside my head
+              My accomplishments pulled from the Notion API
             </p>
           </div>
-          <TopTracks />
+          <Timeline />
         </section>
       </div>
     </>
