@@ -9,6 +9,8 @@ linkedin: https://www.linkedin.com/in/shariqhirani
 github: https://github.com/shariq
 ---
 
+# Shariq Hirani
+
 Shariq is a software architect, media buff, and overall dabbler in all things technology. In his free time, he gives bad
 haircuts to his plants - check them out on his [Instagram](https://instagram.com/shariqhiraniphoto). He's a huge fan
 of [Plex](https://plex.tv/) and containerizes everything. Take a look at his media
@@ -24,5 +26,15 @@ specialty.
 
 Lately, he has been focusing on Next.js and TailwindCSS to create websites. His goal is to always learn something new,
 and maybe he can use it to change the world. But as we have seen over these past few years, change does not come so
-easily. His other less known goal is to break his addiction to coffee. Seriously, he dedicated
-a [whole webpage](/coffee) to it ☕.
+easily. His other less known goal is to break his addiction to coffee. Seriously, he's dedicating a
+[whole webpage](/coffee) to it ☕.
+
+---
+
+# Shoutouts 📢
+
+[**Braydon Coyer**](https://braydoncoyer.dev/) for his guidance and motivation.
+
+[**Lee Robinson**](https://leerob.io/) for great tutorials and the willingness to share.
+
+[**Timothy Lin**](https://www.timlrx.com/) for the awesome [template](https://github.com/timlrx/tailwind-nextjs-starter-blog) and being a contributor to amazing open source.
