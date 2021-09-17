@@ -17,6 +17,8 @@ export default function Timeline() {
   const yearsArr = completedGoals.map(({ updatedDate }) => new Date(updatedDate).getFullYear())
   let years = [...new Set(yearsArr)].sort().reverse()
 
+  console.log('RESPONSE: ' + completedGoals)
+
   // organize tasks into timeline view for that year
   return (
     <>
