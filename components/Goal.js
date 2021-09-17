@@ -45,7 +45,7 @@ export default function Goal(goal) {
         )}
         {goal.status === 'Not started' && (
           <div className="flex items-center mb-2 text-red-600 dark:text-red-400">
-            <span className="sr-only">Stopwatch</span>
+            <span className="sr-only">Stop</span>
             <svg
               className="h-4 w-4 mr-2"
               viewBox="0 0 24 24"
