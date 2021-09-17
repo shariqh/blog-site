@@ -7,7 +7,7 @@ const notion = new Client({
   auth: client_token,
 })
 
-export default async (_, res) => {
+export default async function handler(_, res) {
   const response = await notion.databases.query({
     database_id: goals_db_id,
     filter: {
@@ -40,9 +40,10 @@ export default async (_, res) => {
   const { results } = await response
 
   const goals = results.map((goal) => ({
-    name: goal.properties.Name.title[0].plain_text,
-    status: goal.properties.Status.select.name,
-    link: goal.properties.Link.url,
+    name: goal.properties?.Name?.title[0]?.plain_text,
+    description: goal.properties?.Description?.rich_text[0]?.plain_text,
+    status: goal.properties?.Status?.select?.name,
+    link: goal.properties?.Link?.url,
     updatedDate: goal.last_edited_time,
   }))
 
