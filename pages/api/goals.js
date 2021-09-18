@@ -8,6 +8,7 @@ const notion = new Client({
 })
 
 export default async function handler(_, res) {
+  console.log('GOALS DB ID1: ' + goals_db_id)
   const response = await notion.databases.query({
     database_id: goals_db_id,
     filter: {
