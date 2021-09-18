@@ -3,11 +3,10 @@ import fetcher from '@/lib/fetcher'
 import Goal from '@/components/Goal'
 
 export default function Timeline() {
-  console.log('AT TIMELINE LOAD')
-
   const { data } = useSWR('/api/goals', fetcher)
 
   if (!data) {
+    console.log('NO DATA')
     return null
   }
 
