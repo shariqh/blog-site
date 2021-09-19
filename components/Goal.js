@@ -1,5 +1,7 @@
+import Link from '@/components/Link'
+
 export default function Goal(goal) {
-  const Step = ({ title, children }) => {
+  const Step = ({ title, link, children }) => {
     return (
       <li className="mb-4 ml-2">
         {goal.status === 'Completed' && (
@@ -17,7 +19,13 @@ export default function Goal(goal) {
                 <path d="M22 4L12 14.01l-3-3" />
               </g>
             </svg>
-            <p className="font-medium text-gray-900 dark:text-gray-100">{title}</p>
+            {goal.link ? (
+              <Link href={goal.link}>
+                <a className="font-medium text-gray-900 dark:text-gray-100">{title}</a>
+              </Link>
+            ) : (
+              <p className="font-medium text-gray-900 dark:text-gray-100">{title}</p>
+            )}
           </div>
         )}
         {goal.status === 'In progress' && (
@@ -40,7 +48,13 @@ export default function Goal(goal) {
                 fill="currentColor"
               />
             </svg>
-            <p className="font-medium text-gray-900 dark:text-gray-100">{title}</p>
+            {goal.link ? (
+              <Link href={goal.link}>
+                <a className="font-medium text-gray-900 dark:text-gray-100">{title}</a>
+              </Link>
+            ) : (
+              <p className="font-medium text-gray-900 dark:text-gray-100">{title}</p>
+            )}{' '}
           </div>
         )}
         {goal.status === 'Not started' && (
@@ -60,7 +74,13 @@ export default function Goal(goal) {
                 fill="currentColor"
               />
             </svg>
-            <p className="font-medium text-gray-900 dark:text-gray-100">{title}</p>
+            {goal.link ? (
+              <Link href={goal.link}>
+                <a className="font-medium text-gray-900 dark:text-gray-100">{title}</a>
+              </Link>
+            ) : (
+              <p className="font-medium text-gray-900 dark:text-gray-100">{title}</p>
+            )}{' '}
           </div>
         )}
         <p className="text-gray-700 dark:text-gray-400 ml-6">{children}</p>
@@ -70,7 +90,9 @@ export default function Goal(goal) {
 
   return (
     <ul>
-      <Step title={goal.name}>{goal.description}</Step>
+      <Step title={goal.name} link={goal.link}>
+        {goal.description}
+      </Step>
     </ul>
   )
 }
