@@ -6,7 +6,6 @@ export default function Timeline() {
   const { data } = useSWR('/api/goals', fetcher)
 
   if (!data) {
-    console.log('NO DATA')
     return null
   }
 
@@ -17,8 +16,6 @@ export default function Timeline() {
   // for completed tasks, get each year something was completed
   const yearsArr = completedGoals.map(({ updatedDate }) => new Date(updatedDate).getFullYear())
   let years = [...new Set(yearsArr)].sort().reverse()
-
-  console.log('RESPONSE: ' + completedGoals)
 
   // organize tasks into timeline view for that year
   return (
