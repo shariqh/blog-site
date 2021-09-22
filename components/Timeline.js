@@ -11,7 +11,6 @@ export default function Timeline() {
 
   const completedGoals = data.goals.filter((goal) => goal.status === 'Completed')
   const inProgressGoals = data.goals.filter((goal) => goal.status === 'In progress')
-  const notStartedGoals = data.goals.filter((goal) => goal.status === 'Not started')
 
   // for completed tasks, get each year something was completed
   const yearsArr = completedGoals.map(({ updatedDate }) => new Date(updatedDate).getFullYear())
@@ -36,12 +35,6 @@ export default function Timeline() {
         In Progress
       </h2>
       {inProgressGoals.map((goal) => {
-        return <Goal key={goal.name} {...goal} />
-      })}
-      <h2 className="text-lg font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:leading-10 md:leading-14">
-        Not Started
-      </h2>
-      {notStartedGoals.map((goal) => {
         return <Goal key={goal.name} {...goal} />
       })}
     </>

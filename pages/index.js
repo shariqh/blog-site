@@ -44,7 +44,7 @@ export default function Home({ posts }) {
               Recent Blog Posts
             </h1>
             <p className="text-lg leading-7 text-gray-500 dark:text-gray-400">
-              <span role="img" aria-label="blogPosts">
+              <span role="img" aria-label="blogPosts" className="mr-1">
                 ✍️
               </span>{' '}
               Check out what I've been working on with these posts
@@ -119,7 +119,7 @@ export default function Home({ posts }) {
               Tools
             </h1>
             <p className="text-lg leading-7 text-gray-500 dark:text-gray-400">
-              <span role="img" aria-label="Tools">
+              <span role="img" aria-label="Tools" className="mr-1">
                 ⚒️
               </span>{' '}
               The tools of the trade that I use most frequently
@@ -154,7 +154,7 @@ export default function Home({ posts }) {
               Timeline
             </h1>
             <p className="text-lg leading-7 text-gray-500 dark:text-gray-400">
-              <span role="img" aria-label="Headphones">
+              <span role="img" aria-label="Headphones" className="mr-1">
                 ✔️
               </span>{' '}
               My accomplishments pulled from the Notion API
