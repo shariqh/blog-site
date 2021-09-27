@@ -6,7 +6,6 @@ import { getAllFilesFrontMatter } from '@/lib/mdx'
 import formatDate from '@/lib/utils/formatDate'
 import Image from '@/components/Image'
 import MediaCard from '@/components/MediaCard'
-import TopTracks from '@/components/TopTracks'
 import Timeline from '@/components/Timeline'
 
 const MAX_DISPLAY = 3
