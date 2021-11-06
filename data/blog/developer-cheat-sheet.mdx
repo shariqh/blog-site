@@ -15,7 +15,7 @@ summary: 'My personal developer cheat sheet with shortcuts for common tasks.'
 
 ### Delete all local git branches that don't have a remote, except master, stable, and main
 
-```
+```bash
 git branch --merged master --no-color | grep -v "master\|stable\|main" | xargs git branch -d
 ```
 
@@ -23,7 +23,7 @@ git branch --merged master --no-color | grep -v "master\|stable\|main" | xargs g
 
 If you're not merging in often, this will get messy depending on the velocity of changes for the git fork or template
 
-```
+```bash
 git remote add <template/fork> <URL of the template/fork repo>
 git fetch --all
 git merge <template/fork>/<branch to merge> --allow-unrelated-histories
@@ -48,7 +48,7 @@ A git fork will keep all commit history when you create it. A git template will 
 
 ### Find and kill a process running on a specific port
 
-```
+```bash
 sudo kill -9 `sudo lsof -t -i:<port>`
 ```
 
@@ -76,7 +76,7 @@ VARIABLE_NAME=<value>
 
 ### Bootstrap app with TailwindCSS
 
-```
+```bash
 npx create-next-app -e with-tailwindcss
 ```
 
@@ -84,16 +84,16 @@ npx create-next-app -e with-tailwindcss
 
 ### Format docker ps output
 
-```
+```bash
 docker ps --format "{{.<field-1>}}: {{.<field-2>}}: {{.<field-n>}}"
 ```
 
 ### Enter started container through app CLI
 
-```
+```bash
 docker exec -it <containerName> <app>
 ```
 
-`<app>` can be anything installed on the box (e.g. `bash`, `mongo`)
+`app` can be anything installed on the box (e.g. `bash`, `mongo`)
 
 <Callout text="Use the social icons in the footer if there's a command you believe should be added to the list!" />
