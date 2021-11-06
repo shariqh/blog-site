@@ -1,7 +1,7 @@
 ---
 title: Developer Cheat Sheet
 date: '2021-08-26'
-lastmod: '2021-09-19'
+lastmod: '2021-11-06'
 tags: ['engineering']
 draft: false
 summary: 'My personal developer cheat sheet with shortcuts for common tasks.'
@@ -24,18 +24,18 @@ git branch --merged master --no-color | grep -v "master\|stable\|main" | xargs g
 If you're not merging in often, this will get messy depending on the velocity of changes for the git fork or template
 
 ```
-git remote add [template/fork] [URL of the template/fork repo]
+git remote add <template/fork> <URL of the template/fork repo>
 git fetch --all
-git merge [templatefork]/[branch to merge] --allow-unrelated-histories
+git merge <template/fork>/<branch to merge> --allow-unrelated-histories
 ```
 
-`git remote add [template/fork] [URL of the template repo]` adds an additional remote repository to your local
+`git remote add <template/fork> <URL of the template repo>` adds an additional remote repository to your local
 repository. Name the git remote whatever you like (I use template or fork). Append the template or fork URL (ending in
 .git)
 
 `git fetch --all` pulls down the latest changes to the remote
 
-`git merge [templatefork]/[branch to merge] --allow-unrelated-histories` merges in the template or fork code. **For
+`git merge <templatefork>/[=<branch to merge> --allow-unrelated-histories` merges in the template or fork code. **For
 templates** you'll need the `--allow-unrelated-histories` flag as you won't have the commit history of the template.
 
 Good luck dealing with merge conflicts if you're not doing this often.
@@ -49,7 +49,7 @@ A git fork will keep all commit history when you create it. A git template will 
 ### Find and kill a process running on a specific port
 
 ```
-sudo kill -9 `sudo lsof -t -i:<PORT>`
+sudo kill -9 `sudo lsof -t -i:<port>`
 ```
 
 `lsof` list of files (also used to list related processes)
@@ -58,7 +58,7 @@ sudo kill -9 `sudo lsof -t -i:<PORT>`
 
 `-i` show only internet connection related process
 
-`:<PORT>` show only processes on this port number (e.g. 3000)
+`:<port>` show only processes on this port number (e.g. 3000)
 
 `kill` command to kill the process
 
@@ -69,15 +69,31 @@ sudo kill -9 `sudo lsof -t -i:<PORT>`
 ### Set an environment variable
 
 ```bash
-VARIABLE_NAME=value
+VARIABLE_NAME=<value>
 ```
 
-<Callout text="Use the social icons in the footer if there's a command you believe should be added to the list!" />
-
-## Next.js
+## next.js
 
 ### Bootstrap app with TailwindCSS
 
 ```
 npx create-next-app -e with-tailwindcss
 ```
+
+## docker
+
+### Format docker ps output
+
+```
+docker ps --format "{{.<field-1>}}: {{.<field-2>}}: {{.<field-n>}}"
+```
+
+### Enter started container through app CLI
+
+```
+docker exec -it <containerName> <app>
+```
+
+`<app>` can be anything installed on the box (e.g. `bash`, `mongo`)
+
+<Callout text="Use the social icons in the footer if there's a command you believe should be added to the list!" />
