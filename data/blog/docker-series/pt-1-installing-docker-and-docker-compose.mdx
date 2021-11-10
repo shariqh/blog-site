@@ -1,7 +1,7 @@
 ---
 title: Installing Docker and Docker Compose
 date: '2021-08-23'
-lastmod: '2021-11-06'
+lastmod: '2021-11-10'
 tags: ['docker', 'architecture']
 draft: false
 summary: 'We take a look at how to install Docker and Docker Compose on Ubuntu, macOS, and Windows with WSL2.'
@@ -82,6 +82,31 @@ That's quite a few steps, but if you followed along exactly, you should be ready
 ```bash
 sudo apt-get update
 sudo apt-get install docker-ce docker-ce-cli containerd.io
+```
+
+If you are running a later version of Ubuntu than what Docker has official builds for, you may get the following
+error during this step.
+
+```
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+Package docker-ce is not available, but is referred to by another package.
+This may mean that the package is missing, has been obsoleted, or
+is only available from another source
+
+E: Package 'docker-ce' has no installation candidate
+E: Unable to locate package docker-ce-cli
+E: Unable to locate package containerd.io
+E: Couldn't find any package by glob 'containerd.io'
+E: Couldn't find any package by regex 'containerd.io'
+```
+
+But don't worry! We'll just need to go install the latest version that is available. This can be done with the
+following command INSTEAD of the one above.
+
+```bash
+sudo apt-get install -y docker.io
 ```
 
 2. Verify your install by running your first image.
