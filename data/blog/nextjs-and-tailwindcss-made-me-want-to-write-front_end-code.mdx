@@ -1,0 +1,72 @@
+---
+title: Next.js and TailwindCSS Made Me Want to Write Front-End Code
+date: '2021-11-11'
+tags: ['insights', 'engineering']
+draft: false
+summary: 'With a background in Back-End and Architecture, Front-End Development was always daunting until I got to
+experience Next.js and TailwindCSS.'
+images: ['/static/images/blog/nextjs-and-tailwindcss-made-me-want-to-write-front_end-code/banner.png']
+---
+
+<Image
+  placeholder="blur"
+  blurDataURL={
+    '/static/images/blog/nextjs-and-tailwindcss-made-me-want-to-write-front_end-code/banner.png'
+  }
+  alt={'installing docker and docker compose banner image'}
+  src={'/static/images/blog/nextjs-and-tailwindcss-made-me-want-to-write-front_end-code/banner.png'}
+  width={1200}
+  height={600}
+/>
+
+Components, micro-frontends, promises, middleware. These are just a few of the front-end development-specific
+technologies that gave me nightmares and had me ready to walk away from my IDE when I encountered them. Career-wise, I've been very limited in front-end development, and so I try not to be too hard on myself. My main focus has been on backend technologies and infrastructures such as Java, Spring Boot, Docker, and Kubernetes with some DevOps tooling like Jenkins, Sonar, and Nexus.
+
+## Time of Reckoning
+
+However, everything that glitters isn't gold. This is also the case with my time away from any substantial front-end development. I wanted to provide value no matter the situation I was in and decided I had to, at least, try and learn basic front-end development principles. I couldn't have junior developers running laps around me.
+
+## TailwindCSS
+
+1. Highly customizable
+2. Incline CSS
+3. Responsive out of the box
+4. Just-in-time engine
+5. HeadlessUI
+
+TailwindCSS redefined how a developer interfaces with CSS and brought a much more approachable, single-file approach. No longer did I have to worry about correct naming structures, pre-processors, BEM (which is also super helpful), or hex codes as I haphazardly applied CSS to my elements and hoped that the z-index was correct.
+
+On to screen sizes. Creating custom `@media` modifiers and having to guess screen sizes was always frustrating. Being responsive was always a challenge, and no amount of Flexbox Froggy could save me. If you solved screen sizes once, you could copy and paste your CSS across multiple applications, but it never sat well with me. On the other hand, TailwindCSS brings in opinionated screen sizes from extra small to some multiplier of extra-large and easy to apply flex and grid classes that almost always do what I expect.
+
+If I ever do feel the need to define my own sizes, everything in TailwindCSS is customizable from default color palettes, screen breaks, and spacing. It can be further customized and tailored with the JIT engine and plug-ins that can be created or leveraged by developers who have posted their solutions online.
+
+## Next.js
+
+1. Consistent, opinionated structure and workflow
+2. Static, incremental, and server-side rendering
+3. Pre-defined routing
+4. Image and Link components (if you're using the Vercel ecosystem, which you should)
+
+Styling is only one part of the front-end development story. The actual creation of elements, components, and functionality take a majority of the proverbial cake. Whether it was passing around data, managing routing, or making API requests, it was all so foreign to me. I attempted to understand React Router, Express, and even Promises but because of the complexity and constant shape-shifting nature of React, I was never able to capture how it all came together.
+
+Next.js is not inherently different from React, namely because it is a framework built on React itself. What it is, however, is an opinionated approach that can be followed with relative ease. Thanks to predefined routing and useful lifecycle events to fetch static and server-side data and a very clear, forced organization structure, I was able to spend less time thinking about the right way to do something and more time learning and creating front-end applications.
+
+Overall, Next.js made React more approachable and deployable for someone with very limited experience such as myself.
+
+## Getting Started
+
+If you're excited to get started on a Next.js project with TailwindCSS, I have GREAT news for you. It starts with
+one simple NPX command and the Next.js tutorial. This command can also be found in my [developer cheat sheet](/blog/developer-cheat-sheet#nextjs).
+
+```bash
+npx create-next-app -e with-tailwindcss
+```
+
+The Next.js tutorial can be found on [Vercel's site](https://nextjs.org/docs/getting-started). The TailwindCSS guide
+can be found [here](https://tailwindcss.com/docs/guides/nextjs).
+
+## Conclusion
+
+Don't get me wrong, I'm still horrible at front-end development. I'm still haphazard in my classes and structure. My organization and component naming would make any code reviewer uncomfortable. I really don't understand the difference between functional and class components (at least not enough to have a debate as to why one is better than the other). But, I can now provide value. I can, with a bit of copy and paste, create components, utilize state and routing, style and create responsive UIs, and even use some middleware to capture and validate requests.
+
+The goal is always simple, be able to provide value in any situation. TailwindCSS and Next.js have allowed me to do just that.
