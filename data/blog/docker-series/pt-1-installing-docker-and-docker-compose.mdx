@@ -1,7 +1,7 @@
 ---
 title: Installing Docker and Docker Compose
 date: '2021-08-23'
-lastmod: '2021-11-11'
+lastmod: '2021-12-01'
 tags: ['docker', 'architecture']
 draft: false
 summary: 'We take a look at how to install Docker and Docker Compose on Ubuntu, macOS, and Windows with WSL2.'
@@ -63,7 +63,7 @@ sudo apt-get update
 sudo apt-get install apt-transport-https ca-certificates curl gnupg lsb-release
 ```
 
-3. For security purposes, add Docker's official GPG key. Read more about that [here](https://unix.stackexchange.com/questions/96951/why-do-i-need-to-add-a-gpg-key-with-apt-key-before-adding-url-to-sources-list-an).
+3. For security purposes, add Docker's official GPG key. Read more about that [here](https://unix.stackexchange.com/questions/96951/why-do-i-need-to-add-a-gpg-key-with-apt-key-before-adding-url-to-sources-list-an).
 
 ```bash
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
@@ -180,8 +180,7 @@ sudo rm /usr/local/bin/docker-compose
 
 ## Automated Installation Script for Linux (Ubuntu)
 
-An automated installation script can be found [here](https://gist.github.
-com/shariqh/f2df37d5f80bc3b944a9cc6f70aafebe). The contents are pasted below.
+An automated installation script can be found [here](https://gist.github.com/shariqh/f2df37d5f80bc3b944a9cc6f70aafebe). The contents are pasted below.
 
 ```bash
 #!/bin/sh

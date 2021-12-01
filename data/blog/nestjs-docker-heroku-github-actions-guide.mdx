@@ -1,6 +1,7 @@
 ---
 title: 'Deploy NestJS with Docker, Heroku, and GitHub Actions'
 date: '2021-10-01'
+lastmod: '2021-12-01'
 tags: ['docker', 'architecture']
 draft: false
 summary: 'The Definitive Guide: A CI/CD Tutorial On Deploying a NestJS microservice with Docker, Heroku, and GitHub Actions.'
@@ -32,7 +33,7 @@ NestJS has made its way onto the API development scene with robust support for R
 
 ## Creating a NestJS Example Project
 
-Firstly, we'll need to spin up a local NestJS example project using the CLI. Documentation can be found on the [official site](<[https://docs.nestjs.com/](https://docs.nestjs.com/)>), but the steps will be covered below. As a prerequisite, you'll need Node and npm available to you.
+Firstly, we'll need to spin up a local NestJS example project using the CLI. Documentation can be found on the [official site](https://docs.nestjs.com/), but the steps will be covered below. As a prerequisite, you'll need Node and npm available to you.
 
 Firstly, install the Nest CLI with npm and create a project. The CLI can be invoked with the `nest` command.
 
@@ -348,7 +349,7 @@ jobs:
 
 `- uses: actions/checkout@v2` calls a pre-built action from the GitHub Actions Marketplace to check out your branch. You could write this out manually.
 
-`- uses: akhileshns/heroku-deploy@v3.12.12` is another pre-built action that will run your Dockerfile steps. This can also be manually created if you need any customization. Feel free to check out [this post](<[https://remarkablemark.org/blog/2021/03/12/github-actions-deploy-to-heroku/](https://remarkablemark.org/blog/2021/03/12/github-actions-deploy-to-heroku/)>) for instructions.
+`- uses: akhileshns/heroku-deploy@v3.12.12` is another pre-built action that will run your Dockerfile steps. This can also be manually created if you need any customization. Feel free to check out [this post](https://remarkablemark.org/blog/2021/03/12/github-actions-deploy-to-heroku/) for instructions.
 
 `with:` indicates any variables the action needs to complete the specified script. In our case, we need to provide `heroku_api_key`, `heroku_app_name`, `heroku_email`, and set the boolean `usedocker`.
 
