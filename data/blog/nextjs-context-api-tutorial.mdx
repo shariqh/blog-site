@@ -1,0 +1,180 @@
+---
+title: Next.js Context API Tutorial
+date: '2021-10-02'
+tags: ['javascript', 'nextjs']
+draft: false
+summary: 'Using the latest features of the React Context API, we dive into leveraging these patterns for Next.js Context.'
+authors: ['shariqhirani']
+banner: '/static/images/blog/nextjs-context-api-tutorial/banner.png'
+---
+
+<Image
+  placeholder="blur"
+  blurDataURL={'/static/images/blog/nextjs-context-api-tutorial/banner.png'}
+  alt={'nextjs context api tutorial'}
+  src={'/static/images/blog/nextjs-context-api-tutorial/banner.png'}
+  width={1200}
+  height={630}
+/>
+
+## Next.js Context and React Context
+
+As Next.js is a framework built on top of React, we're able to leverage the latest features released by the team over at Facebook. One of the latest must-use features is the React Context API. In short, Next.js and React Context patterns are the same.
+
+### What is React Context
+
+React Context, introduced in [React 16.3](https://reactjs.org/blog/2018/03/29/react-v-16-3.html), is a way to share props globally across the React components tree. Some use cases could be managing and passing around user state or a selected theme with the whole of the app without having to manually pass props down to each button through the component tree.
+
+### Why Do We Need React Context
+
+Managing React props across multiple components, determining hierarchy, and forcing a convenient tree structure causes a lot of annoyance and complicated code throughout application development. With the introduction of React Hooks in [React 16.8](https://reactjs.org/docs/hooks-intro.html), functional programming through React became more manageable, but still lacked an integrated way to effectively manage state. This led to third-party libraries like Redux being invoked in every project. Though this was a good solution, it wasn't streamlined, led to a lot of context switching, and made it difficult for developers new to React to be able to adopt best practices across a project.
+
+## Creating React Context In a Next.js Application
+
+<Callout
+  text="Follow along with the completed"
+  linkText="code sample"
+  link="https://github.com/bundlellc/nextjs-context-example"
+  postLinkText="."
+/>
+
+Firstly, invoke a new Next.js app.
+
+```bash
+npx create-next-app
+```
+
+Create a directory called `lib` in the root of the project and a Context file called `ThemeContext.js`
+
+```jsx
+mkdir lib
+touch lib/ThemeContext.js
+```
+
+Populate the `ThemeContext.js` with the following
+
+```jsx
+import React, { useContext, useState } from 'react'
+
+export const themes = {
+  light: {
+    foreground: '#000000',
+    background: '#eeeeee',
+  },
+  dark: {
+    foreground: '#ffffff',
+    background: '#222222',
+  },
+}
+
+export const ThemeContext = React.createContext({
+  theme: undefined,
+  setTheme: async (theme) => null,
+})
+
+export const useTheme = () => useContext(ThemeContext)
+
+export const ThemeProvider = ({ children }) => {
+  const [theme, setTheme] = useState(themes.light)
+
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>
+}
+```
+
+### Breakdown of React Context File
+
+`import React, { useContext, useState } from "react";` imports the React project and also `useContext` and `userState` modules. Context is just globally set state, so it makes sense that we'll want to invoke it.
+
+`export const themes = {...}` creates some values for us to use based on the theme.
+
+`export const ThemeContext = React.createContext({...})` creates the actual Context along with holding its value. In this case, we're setting the theme's default state to `themes.dark`.
+
+`export const useTheme = () => useContext(ThemeContext)` creates a hook to let subscribing components update the theme.
+
+`export const ThemeProvider = ({ children }) => {...}` creates the Provider component that can be subscribed to fetch the theme. This is what exposes our Context to the rest of the project.
+
+`const [theme, setTheme] = useState(themes.light);` set the initial state for us on load of the component itself.
+
+### The Provider Component
+
+The Provider component allows consuming components to subscribe to context changes. Each React Context component is shipped with this. Whenever the `value` prop changes, every subscriber to it will be re-rendered.
+
+<Callout
+  text="The value is compared with the same algorithm as"
+  linkText="Object.is"
+  link="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is#description"
+  postLinkText="."
+/>
+
+## Making React Context Available To The Application
+
+Navigate to `pages/_app.js` and surround `Component` with the `ThemeProvider` Context Provider.
+
+```jsx
+import '../styles/globals.css'
+
+import { ThemeProvider } from '../lib/ThemeContext'
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <ThemeProvider>
+      <Component {...pageProps} />
+    </ThemeProvider>
+  )
+}
+
+export default MyApp
+```
+
+This is where the magic of Context is demystified - it's simply another component encapsulating the whole project.
+
+## Consuming Context In A Component
+
+Navigate to`pages/index.js` and import the Context and then destructure the `theme` and `setTheme` state properties.
+
+```jsx
+//...
+import { useTheme } from '../lib/ThemeContext'
+
+export default function Home() {
+  const { theme, setTheme } = useTheme()
+
+  const toggleTheme = () => {
+    setTheme(theme === themes.dark ? themes.light : themes.dark)
+  }
+
+  return (
+    //...
+    <main className={styles.main}>
+      <button
+        style={{
+          backgroundColor: theme?.background,
+          height: 36,
+          width: 256,
+        }}
+        onClick={toggleTheme}
+      >
+        ThemeContext Toggle
+      </button>
+      {/*...*/}
+    </main>
+  )
+}https://reactjs.org/docs/hooks-intro.html
+```
+
+Run the application.
+
+```jsx
+npm run dev
+```
+
+The Next.js landing page is updated with a button at the top that will toggle and adopt the theme upon click.
+
+<Image
+  placeholder="blur"
+  blurDataURL={'/static/images/blog/nextjs-context-api-tutorial/context-toggle-btn.gif'}
+  alt={'code of ethical behavior'}
+  src={'/static/images/blog/nextjs-context-api-tutorial/context-toggle-btn.gif'}
+  width={1584}
+  height={496}
+/>
