@@ -5,6 +5,7 @@ describe('resolveBucket', () => {
   it("returns 'leadership' for leadership-family tags", () => {
     expect(resolveBucket(['leadership']).key).toBe('leadership')
     expect(resolveBucket(['management', 'teams']).key).toBe('leadership')
+    expect(resolveBucket(['insights']).key).toBe('leadership')
   })
 
   it("returns 'engineering' for engineering-family tags", () => {
@@ -28,8 +29,8 @@ describe('resolveBucket', () => {
   })
 
   it('first matching tag wins', () => {
-    // 'insights' is unknown, 'docker' is engineering -> engineering wins (not notes)
-    expect(resolveBucket(['insights', 'docker']).key).toBe('engineering')
+    // 'foobar' is unknown, 'docker' is engineering -> engineering wins (not notes)
+    expect(resolveBucket(['foobar', 'docker']).key).toBe('engineering')
   })
 
   it('exposes labels', () => {

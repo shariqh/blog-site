@@ -1,7 +1,7 @@
 export const BUCKETS = {
   leadership: {
     label: 'Leadership',
-    tags: ['leadership', 'management', 'teams', 'culture'],
+    tags: ['leadership', 'management', 'teams', 'culture', 'insights'],
   },
   engineering: {
     label: 'Engineering',
