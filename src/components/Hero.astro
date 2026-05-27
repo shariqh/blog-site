@@ -1,0 +1,21 @@
+---
+interface Props {
+  eyebrow?: string;
+  /** Marked as italic-serif. Use a string with explicit line break HTML if you need control. */
+  title: string;
+  subtitle?: string;
+}
+
+const { eyebrow, title, subtitle } = Astro.props;
+---
+<section class="py-16">
+  {eyebrow && (
+    <p class="mb-4 inline-block bg-[var(--fg)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--bg)]">
+      {eyebrow}
+    </p>
+  )}
+  <h1 class="font-display text-5xl italic leading-[0.95] tracking-tight" set:html={title} />
+  {subtitle && (
+    <p class="mt-6 max-w-prose font-sans text-base text-[var(--fg-soft)]">{subtitle}</p>
+  )}
+</section>
