@@ -5,6 +5,7 @@ import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 
 import remarkMath from "remark-math";
+import { remarkReadingTime } from "./src/lib/remark-reading-time.ts";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
@@ -15,7 +16,7 @@ export default defineConfig({
   site: SITE.url,
   integrations: [mdx(), sitemap(), react()],
   markdown: {
-    remarkPlugins: [remarkMath],
+    remarkPlugins: [remarkMath, remarkReadingTime],
     rehypePlugins: [
       rehypeSlug,
       [rehypeAutolinkHeadings, { behavior: "wrap" }],
