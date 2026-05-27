@@ -9,8 +9,10 @@ import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
+import { SITE } from "./src/lib/site.ts";
+
 export default defineConfig({
-  site: "https://www.shariq.dev",
+  site: SITE.url,
   integrations: [mdx(), sitemap(), react()],
   markdown: {
     remarkPlugins: [remarkMath],
