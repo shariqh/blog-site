@@ -1,0 +1,42 @@
+---
+// Theme is stored in localStorage as 'system' | 'light' | 'dark'.
+// 'system' (default) follows prefers-color-scheme.
+---
+<button
+  type="button"
+  id="theme-toggle"
+  class="font-mono text-xs uppercase tracking-widest underline-offset-4 hover:underline"
+  aria-label="Toggle theme"
+>
+  <span data-theme-label>system</span>
+</button>
+
+<script is:inline>
+  (function () {
+    const root = document.documentElement;
+    const stored = localStorage.getItem("theme") || "system";
+    const apply = (mode) => {
+      const dark =
+        mode === "dark" ||
+        (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      root.classList.toggle("dark", dark);
+      const label = document.querySelector("[data-theme-label]");
+      if (label) label.textContent = mode;
+    };
+    apply(stored);
+
+    document.addEventListener("click", (e) => {
+      const target = e.target;
+      if (target && target.id === "theme-toggle") {
+        const current = localStorage.getItem("theme") || "system";
+        const next = current === "system" ? "light" : current === "light" ? "dark" : "system";
+        localStorage.setItem("theme", next);
+        apply(next);
+      }
+    });
+
+    window
+      .matchMedia("(prefers-color-scheme: dark)")
+      .addEventListener("change", () => apply(localStorage.getItem("theme") || "system"));
+  })();
+</script>
