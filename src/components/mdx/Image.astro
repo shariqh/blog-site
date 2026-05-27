@@ -1,0 +1,12 @@
+---
+interface Props {
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  placeholder?: string;     // ignored, kept for back-compat with migrated posts
+  blurDataURL?: string;     // ignored, kept for back-compat with migrated posts
+}
+const { src, alt, width = 1200, height = 630 } = Astro.props;
+---
+<img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" class="my-6 rounded-lg" />
