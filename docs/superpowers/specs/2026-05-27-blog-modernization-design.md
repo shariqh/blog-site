@@ -103,6 +103,22 @@ export const BUCKETS = {
     label: 'Engineering',
     tags: ['nextjs', 'docker', 'devops', 'cloud', 'architecture', 'astro', 'typescript'],
   },
+  ai: {
+    label: 'AI',
+    tags: [
+      'ai',
+      'llm',
+      'claude',
+      'agents',
+      'mcp',
+      'claude-code',
+      'agent-sdk',
+      'anthropic',
+      'openai',
+      'prompts',
+      'rag',
+    ],
+  },
   process: { label: 'Process', tags: ['workflow', 'tooling', 'systems', 'how-to', 'guide'] },
   notes: { label: 'Notes', tags: [] }, // fallback
 } as const
@@ -114,44 +130,59 @@ Resolver: first tag with a bucket match wins; otherwise `notes`. Adding a new bu
 
 ## Design system
 
+The visual direction is editorial-magazine: Pentagram-style restraint, navy + ochre + cream palette, art-directed homepage grid, italic-serif display type. The sections below set **intent**. Implementation details (exact Tailwind classes, component internals, CSS specifics) are for the AI agents that execute the build — the spec defines the look, not the how.
+
 ### Palette
 
-Pentagram-magazine direction (navy + ochre + cream), defined as Tailwind 4 design tokens:
+Six named tokens, exposed as Tailwind 4 design tokens:
 
-```css
-@theme {
-  --color-ink: #15233a; /* deep navy — primary text, primary cell */
-  --color-ink-soft: #2a3f5f; /* secondary navy */
-  --color-ochre: #d49a3a; /* golden ochre — accent cell, link hover */
-  --color-paper: #f3e8d2; /* cream — primary background */
-  --color-paper-soft: #faf3e3; /* lighter cream — card backgrounds */
-}
-```
+| Token        | Color                    | Job                                                   |
+| ------------ | ------------------------ | ----------------------------------------------------- |
+| `ink`        | deep navy `#15233a`      | Primary text, primary cell background, dark headlines |
+| `ink-soft`   | secondary navy `#2a3f5f` | Secondary cells, hover states                         |
+| `ochre`      | golden `#d49a3a`         | Engineering accent, link hover, callouts              |
+| `terracotta` | brick `#b04a3a`          | AI accent (added for the AI bucket)                   |
+| `paper`      | cream `#f3e8d2`          | Primary background, light cells                       |
+| `paper-soft` | lighter cream `#faf3e3`  | Card backgrounds, subtle elevation                    |
 
-**Dark mode:** palette inverts (`ink` becomes background, `paper` becomes text, `ochre` stays as accent). Default behavior is `prefers-color-scheme` system pref with a manual toggle in the header.
+**Dark mode:** palette inverts (`ink` becomes background, `paper` becomes text; `ochre` and `terracotta` stay as accents). Default to `prefers-color-scheme` with a manual toggle in the header.
 
 ### Typography
 
-| Family                                 | Job                                                         |
-| -------------------------------------- | ----------------------------------------------------------- |
-| **Fraunces** (serif, variable, italic) | Display + body type. Italic hero titles.                    |
-| **Inter** (sans, variable)             | UI chrome, post body, navigation, post meta.                |
-| **JetBrains Mono**                     | Eyebrows, dates, code blocks, "//" prefix on category tags. |
+Three families, each with a clear job:
 
-All three are free, shipped via Astro font optimization (subset, preload, swap). ~30kb total.
+- **Fraunces** (variable serif, italic) — display type, italic hero titles
+- **Inter** (variable sans) — UI chrome, body text, navigation, post meta
+- **JetBrains Mono** — eyebrows, dates, code blocks, the `//` prefix on category tags
 
-### Layout primitives
+All free; shipped via Astro font optimization.
 
-Four reusable components do most of the heavy lifting:
+### Bucket → visual treatment
 
-1. `<Hero>` — cream/navy intro block. Used on home, about, projects, post pages.
-2. `<PostCard variant="bucket">` — colored cell in the homepage grid. `variant` drives palette per bucket.
-3. `<PostHeader>` — for post pages: eyebrow (bucket + date), italic serif title, summary, optional hero image.
-4. `<Prose>` — wraps MDX body. Owns the typography craft for headings, links, lists, code blocks, callouts.
+Each bucket has a distinct color treatment that's applied wherever a post is rendered (homepage grid cell, post header eyebrow, hover affordances):
 
-### Per-post art direction
+| Bucket      | Cell background | Cell text | Eyebrow label   |
+| ----------- | --------------- | --------- | --------------- |
+| Leadership  | `ink`           | `paper`   | `// LEADERSHIP` |
+| Engineering | `ochre`         | `ink`     | `ENGINEERING`   |
+| AI          | `terracotta`    | `paper`   | `// AI`         |
+| Process     | `ink-soft`      | `paper`   | `PROCESS`       |
+| Notes       | `paper`         | `ink`     | `NOTES`         |
 
-Each post can override its hero treatment via optional frontmatter (`hero.background`, `hero.titleStyle`). Defaults derive from the bucket; specific posts can break the mold. Keeps visual variety without making every post a one-off.
+### Layout
+
+Homepage = a cream intro hero (italic-serif title) above an art-directed 4-cell grid showing the 4 most recent posts. Each cell is colored by its own bucket — the grid doesn't enforce one-bucket-per-cell, it just shows recency.
+
+Per-post art direction: each post can override its hero treatment via optional frontmatter (`hero.background`, `hero.titleStyle`). Defaults derive from the bucket; specific posts can break the mold.
+
+### Component primitives (intent, not prescription)
+
+The AI build will produce roughly these reusable patterns. Exact names and shapes are an implementation detail:
+
+- A hero block for cream/navy intros (home, about, projects, post pages)
+- A post card for the colored homepage grid cells, colored per bucket
+- A post header for individual post pages (eyebrow, italic title, summary, optional hero image)
+- A prose wrapper for MDX body content with typography craft for headings, links, code blocks, callouts
 
 ### Pages
 
