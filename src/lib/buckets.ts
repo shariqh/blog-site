@@ -46,6 +46,16 @@ export const BUCKETS = {
 export type BucketKey = keyof typeof BUCKETS
 export type Bucket = { key: BucketKey; label: string }
 
+// Eyebrow label prefix per bucket — "// " for the technical-feeling buckets,
+// nothing for the editorial ones. Shared across PostCard and PostHeader.
+export const EYEBROW_PREFIX: Record<BucketKey, string> = {
+  leadership: '// ',
+  engineering: '',
+  ai: '// ',
+  process: '',
+  notes: '',
+}
+
 const TAG_INDEX: Record<string, BucketKey> = (() => {
   const index: Record<string, BucketKey> = {}
   for (const [key, def] of Object.entries(BUCKETS) as [BucketKey, { tags: readonly string[] }][]) {

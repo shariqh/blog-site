@@ -1,5 +1,5 @@
 ---
-import type { BucketKey } from "../lib/buckets";
+import { EYEBROW_PREFIX, type BucketKey } from "../lib/buckets";
 import { formatDate } from "../lib/formatDate";
 
 interface Props {
@@ -21,13 +21,6 @@ const cellClasses: Record<BucketKey, string> = {
   notes:       "bg-[var(--color-paper-soft)] text-[var(--color-ink)] italic font-display",
 };
 
-const eyebrowPrefix: Record<BucketKey, string> = {
-  leadership: "// ",
-  engineering: "",
-  ai: "// ",
-  process: "",
-  notes: "",
-};
 ---
 <a
   href={href}
@@ -37,7 +30,7 @@ const eyebrowPrefix: Record<BucketKey, string> = {
   ]}
 >
   <p class="font-mono text-[10px] uppercase tracking-[0.18em] opacity-80">
-    {eyebrowPrefix[bucket]}{bucketLabel.toUpperCase()}
+    {EYEBROW_PREFIX[bucket]}{bucketLabel.toUpperCase()}
   </p>
   <div>
     <h2 class:list={["text-xl font-semibold leading-tight tracking-tight", bucket === "notes" && "italic"]}>

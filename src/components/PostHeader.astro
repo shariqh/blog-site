@@ -1,6 +1,6 @@
 ---
 import { formatDate } from "../lib/formatDate";
-import type { BucketKey } from "../lib/buckets";
+import { EYEBROW_PREFIX, type BucketKey } from "../lib/buckets";
 
 interface Props {
   title: string;
@@ -14,19 +14,11 @@ interface Props {
 
 const { title, date, bucket, bucketLabel, summary, hero, readingMinutes } = Astro.props;
 
-const eyebrowPrefix: Record<BucketKey, string> = {
-  leadership: "// ",
-  engineering: "",
-  ai: "// ",
-  process: "",
-  notes: "",
-};
-
 const { Image } = await import("astro:assets");
 ---
 <header class="py-12">
   <p class="font-mono text-xs uppercase tracking-[0.22em] text-[var(--fg-soft)]">
-    {eyebrowPrefix[bucket]}{bucketLabel.toUpperCase()}
+    {EYEBROW_PREFIX[bucket]}{bucketLabel.toUpperCase()}
     <span class="mx-2">·</span>
     {formatDate(date)}
     {readingMinutes ? <><span class="mx-2">·</span>{readingMinutes} min read</> : null}
