@@ -30,6 +30,17 @@ const canonical = new URL(Astro.url.pathname, SITE.url).toString();
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
+    <script is:inline>
+      // Apply theme before first paint to avoid FOUC.
+      (function () {
+        const stored = localStorage.getItem("theme") || "system";
+        const dark =
+          stored === "dark" ||
+          (stored === "system" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
   </head>
   <body>
     <Header />

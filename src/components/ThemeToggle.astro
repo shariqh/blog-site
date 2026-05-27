@@ -27,7 +27,7 @@
 
     document.addEventListener("click", (e) => {
       const target = e.target;
-      if (target && target.id === "theme-toggle") {
+      if (target && target.closest && target.closest("#theme-toggle")) {
         const current = localStorage.getItem("theme") || "system";
         const next = current === "system" ? "light" : current === "light" ? "dark" : "system";
         localStorage.setItem("theme", next);
