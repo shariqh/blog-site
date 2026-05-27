@@ -1,0 +1,24 @@
+---
+import type { MarkdownHeading } from "astro";
+
+interface Props {
+  headings: MarkdownHeading[];
+  minDepth?: number;
+  maxDepth?: number;
+}
+
+const { headings, minDepth = 2, maxDepth = 3 } = Astro.props;
+const filtered = headings.filter((h) => h.depth >= minDepth && h.depth <= maxDepth);
+---
+{filtered.length > 0 && (
+  <nav class="my-8 border-l-2 border-[var(--accent)] pl-4">
+    <p class="mb-2 font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">Contents</p>
+    <ul class="space-y-1 text-sm">
+      {filtered.map((h) => (
+        <li class={h.depth === 3 ? "ml-4" : ""}>
+          <a href={`#${h.slug}`} class="hover:text-[var(--accent)]">{h.text}</a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+)}
