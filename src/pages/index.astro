@@ -1,13 +1,52 @@
 ---
+import { getCollection } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import Hero from "../components/Hero.astro";
+import PostCard from "../components/PostCard.astro";
+import { resolveBucket } from "../lib/buckets";
+
+const all = await getCollection("writing", ({ data }) => !data.draft);
+const posts = all
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+  .slice(0, 4);
 ---
 <BaseLayout>
-  <section class="py-16">
-    <h1 class="font-display text-5xl italic leading-none tracking-tight">
-      Musings on leadership<br />and technology.
-    </h1>
-    <p class="mt-6 max-w-prose font-sans text-base text-[var(--fg-soft)]">
-      Site is being rebuilt. Real homepage lands in Phase 5.
-    </p>
+  <Hero
+    eyebrow="Shariq Hirani"
+    title="Writing on tech,<br/>leadership,<br/>& shipping."
+    subtitle="Notes from inside the work — engineering leadership, product calls, and the weird, fun parts."
+  />
+
+  <section class="grid grid-cols-1 gap-0 sm:grid-cols-2">
+    {posts.map((post) => {
+      const bucket = resolveBucket(post.data.tags);
+      return (
+        <PostCard
+          href={`/blog/${post.id.replace(/\.mdx$/, "")}`}
+          title={post.data.title}
+          date={post.data.date}
+          bucket={bucket.key}
+          bucketLabel={bucket.label}
+        />
+      );
+    })}
   </section>
+
+  {all.length > 4 && (
+    <section class="mt-16">
+      <p class="mb-4 font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">More</p>
+      <ul class="space-y-2">
+        {all.slice(4).map((post) => (
+          <li class="flex items-baseline justify-between gap-4 border-b border-[color-mix(in_oklab,var(--fg)_10%,transparent)] py-2">
+            <a href={`/blog/${post.id.replace(/\.mdx$/, "")}`} class="text-base hover:text-[var(--accent)]">
+              {post.data.title}
+            </a>
+            <span class="flex-shrink-0 font-mono text-xs text-[var(--fg-soft)]">
+              {post.data.date.toISOString().slice(0, 10)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 </BaseLayout>
