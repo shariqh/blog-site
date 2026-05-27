@@ -1,16 +1,31 @@
-// @ts-check
-import { defineConfig } from 'astro/config';
+import { defineConfig } from "astro/config";
+import mdx from "@astrojs/mdx";
+import sitemap from "@astrojs/sitemap";
+import react from "@astrojs/react";
+import tailwindcss from "@tailwindcss/vite";
 
-import tailwindcss from '@tailwindcss/vite';
-import mdx from '@astrojs/mdx';
-import sitemap from '@astrojs/sitemap';
-import react from '@astrojs/react';
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
-// https://astro.build/config
 export default defineConfig({
-  vite: {
-    plugins: [tailwindcss()]
+  site: "https://www.shariq.dev",
+  integrations: [mdx(), sitemap(), react()],
+  markdown: {
+    remarkPlugins: [remarkMath],
+    rehypePlugins: [
+      rehypeSlug,
+      [rehypeAutolinkHeadings, { behavior: "wrap" }],
+      rehypeKatex,
+    ],
+    shikiConfig: {
+      themes: { light: "github-light", dark: "github-dark" },
+      wrap: true,
+    },
   },
-
-  integrations: [mdx(), sitemap(), react()]
+  vite: {
+    plugins: [tailwindcss()],
+    css: { devSourcemap: true },
+  },
 });
