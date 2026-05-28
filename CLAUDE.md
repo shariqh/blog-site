@@ -15,7 +15,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Static Astro 6 + TypeScript + Tailwind 4 site. Content lives as MDX in
 `src/content/writing/`, validated by Astro Content Collections (Zod schema
-in `src/content.config.ts`).
+in `src/content.config.ts`). Hosted on Cloudflare Pages (DNS also on
+Cloudflare). No analytics, no comments — engagement routes to email / X
+via the footer.
 
 ### Content pipeline
 

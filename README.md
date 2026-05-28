@@ -1,6 +1,6 @@
 # shariq.dev
 
-Personal blog at [shariq.dev](https://www.shariq.dev). Astro 6 + Tailwind 4 + MDX.
+Personal blog at [shariq.dev](https://www.shariq.dev). Astro 6 + Tailwind 4 + MDX. Hosted on Cloudflare Pages.
 
 ## Develop
 
