@@ -9,42 +9,32 @@ interface Props {
   portraitAlt?: string;
   /** Optional "currently" / status line that sits under subtitle. */
   currently?: string;
-  /** Decorative asterisk above the title. */
-  ornament?: boolean;
 }
 
-const {
-  eyebrow,
-  title,
-  subtitle,
-  portrait,
-  portraitAlt,
-  currently,
-  ornament = false,
-} = Astro.props;
+const { eyebrow, title, subtitle, portrait, portraitAlt, currently } = Astro.props;
 ---
-<section class="relative py-14 sm:py-20">
-  {ornament && (
-    <span
-      aria-hidden="true"
-      class="absolute -top-4 left-0 select-none font-display text-[7rem] italic leading-none text-[var(--accent)] opacity-90 sm:text-[9rem]"
-    >*</span>
-  )}
-
+<section class="py-12 sm:py-16">
   {portrait ? (
-    <div class="relative z-10 grid items-end gap-10 sm:grid-cols-[1fr_auto]">
-      <div class="pt-2">
+    <div class="grid items-start gap-8 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-10">
+      <img
+        src={portrait}
+        alt={portraitAlt ?? ""}
+        width="320"
+        height="320"
+        class="aspect-square h-32 w-32 flex-shrink-0 border-2 border-[var(--fg)] object-cover shadow-[6px_6px_0_0_var(--accent)] sm:h-48 sm:w-48 sm:shadow-[8px_8px_0_0_var(--accent)]"
+      />
+      <div>
         {eyebrow && (
-          <p class="mb-5 inline-block bg-[var(--fg)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--bg)]">
+          <p class="mb-3 inline-block bg-[var(--fg)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--bg)]">
             {eyebrow}
           </p>
         )}
-        <h1 class="font-display text-6xl italic leading-[0.92] tracking-tight sm:text-7xl" set:html={title} />
+        <h1 class="font-display text-3xl italic leading-[1.05] tracking-tight sm:text-4xl" set:html={title} />
         {subtitle && (
-          <p class="mt-6 max-w-prose font-sans text-base leading-relaxed text-[var(--fg-soft)]">{subtitle}</p>
+          <p class="mt-4 max-w-prose font-sans text-[15px] leading-relaxed text-[var(--fg-soft)]">{subtitle}</p>
         )}
         {currently && (
-          <p class="mt-5 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-[var(--fg-soft)]">
+          <p class="mt-4 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--fg-soft)]">
             <span class="relative inline-flex h-2 w-2">
               <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent)] opacity-60"></span>
               <span class="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]"></span>
@@ -53,27 +43,20 @@ const {
           </p>
         )}
       </div>
-      <img
-        src={portrait}
-        alt={portraitAlt ?? ""}
-        width="320"
-        height="320"
-        class="aspect-square h-48 w-48 flex-shrink-0 justify-self-start border-2 border-[var(--fg)] object-cover shadow-[6px_6px_0_0_var(--accent)] sm:h-64 sm:w-64 sm:justify-self-end sm:shadow-[8px_8px_0_0_var(--accent)]"
-      />
     </div>
   ) : (
-    <div class="relative z-10">
+    <div>
       {eyebrow && (
-        <p class="mb-5 inline-block bg-[var(--fg)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--bg)]">
+        <p class="mb-3 inline-block bg-[var(--fg)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--bg)]">
           {eyebrow}
         </p>
       )}
-      <h1 class="font-display text-6xl italic leading-[0.92] tracking-tight sm:text-7xl" set:html={title} />
+      <h1 class="font-display text-3xl italic leading-[1.05] tracking-tight sm:text-4xl" set:html={title} />
       {subtitle && (
-        <p class="mt-6 max-w-prose font-sans text-base leading-relaxed text-[var(--fg-soft)]">{subtitle}</p>
+        <p class="mt-4 max-w-prose font-sans text-[15px] leading-relaxed text-[var(--fg-soft)]">{subtitle}</p>
       )}
       {currently && (
-        <p class="mt-5 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-[var(--fg-soft)]">
+        <p class="mt-4 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--fg-soft)]">
           <span class="relative inline-flex h-2 w-2">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent)] opacity-60"></span>
             <span class="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]"></span>

@@ -18,12 +18,11 @@ const pad = (n: number) => String(n).padStart(2, "0");
 <BaseLayout>
   <Hero
     eyebrow="Shariq Hirani"
-    title='Writing on tech,<br/>leadership,<br/>&amp; <span class="text-[var(--accent)]">shipping</span>.'
-    subtitle="Notes from inside the work — engineering leadership, product calls, AI agents, and the weird, fun parts."
+    title='Notes on engineering leadership <span class="text-[var(--accent)]">&amp; AI</span>.'
+    subtitle="From inside the work — leading teams, building systems, and the AI shift happening in real time."
     portrait="/static/images/avatar.jpg"
     portraitAlt="Shariq Hirani"
-    currently="Rebuilding this blog and shipping AI things at Coreworx."
-    ornament
+    currently="Shipping AI at Coreworx and rebuilding this site in public."
   />
 
   <!-- Ornamental divider -->
@@ -69,9 +68,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
   {rest.length > 0 && (
     <section class="mt-20">
       <div class="mb-8 flex items-end justify-between">
-        <h2 class="font-display text-3xl italic">
-          More <span aria-hidden="true" class="text-[var(--accent)]">*</span>
-        </h2>
+        <h2 class="font-display text-3xl italic">More</h2>
         <p class="font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">
           {pad(rest.length)} more posts
         </p>
