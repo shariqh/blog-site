@@ -4,18 +4,46 @@ interface Props {
   /** Marked as italic-serif. Use a string with explicit line break HTML if you need control. */
   title: string;
   subtitle?: string;
+  /** Path to a portrait image in /public (e.g. "/static/images/avatar.jpg"). */
+  portrait?: string;
+  portraitAlt?: string;
 }
 
-const { eyebrow, title, subtitle } = Astro.props;
+const { eyebrow, title, subtitle, portrait, portraitAlt } = Astro.props;
 ---
 <section class="py-16">
-  {eyebrow && (
-    <p class="mb-4 inline-block bg-[var(--fg)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--bg)]">
-      {eyebrow}
-    </p>
-  )}
-  <h1 class="font-display text-5xl italic leading-[0.95] tracking-tight" set:html={title} />
-  {subtitle && (
-    <p class="mt-6 max-w-prose font-sans text-base text-[var(--fg-soft)]">{subtitle}</p>
+  {portrait ? (
+    <div class="grid items-center gap-8 sm:grid-cols-[1fr_auto]">
+      <div>
+        {eyebrow && (
+          <p class="mb-4 inline-block bg-[var(--fg)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--bg)]">
+            {eyebrow}
+          </p>
+        )}
+        <h1 class="font-display text-5xl italic leading-[0.95] tracking-tight" set:html={title} />
+        {subtitle && (
+          <p class="mt-6 max-w-prose font-sans text-base text-[var(--fg-soft)]">{subtitle}</p>
+        )}
+      </div>
+      <img
+        src={portrait}
+        alt={portraitAlt ?? ""}
+        width="160"
+        height="160"
+        class="h-32 w-32 flex-shrink-0 justify-self-start border-2 border-[var(--fg)] object-cover sm:h-40 sm:w-40 sm:justify-self-end"
+      />
+    </div>
+  ) : (
+    <>
+      {eyebrow && (
+        <p class="mb-4 inline-block bg-[var(--fg)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--bg)]">
+          {eyebrow}
+        </p>
+      )}
+      <h1 class="font-display text-5xl italic leading-[0.95] tracking-tight" set:html={title} />
+      {subtitle && (
+        <p class="mt-6 max-w-prose font-sans text-base text-[var(--fg-soft)]">{subtitle}</p>
+      )}
+    </>
   )}
 </section>

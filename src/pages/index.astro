@@ -15,9 +15,11 @@ const posts = all
     eyebrow="Shariq Hirani"
     title="Writing on tech,<br/>leadership,<br/>& shipping."
     subtitle="Notes from inside the work — engineering leadership, product calls, and the weird, fun parts."
+    portrait="/static/images/avatar.jpg"
+    portraitAlt="Shariq Hirani"
   />
 
-  <section class="grid grid-cols-1 gap-0 sm:grid-cols-2">
+  <section class="grid grid-cols-1 gap-3 sm:grid-cols-2">
     {posts.map((post) => {
       const bucket = resolveBucket(post.data.tags);
       return (

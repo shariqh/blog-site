@@ -13,19 +13,20 @@ interface Props {
 const { href, title, date, bucket, bucketLabel } = Astro.props;
 
 // Each bucket gets a specific Tailwind class set. Inlined (not derived) so Tailwind sees them at build.
+// Cells always use fixed palette colors (not bg/fg semantic vars) so they keep their identity in both light and dark modes.
 const cellClasses: Record<BucketKey, string> = {
   leadership:  "bg-[var(--color-ink)] text-[var(--color-paper)]",
   engineering: "bg-[var(--color-ochre)] text-[var(--color-ink)]",
   ai:          "bg-[var(--color-terracotta)] text-[var(--color-paper)]",
   process:     "bg-[var(--color-ink-soft)] text-[var(--color-paper)]",
-  notes:       "bg-[var(--color-paper-soft)] text-[var(--color-ink)] italic font-display",
+  notes:       "bg-[var(--color-paper)] text-[var(--color-ink)] italic font-display",
 };
 
 ---
 <a
   href={href}
   class:list={[
-    "group flex min-h-[180px] flex-col justify-between border border-[var(--color-ink)] p-5 transition-transform hover:-translate-y-0.5",
+    "group flex min-h-[180px] flex-col justify-between border-2 border-[var(--fg)] p-5 transition-transform hover:-translate-y-0.5",
     cellClasses[bucket],
   ]}
 >
