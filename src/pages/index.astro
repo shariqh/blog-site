@@ -6,48 +6,96 @@ import PostCard from "../components/PostCard.astro";
 import { resolveBucket } from "../lib/buckets";
 
 const all = await getCollection("writing", ({ data }) => !data.draft);
-const posts = all
-  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
-  .slice(0, 4);
+all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const featured = all[0];
+const featuredBucket = featured ? resolveBucket(featured.data.tags) : null;
+const next = all.slice(1, 4);
+const rest = all.slice(4);
+
+const pad = (n: number) => String(n).padStart(2, "0");
 ---
 <BaseLayout>
   <Hero
     eyebrow="Shariq Hirani"
-    title="Writing on tech,<br/>leadership,<br/>& shipping."
-    subtitle="Notes from inside the work — engineering leadership, product calls, and the weird, fun parts."
+    title='Writing on tech,<br/>leadership,<br/>&amp; <span class="text-[var(--accent)]">shipping</span>.'
+    subtitle="Notes from inside the work — engineering leadership, product calls, AI agents, and the weird, fun parts."
     portrait="/static/images/avatar.jpg"
     portraitAlt="Shariq Hirani"
+    currently="Rebuilding this blog and shipping AI things at Coreworx."
+    ornament
   />
 
-  <section class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-    {posts.map((post) => {
-      const bucket = resolveBucket(post.data.tags);
-      return (
-        <PostCard
-          href={`/blog/${post.id.replace(/\.mdx$/, "")}`}
-          title={post.data.title}
-          date={post.data.date}
-          bucket={bucket.key}
-          bucketLabel={bucket.label}
-        />
-      );
-    })}
-  </section>
+  <!-- Ornamental divider -->
+  <div class="relative my-6 flex items-center gap-4">
+    <span class="h-px flex-1 bg-[color-mix(in_oklab,var(--fg)_20%,transparent)]"></span>
+    <span class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--fg-soft)]">
+      Recent Writing
+    </span>
+    <span class="h-px flex-1 bg-[color-mix(in_oklab,var(--fg)_20%,transparent)]"></span>
+  </div>
 
-  {all.length > 4 && (
-    <section class="mt-16">
-      <p class="mb-4 font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">More</p>
-      <ul class="space-y-2">
-        {all.slice(4).map((post) => (
-          <li class="flex items-baseline justify-between gap-4 border-b border-[color-mix(in_oklab,var(--fg)_10%,transparent)] py-2">
-            <a href={`/blog/${post.id.replace(/\.mdx$/, "")}`} class="text-base hover:text-[var(--accent)]">
-              {post.data.title}
-            </a>
-            <span class="flex-shrink-0 font-mono text-xs text-[var(--fg-soft)]">
-              {post.data.date.toISOString().slice(0, 10)}
-            </span>
-          </li>
-        ))}
+  {featured && featuredBucket && (
+    <section class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div class="sm:col-span-2">
+        <PostCard
+          href={`/blog/${featured.id.replace(/\.mdx$/, "")}`}
+          title={featured.data.title}
+          date={featured.data.date}
+          bucket={featuredBucket.key}
+          bucketLabel={featuredBucket.label}
+          index={pad(1)}
+          featured
+        />
+      </div>
+      <div class="grid grid-cols-1 gap-3">
+        {next.map((post, i) => {
+          const bucket = resolveBucket(post.data.tags);
+          return (
+            <PostCard
+              href={`/blog/${post.id.replace(/\.mdx$/, "")}`}
+              title={post.data.title}
+              date={post.data.date}
+              bucket={bucket.key}
+              bucketLabel={bucket.label}
+              index={pad(i + 2)}
+            />
+          );
+        })}
+      </div>
+    </section>
+  )}
+
+  {rest.length > 0 && (
+    <section class="mt-20">
+      <div class="mb-8 flex items-end justify-between">
+        <h2 class="font-display text-3xl italic">
+          More <span aria-hidden="true" class="text-[var(--accent)]">*</span>
+        </h2>
+        <p class="font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">
+          {pad(rest.length)} more posts
+        </p>
+      </div>
+      <ul class="space-y-0">
+        {rest.map((post, i) => {
+          const bucket = resolveBucket(post.data.tags);
+          return (
+            <li class="group">
+              <a
+                href={`/blog/${post.id.replace(/\.mdx$/, "")}`}
+                class="grid grid-cols-[auto_1fr_auto] items-baseline gap-4 border-b border-[color-mix(in_oklab,var(--fg)_15%,transparent)] py-4 transition-colors hover:bg-[color-mix(in_oklab,var(--fg)_3%,transparent)] hover:text-[var(--accent)]"
+              >
+                <span class="font-mono text-[10px] uppercase tracking-widest text-[var(--fg-soft)]">
+                  {pad(i + 5)}
+                </span>
+                <span class="text-base sm:text-lg">{post.data.title}</span>
+                <span class="font-mono text-[10px] uppercase tracking-widest text-[var(--fg-soft)]">
+                  {bucket.label} · {post.data.date.toISOString().slice(0, 10)}
+                </span>
+              </a>
+            </li>
+          );
+        })}
       </ul>
     </section>
   )}

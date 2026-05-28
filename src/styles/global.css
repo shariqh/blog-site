@@ -25,6 +25,14 @@
     --accent: var(--color-ochre);
     --accent-alt: var(--color-terracotta);
 
+    /* Bucket cell colors — mode-aware so they NEVER match page bg. */
+    --bucket-leadership-bg: var(--color-ink);
+    --bucket-leadership-fg: var(--color-paper);
+    --bucket-process-bg: var(--color-ink-soft);
+    --bucket-process-fg: var(--color-paper);
+    --bucket-notes-bg: var(--color-paper-soft);
+    --bucket-notes-fg: var(--color-ink);
+
     color-scheme: light;
   }
 
@@ -35,6 +43,14 @@
     --fg-soft: var(--color-paper-soft);
     --accent: var(--color-ochre);
     --accent-alt: var(--color-terracotta);
+
+    /* In dark mode, the navy buckets invert to cream so they stand out from the navy bg. */
+    --bucket-leadership-bg: var(--color-paper);
+    --bucket-leadership-fg: var(--color-ink);
+    --bucket-process-bg: var(--color-paper-soft);
+    --bucket-process-fg: var(--color-ink);
+    --bucket-notes-bg: var(--color-ink-soft);
+    --bucket-notes-fg: var(--color-paper);
 
     color-scheme: dark;
   }
