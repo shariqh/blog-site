@@ -2,7 +2,7 @@ export const SITE = {
   title: 'Shariq Hirani',
   description: 'Musings on leadership and technology.',
   author: 'Shariq Hirani',
-  url: 'https://www.shariq.dev',
+  url: 'https://shariq.dev',
   email: 'hello@shariq.dev',
   social: {
     twitter: 'https://twitter.com/ShariqHirani',

@@ -1,0 +1,3 @@
+# Cloudflare Pages redirects. Apex (shariq.dev) is canonical;
+# www.shariq.dev 301s to the apex preserving path + query.
+https://www.shariq.dev/* https://shariq.dev/:splat 301
