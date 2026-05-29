@@ -1,5 +1,5 @@
 ---
-// Contact modal triggered by any element with id="contact-open".
+// Contact modal triggered by any element with [data-contact-trigger].
 // POSTs to FormSubmit's free AJAX endpoint, which relays to SITE.email.
 // First submission to a new address triggers a one-time activation email
 // to that inbox — click the link inside, then the form works for everyone.
@@ -90,7 +90,7 @@ const endpoint = `https://formsubmit.co/ajax/${SITE.email}`;
     document.addEventListener("click", (e) => {
       const target = e.target;
       if (!target) return;
-      if (target.closest && target.closest("#contact-open")) {
+      if (target.closest && target.closest("[data-contact-trigger]")) {
         e.preventDefault();
         openModal();
       } else if (target.closest && target.closest("#contact-close")) {

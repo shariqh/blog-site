@@ -1,7 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Hero from "../components/Hero.astro";
-import ContactModal from "../components/ContactModal.astro";
 ---
 <BaseLayout title="About">
   <Hero title="About." eyebrow="Shariq Hirani" />
@@ -33,15 +32,13 @@ import ContactModal from "../components/ContactModal.astro";
     <div class="not-prose mt-8">
       <button
         type="button"
-        id="contact-open"
+        data-contact-trigger
         class="inline-flex items-center gap-2 border-2 border-[var(--fg)] bg-[var(--accent)] px-5 py-2 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-ink)] shadow-[4px_4px_0_0_var(--fg)] transition-transform hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_var(--fg)]"
       >
         Get in touch <span aria-hidden="true">→</span>
       </button>
     </div>
   </div>
-
-  <ContactModal />
 
   <style is:global>
     @reference "../styles/global.css";
