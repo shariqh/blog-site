@@ -149,7 +149,9 @@ const endpoint = `https://formsubmit.co/ajax/${SITE.email}`;
         setTimeout(closeModal, 1800);
       } catch (err) {
         console.error(err);
-        setFeedback("Couldn't send. Email " + (form.querySelector('[name="email"]') ? "hello@shariq.dev" : "") + " directly.", "error");
+        const detail = err && err.message ? err.message : "";
+        const fallback = "Email hello@shariq.dev directly.";
+        setFeedback(detail ? `${detail} ${fallback}` : `Couldn't send. ${fallback}`, "error");
         if (submitLabel) submitLabel.textContent = "Send";
         submitBtn.disabled = false;
       }
