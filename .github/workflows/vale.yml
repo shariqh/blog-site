@@ -2,7 +2,7 @@ name: Vale (prose linter)
 
 on:
   push:
-    branches: [master, rebuild]
+    branches: [main]
     paths:
       - "src/content/writing/**/*.mdx"
       - "vale-styles/**"

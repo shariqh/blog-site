@@ -73,7 +73,7 @@ Vale before opening its PR.
 
 ## Deploy
 
-Cloudflare Pages via `.github/workflows/deploy.yml`. `master` → production
+Cloudflare Pages via `.github/workflows/deploy.yml`. `main` → production
 (`shariq.dev`); every PR gets its own preview URL auto-commented on the PR.
 Required GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 First push to a branch auto-creates the Pages project — no dashboard work

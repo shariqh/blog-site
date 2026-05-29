@@ -2,7 +2,7 @@ name: Deploy to Cloudflare Pages
 
 on:
   push:
-    branches: [master, rebuild]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -43,7 +43,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # Branch mapping:
-          #   master    → production (shariq.dev)
+          #   main      → production (shariq.dev)
           #   any other → preview deployment with its own URL
           command: pages deploy dist --project-name=shariq-dev --branch=${{ github.head_ref || github.ref_name }}
 

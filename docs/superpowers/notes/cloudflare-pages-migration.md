@@ -16,10 +16,10 @@ In **GitHub:** repo → Settings → Secrets and variables → Actions → New r
 
 ## 2. Trigger the first deploy
 
-The workflow auto-creates the `shariq-dev` Pages project on first run. Easiest trigger: push any commit to `rebuild` (or merge the PR to `master`). Watch the run at GitHub → Actions → "Deploy to Cloudflare Pages".
+The workflow auto-creates the `shariq-dev` Pages project on first run. Easiest trigger: push any commit to `rebuild` (or merge the PR to `main`). Watch the run at GitHub → Actions → "Deploy to Cloudflare Pages".
 
 If it's a PR push, the workflow comments the preview URL back on the PR.
-If it's a `master` push, it deploys to the project's production environment.
+If it's a `main` push, it deploys to the project's production environment.
 
 ## 3. Verify the preview at `*.pages.dev`
 

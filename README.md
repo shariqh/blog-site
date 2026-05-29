@@ -30,7 +30,7 @@ write MDX, commit, push, merge.
 ## Deploy (Cloudflare Pages via GitHub Actions)
 
 Deployment is automated by `.github/workflows/deploy.yml`. On push to
-`master`, the workflow builds and deploys to production
+`main`, the workflow builds and deploys to production
 (`shariq.dev`). PRs get preview deployments with their own URL, posted
 back as a PR comment.
 
