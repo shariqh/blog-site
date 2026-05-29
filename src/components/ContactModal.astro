@@ -1,9 +1,15 @@
 ---
 // Contact modal triggered by any element with id="contact-open".
-// POSTs to /api/contact (Pages Function).
+// POSTs to FormSubmit's free AJAX endpoint, which relays to SITE.email.
+// First submission to a new address triggers a one-time activation email
+// to that inbox — click the link inside, then the form works for everyone.
+import { SITE } from "../lib/site";
+
+const endpoint = `https://formsubmit.co/ajax/${SITE.email}`;
 ---
 <dialog
   id="contact-modal"
+  data-endpoint={endpoint}
   class="w-full max-w-md border-2 border-[var(--fg)] bg-[var(--bg)] p-0 text-[var(--fg)] backdrop:bg-[color-mix(in_oklab,var(--color-ink)_60%,transparent)]"
 >
   <form id="contact-form" method="dialog" class="flex flex-col gap-4 p-6">
@@ -48,9 +54,14 @@
       ></textarea>
     </label>
 
-    {/* Honeypot — bots fill it in; humans don't see it. */}
+    {/* FormSubmit settings — these are sent in the body and tell their relay how to format the email. */}
+    <input type="hidden" name="_subject" value="shariq.dev — contact form" />
+    <input type="hidden" name="_template" value="table" />
+    <input type="hidden" name="_captcha" value="false" />
+
+    {/* Honeypot — bots fill it in; humans don't see it. FormSubmit's name is _honey. */}
     <label class="hidden" aria-hidden="true">
-      Don't fill this out: <input type="text" name="website" tabindex="-1" autocomplete="off" />
+      Don't fill this out: <input type="text" name="_honey" tabindex="-1" autocomplete="off" />
     </label>
 
     <button
@@ -70,6 +81,8 @@
     const dialog = document.getElementById("contact-modal");
     const form = document.getElementById("contact-form");
     if (!dialog || !form) return;
+
+    const endpoint = dialog.dataset.endpoint;
 
     function openModal() { dialog.showModal && dialog.showModal(); }
     function closeModal() { dialog.close && dialog.close(); }
@@ -103,23 +116,32 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(form).entries());
+
       // Honeypot: if the bot field is filled, silently no-op.
-      if (data.website) { closeModal(); return; }
+      if (data._honey) { closeModal(); return; }
 
       submitBtn.disabled = true;
       if (submitLabel) submitLabel.textContent = "Sending...";
 
       try {
-        const res = await fetch("/api/contact", {
+        const res = await fetch(endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
           body: JSON.stringify({
             name: data.name,
             email: data.email,
             message: data.message,
+            _subject: data._subject,
+            _template: data._template,
+            _captcha: data._captcha,
+            _replyto: data.email,
           }),
         });
-        if (!res.ok) throw new Error(await res.text());
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || body.success === "false") throw new Error(body.message || "Send failed");
         setFeedback("Sent. I'll get back to you.", "ok");
         form.reset();
         if (submitLabel) submitLabel.textContent = "Send";
@@ -127,7 +149,7 @@
         setTimeout(closeModal, 1800);
       } catch (err) {
         console.error(err);
-        setFeedback("Couldn't send. Try again, or email hello@shariq.dev directly.", "error");
+        setFeedback("Couldn't send. Email " + (form.querySelector('[name="email"]') ? "hello@shariq.dev" : "") + " directly.", "error");
         if (submitLabel) submitLabel.textContent = "Send";
         submitBtn.disabled = false;
       }

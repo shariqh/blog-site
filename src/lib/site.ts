@@ -3,7 +3,7 @@ export const SITE = {
   description: 'Musings on leadership and technology.',
   author: 'Shariq Hirani',
   url: 'https://www.shariq.dev',
-  email: 'shariq@coreworx.io',
+  email: 'hello@shariq.dev',
   social: {
     twitter: 'https://twitter.com/ShariqHirani',
     github: 'https://github.com/shariqh',
