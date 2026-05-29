@@ -7,6 +7,9 @@ draft: false
 summary: 'Tutorial on deploying platform-agnostic microservice applications to Heroku with GitHub Actions and Docker
 utilizing Docker ENV and ARG variables.'
 canonical: 'https://www.bundleapps.io/blog/docker-env-arg-heroku-github-actions-guide'
+hero:
+  image: '/static/images/blog/docker_env_arg-heroku-github_actions-guide/banner.png'
+  alt: 'Deploy Microservices with Docker on Heroku and GitHub Actions banner'
 ---
 
 <Callout
@@ -16,15 +19,6 @@ canonical: 'https://www.bundleapps.io/blog/docker-env-arg-heroku-github-actions-
 />
 
 <br />
-
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/docker_env_arg-heroku-github_actions-guide/banner.png'}
-  alt={'docker env arg heroku github actions banner'}
-  src={'/static/images/blog/docker_env_arg-heroku-github_actions-guide/banner.png'}
-  width={1200}
-  height={630}
-/>
 
 ## Heroku, Github Actions, and Docker ENV & ARG Variables
 
@@ -67,15 +61,6 @@ An important aspect in cloud-native software development has been to keep applic
 ### Create a new secret in GitHub Actions Secrets
 
 Head to GitHub and then your repository secret settings to add a new repository secret. Press `New repository secret` to add your environment variable. Once completed, it should appear in the `Repository secrets` section. If you're following along from the last tutorial, you'll already have the `HEROKU_API_KEY` set. We're going to create a second secret called `TEST_ENV` as seen in the screenshot below. I set it to `test_env_from_github`.
-
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/docker_env_arg-heroku-github_actions-guide/github-secrets.png'}
-  alt={'github secrets menu'}
-  src={'/static/images/blog/docker_env_arg-heroku-github_actions-guide/github-secrets.png'}
-  width={1504}
-  height={717}
-/>
 
 ## Accessing Secrets with GitHub Actions and Docker Build ARGs
 
@@ -234,15 +219,6 @@ bootstrap()
 We should be ready to trigger our GitHub Action and have our NestJS Docker application deploy on Heroku with this next step. All you need to do is add, commit, and push up your changes (namely the GitHub Actions workflow) and your pipeline should automatically trigger!
 
 Navigate to your Heroku logs to see if the expected variables were output.
-
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/docker_env_arg-heroku-github_actions-guide/heroku-logs.png'}
-  alt={'heroku logs'}
-  src={'/static/images/blog/docker_env_arg-heroku-github_actions-guide/heroku-logs.png'}
-  width={1216}
-  height={287}
-/>
 
 ## Conclusion
 

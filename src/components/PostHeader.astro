@@ -8,13 +8,12 @@ interface Props {
   bucket: BucketKey;
   bucketLabel: string;
   summary?: string;
-  hero?: { image: ImageMetadata; alt: string } | null;
+  /** Path served from /public/, e.g. /static/images/blog/<slug>/hero.png. */
+  hero?: { image: string; alt: string } | null;
   readingMinutes?: number;
 }
 
 const { title, date, bucket, bucketLabel, summary, hero, readingMinutes } = Astro.props;
-
-const { Image } = await import("astro:assets");
 ---
 <header class="py-12">
   <p class="font-mono text-xs uppercase tracking-[0.22em] text-[var(--fg-soft)]">
@@ -32,7 +31,7 @@ const { Image } = await import("astro:assets");
 
   {hero && (
     <div class="mt-8">
-      <Image src={hero.image} alt={hero.alt} class="w-full rounded-lg" />
+      <img src={hero.image} alt={hero.alt} class="w-full rounded-lg" loading="lazy" decoding="async" />
     </div>
   )}
 </header>

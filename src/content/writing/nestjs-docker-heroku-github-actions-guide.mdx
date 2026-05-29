@@ -6,16 +6,10 @@ tags: ['docker', 'architecture']
 draft: false
 summary: 'The Definitive Guide: A CI/CD Tutorial On Deploying a NestJS microservice with Docker, Heroku, and GitHub Actions.'
 canonical: 'https://www.bundleapps.io/blog/nestjs-docker-heroku-github-actions-guide'
+hero:
+  image: '/static/images/blog/nestjs-docker-heroku-github_actions-guide/banner.png'
+  alt: 'Deploy NestJS with Docker, Heroku, and GitHub Actions banner'
 ---
-
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/banner.png'}
-  alt={'nestjs docker heroku github actions banner'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/banner.png'}
-  width={1200}
-  height={630}
-/>
 
 ## The NestJS Cloud-Native Toolchain
 
@@ -43,38 +37,9 @@ If more insight is needed on the tooling and setup of NestJS, visit the official
 
 Select your preferred package manager. I'm partial to npm and that's what this tutorial is based on.
 
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/install-nest.png'}
-  alt={'install nest with npm'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/install-nest.png'}
-  width={771}
-  height={528}
-/>
-
 The project will complete set up, and you'll have a shiny new NestJS project set up.
 
-<Image
-  placeholder="blur"
-  blurDataURL={
-    '/static/images/blog/nestjs-docker-heroku-github_actions-guide/nest-npm-settings.png'
-  }
-  alt={'nest select npm'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/nest-npm-settings.png'}
-  width={771}
-  height={292}
-/>
-
 By default, NestJS launches applications on port `3000`. This can be modified in the `/src/main.ts` file as seen in the screenshot.
-
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/nest-port.png'}
-  alt={'nestjs default port'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/nest-port.png'}
-  width={1258}
-  height={340}
-/>
 
 Start your NestJS application in dev mode for live reloading.
 
@@ -90,31 +55,9 @@ curl -X GET 'localhost:3000'
 
 The response should print similar to below. Stop the instance before moving on `ctrl/cmd + c`.
 
-<Image
-  placeholder="blur"
-  blurDataURL={
-    '/static/images/blog/nestjs-docker-heroku-github_actions-guide/curl-get-localhost.png'
-  }
-  alt={'curl localhost'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/curl-get-localhost.png'}
-  width={770}
-  height={43}
-/>
-
 ## Add your NestJS Repository to GitHub
 
 Log in to GitHub and create a new repository. Press Create repository to complete this. I named the repository **nestjs-docker-heroku-github_actions-example**.
-
-<Image
-  placeholder="blur"
-  blurDataURL={
-    '/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-create-repo.png'
-  }
-  alt={'github create new repository'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-create-repo.png'}
-  width={1307}
-  height={743}
-/>
 
 Come back to your terminal and complete the steps outlined by GitHub to push up your local branch (or follow the steps below).
 
@@ -228,17 +171,6 @@ This command creates your docker image based on the Dockerfile at your current t
 
 After a few minutes, you should have a successful output message.
 
-<Image
-  placeholder="blur"
-  blurDataURL={
-    '/static/images/blog/nestjs-docker-heroku-github_actions-guide/docker-build-nest-image.png'
-  }
-  alt={'docker build nest image'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/docker-build-nest-image.png'}
-  width={770}
-  height={410}
-/>
-
 To further validate that your image is ready, check that the image exists locally.
 
 ```bash
@@ -246,15 +178,6 @@ docker images
 ```
 
 The output should print the new image.
-
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/docker-images.png'}
-  alt={'docker images'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/docker-images.png'}
-  width={770}
-  height={53}
-/>
 
 ## Run the NestJS Docker Development Server
 
@@ -274,25 +197,7 @@ Stop the container and let's continue on to get the NestJS application ready for
 
 Login to the Heroku site and create a new application.
 
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-new-app.png'}
-  alt={'create a new app in heroku'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-new-app.png'}
-  width={1262}
-  height={189}
-/>
-
 Name it whatever you like, as long as it's unique, and select `Create new app`.
-
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-app-name.png'}
-  alt={'name heroku app'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-app-name.png'}
-  width={1262}
-  height={441}
-/>
 
 We're done with Heroku for now, but will need to revisit it to grab your API key, so don't close the tab.
 
@@ -301,17 +206,6 @@ We're done with Heroku for now, but will need to revisit it to grab your API key
 <Callout text="Checkpoint! So far, we've bootstrapped a NestJS application, created a docker container for it, and created the application space on Heroku. Good job making it this far!" />
 
 Switching back to your terminal, create a new folder structure to house the GitHub Actions YAML (.yml) within the `nestjs-example-project` and then create the file itself. The folder structure is non-negotiable, this is where GitHub will look for your workflow.
-
-<Image
-  placeholder="blur"
-  blurDataURL={
-    '/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-workflow-file.png'
-  }
-  alt={'github workflow directory structure'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-workflow-file.png'}
-  width={770}
-  height={106}
-/>
 
 Paste the following into your file.
 
@@ -379,88 +273,19 @@ Though we've configured our application repository now, unfortunately, we won't 
 
 Go back to Heroku and grab your API key from the `Account settings` page. Press `Reveal` and copy the key.
 
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-api-key.png'}
-  alt={'Heroku API key'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-api-key.png'}
-  width={1453}
-  height={1023}
-/>
-
 Head to GitHub and then your repository secret settings to add the key. Press `New repository` secret to add your key and once completed, it should appear in the `Repository secrets` section.
-
-<Image
-  placeholder="blur"
-  blurDataURL={
-    '/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-new-secret.png'
-  }
-  alt={'github add repository secret'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-new-secret.png'}
-  width={1262}
-  height={441}
-/>
 
 ### Trigger the GitHub Action
 
 We should be ready to trigger our GitHub Action and have our NestJS Docker application deploy on Heroku with this next step. All you need to do is add, commit, and push up your changes (namely the GitHub Actions workflow) and your pipeline should automatically trigger!
 
-<Image
-  placeholder="blur"
-  blurDataURL={
-    '/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-workflow-overview.png'
-  }
-  alt={'github workflow overview'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-workflow-overview.png'}
-  width={1461}
-  height={403}
-/>
-
 Clicking on the workflow will give you more details and logs about your run.
-
-<Image
-  placeholder="blur"
-  blurDataURL={
-    '/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-workflow-logs.png'
-  }
-  alt={'github workflow logs'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/github-workflow-logs.png'}
-  width={1664}
-  height={551}
-/>
 
 You can also watch your Heroku logs for your application to see the status, but you should expect it to take a couple of minutes to populate after the GitHub Actions workflow.
 
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-logs.png'}
-  alt={'heroku logs'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-logs.png'}
-  width={1210}
-  height={279}
-/>
-
 Once the pipelines finish and your state has changed to up, select the Open app button on Heroku to see your "Hello World" displayed in all its glory!
 
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-open-app.png'}
-  alt={'heroku dashboard open app button'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/heroku-open-app.png'}
-  width={1274}
-  height={223}
-/>
-
 Good job on completing the tutorial!
-
-<Image
-  placeholder="blur"
-  blurDataURL={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/deployed-app.png'}
-  alt={'deployed heroku application'}
-  src={'/static/images/blog/nestjs-docker-heroku-github_actions-guide/deployed-app.png'}
-  width={543}
-  height={117}
-/>
 
 ## NestJS Docker Production Environment
 

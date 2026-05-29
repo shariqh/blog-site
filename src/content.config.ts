@@ -3,7 +3,7 @@ import { glob } from 'astro/loaders'
 
 const writing = defineCollection({
   loader: glob({ pattern: '**/*.mdx', base: './src/content/writing' }),
-  schema: ({ image }) =>
+  schema: () =>
     z.object({
       title: z.string(),
       date: z.coerce.date(),
@@ -11,7 +11,10 @@ const writing = defineCollection({
       summary: z.string().max(280),
       hero: z
         .object({
-          image: image(),
+          // Path served from /public/ (e.g. /static/images/blog/<slug>/hero.png).
+          // Rendered as a plain <img> in PostHeader. Skips Astro's image
+          // optimization, which is fine for v1 — banner PNGs are already small.
+          image: z.string(),
           alt: z.string(),
           prompt: z.string().optional(),
           background: z.enum(['ink', 'ink-soft', 'ochre', 'terracotta', 'paper']).optional(),
