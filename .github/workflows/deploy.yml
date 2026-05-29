@@ -39,6 +39,11 @@ jobs:
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         id: deploy
+        env:
+          # Modern npm (10+) prompts on `npx wrangler@<version>` if wrangler
+          # isn't installed locally, and the prompt fails non-interactively
+          # in CI. Auto-accept the install.
+          NPM_CONFIG_YES: "true"
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
