@@ -1,14 +1,201 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Hero from "../components/Hero.astro";
+
+type ProjectKind = "product" | "tool" | "site" | "learn" | "talk";
+
+interface Project {
+  name: string;
+  description: string;
+  kind: ProjectKind;
+  /** Public-facing site, if any. */
+  site?: string;
+  /** GitHub repo, if open source. Omit for closed-source products. */
+  repo?: string;
+  /** Optional badge text like "active" / "archived" / a year. */
+  status?: string;
+}
+
+const active: Project[] = [
+  {
+    name: "lognote",
+    description:
+      "Local audio transcription + summarization for Mac. Records mic + system audio, runs MLX-Whisper on-device, lands a Markdown transcript and summary in your notes.",
+    kind: "product",
+    site: "https://lognote.dev",
+    status: "active",
+  },
+  {
+    name: "unrivaledpro",
+    description:
+      "Closed-source product. (Update this description in src/pages/projects.astro.)",
+    kind: "product",
+    site: "https://unrivaledpro.com",
+    status: "active",
+  },
+  {
+    name: "shariq.dev",
+    description:
+      "This site. Astro + Tailwind 4 + MDX, deployed on Cloudflare Pages. The whole rebuild is documented in the blog.",
+    kind: "site",
+    site: "https://shariq.dev",
+    repo: "https://github.com/shariqh/blog-site",
+    status: "active",
+  },
+];
+
+const built: Project[] = [
+  {
+    name: "home-server-docker-compose",
+    description:
+      "A collection of docker-compose files I use to run my home server. With comments.",
+    kind: "tool",
+    repo: "https://github.com/shariqh/home-server-docker-compose",
+  },
+  {
+    name: "template-docker-react+vite+tailwind+ts+postgres+pgjwt-auth",
+    description:
+      "Starter template for a containerized React/Vite/TS app with a Postgres backend and pgjwt-based auth.",
+    kind: "tool",
+    repo: "https://github.com/shariqh/template-docker-react_vite_tailwind_ts-postgres_pgjwt_auth",
+  },
+  {
+    name: "myspace",
+    description: "A personal sandbox / landing page from a while back.",
+    kind: "site",
+    site: "https://shariqh.github.io/myspace/",
+    repo: "https://github.com/shariqh/myspace",
+  },
+  {
+    name: "coffee-ui",
+    description: "Coffee-themed UI experiments.",
+    kind: "site",
+    site: "https://coffee-ui.vercel.app",
+    repo: "https://github.com/shariqh/coffee-ui",
+  },
+  {
+    name: "nbafanpage",
+    description: "An NBA fan-page side project.",
+    kind: "site",
+    site: "https://nbafanpage.vercel.app",
+    repo: "https://github.com/shariqh/nbafanpage",
+  },
+  {
+    name: "theoffice-swiftui",
+    description: "An Office trivia app built with SwiftUI.",
+    kind: "learn",
+    repo: "https://github.com/shariqh/theoffice-swiftui",
+  },
+  {
+    name: "bullmq + bull-board + redis docker starter",
+    description: "Quickstart for running BullMQ with Bull-Board behind Redis, in Docker.",
+    kind: "tool",
+    repo: "https://github.com/shariqh/bullmq_bull-board_redis_docker_starter",
+  },
+  {
+    name: "acme-inventory-api",
+    description: "Python inventory-management API exercise.",
+    kind: "tool",
+    repo: "https://github.com/shariqh/acme-inventory-api",
+  },
+  {
+    name: "developer.box.com",
+    description: "Box's public developer documentation site. Contributed during my time at Box.",
+    kind: "site",
+    site: "https://developer.box.com",
+    repo: "https://github.com/shariqh/developer.box.com",
+  },
+];
+
+const talks: Project[] = [
+  {
+    name: "DevOps intro",
+    description: "Internal presentation introducing DevOps practices.",
+    kind: "talk",
+    repo: "https://github.com/shariqh/presentation_devops",
+  },
+  {
+    name: "JUnit + Mockito intro",
+    description: "Internal presentation on Java unit testing.",
+    kind: "talk",
+    repo: "https://github.com/shariqh/presentation_junit-mockito-intro",
+  },
+  {
+    name: "Managing in high-turnover environments",
+    description: "Internal presentation on engineering management during attrition.",
+    kind: "talk",
+    repo: "https://github.com/shariqh/presentation_managing-in-high-turnover",
+  },
+];
+
+function host(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
 ---
 <BaseLayout title="Projects">
-  <Hero title="Projects." eyebrow="Building" />
+  <Hero title="Projects." eyebrow="Building, built, talked about" />
 
-  <div class="pb-16">
-    <p class="max-w-prose text-[var(--fg-soft)]">
-      Things I'm building or have built. (Real content lives in your head — fill this in
-      next time you ship something noteworthy.)
-    </p>
-  </div>
+  <p class="mb-12 max-w-prose font-sans text-[var(--fg-soft)]">
+    Things I'm building, things I've built, and a few talks. Closed-source products link to their sites; open-source ones link to their repo and (if there's one) their live site.
+  </p>
+
+  {[
+    { heading: "Active", items: active },
+    { heading: "Built", items: built },
+    { heading: "Talks", items: talks },
+  ].map((section) => (
+    <section class="mb-16">
+      <div class="mb-6 flex items-center gap-4">
+        <h2 class="font-display text-2xl italic">{section.heading}</h2>
+        <span class="h-px flex-1 bg-[color-mix(in_oklab,var(--fg)_20%,transparent)]"></span>
+        <span class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--fg-soft)]">
+          {String(section.items.length).padStart(2, "0")}
+        </span>
+      </div>
+
+      <ul class="space-y-3">
+        {section.items.map((p) => (
+          <li class="group border-2 border-[var(--fg)] p-5 transition-transform hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_var(--fg)]">
+            <div class="flex flex-wrap items-baseline justify-between gap-3">
+              <h3 class="font-display text-xl italic">{p.name}</h3>
+              {p.status && (
+                <span class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--accent)]">
+                  ● {p.status}
+                </span>
+              )}
+            </div>
+            <p class="mt-2 max-w-prose text-sm leading-relaxed text-[var(--fg-soft)]">
+              {p.description}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-4 font-mono text-[11px] uppercase tracking-[0.18em]">
+              {p.site && (
+                <a
+                  href={p.site}
+                  class="underline decoration-[var(--accent)] underline-offset-4 hover:text-[var(--accent)]"
+                >
+                  {host(p.site)} ↗
+                </a>
+              )}
+              {p.repo && (
+                <a
+                  href={p.repo}
+                  class="underline decoration-[var(--accent)] underline-offset-4 hover:text-[var(--accent)]"
+                >
+                  github ↗
+                </a>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+
+  <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--fg-soft)]">
+    Want to prune this list? Edit <code>src/pages/projects.astro</code>.
+  </p>
 </BaseLayout>

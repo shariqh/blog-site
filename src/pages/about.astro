@@ -1,24 +1,59 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Hero from "../components/Hero.astro";
+import ContactModal from "../components/ContactModal.astro";
 ---
 <BaseLayout title="About">
   <Hero title="About." eyebrow="Shariq Hirani" />
-  <div class="prose max-w-prose pb-16">
+
+  <div class="about-prose pb-16">
     <p>
-      Engineering leader. I write about leading software teams, building product,
-      and the in-between of tech and being a person. Currently working at Coreworx
-      on the AI side.
+      Engineering leader. I write here about the work and the in-between — leading teams, building systems, and the AI shift happening in real time.
     </p>
+
     <p>
-      You can reach me at <a href="mailto:shariq@coreworx.io">shariq@coreworx.io</a>
-      or on the various accounts linked in the footer.
+      Most of what I do day-to-day lives at the intersection of engineering practice and product calls. I've spent over a decade moving between IC and leadership roles across architecture, distributed systems, infrastructure, and platform — and lately, building things on my own. The themes I keep coming back to:
     </p>
+
+    <ul>
+      <li>How engineering teams <em>actually</em> run, vs how they're written about.</li>
+      <li>The line between shipping fast and shipping right — and why most of the disagreement here is really about risk tolerance, not technique.</li>
+      <li>What AI tooling looks like when it holds up under real, sustained use — not demos, not press releases.</li>
+      <li>Career arcs in tech: the asymmetric leap from senior engineer to lead, and the under-discussed move <em>back</em> down the ladder when leadership stops fitting.</li>
+    </ul>
+
+    <p>
+      Lately I'm building <a href="https://lognote.dev">lognote</a> (local audio transcription and summarization for Mac) and a few other things over on <a href="/projects">projects</a>.
+    </p>
+
+    <p>
+      If you want to reach out — about anything — the form below is the best way. It doesn't go through Twitter or LinkedIn; it ends up in my inbox.
+    </p>
+
+    <div class="not-prose mt-8">
+      <button
+        type="button"
+        id="contact-open"
+        class="inline-flex items-center gap-2 border-2 border-[var(--fg)] bg-[var(--accent)] px-5 py-2 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-ink)] shadow-[4px_4px_0_0_var(--fg)] transition-transform hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_var(--fg)]"
+      >
+        Get in touch <span aria-hidden="true">→</span>
+      </button>
+    </div>
   </div>
+
+  <ContactModal />
 
   <style is:global>
     @reference "../styles/global.css";
-    .prose p { @apply my-5 leading-[1.7]; }
-    .prose a { @apply underline decoration-[var(--accent)] decoration-2 underline-offset-4; }
+    .about-prose {
+      @apply max-w-prose font-sans text-[16px] leading-[1.7];
+    }
+    .about-prose p { @apply my-5; }
+    .about-prose ul { @apply my-5 list-disc space-y-2 pl-6; }
+    .about-prose a {
+      @apply underline decoration-[var(--accent)] decoration-2 underline-offset-4 transition-colors;
+    }
+    .about-prose a:hover { color: var(--accent); }
+    .about-prose em { @apply italic; }
   </style>
 </BaseLayout>
