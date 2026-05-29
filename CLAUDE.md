@@ -50,3 +50,14 @@ injected into MDX via `<Content components={...} />` in
 - Strict TypeScript (`tsconfig.json` extends `astro/tsconfigs/strict`).
 - Don't use the Tailwind 3 `tailwind.config.js` pattern — tokens live in
   CSS via `@theme`.
+
+## Deploy
+
+Cloudflare Pages via `.github/workflows/deploy.yml`. `master` → production
+(`shariq.dev`); every PR gets its own preview URL auto-commented on the PR.
+Required GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+First push to a branch auto-creates the Pages project — no dashboard work
+needed beyond adding the custom domain. The wrangler CLI (`wrangler pages
+deployment tail --project-name=shariq-dev` etc.) is useful for ops; see
+README for the full command list. Don't conflate `wrangler login` (your
+personal OAuth) with `CLOUDFLARE_API_TOKEN` (the CI secret).
