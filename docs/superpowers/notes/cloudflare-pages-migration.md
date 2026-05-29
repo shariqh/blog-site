@@ -14,16 +14,27 @@ In **GitHub:** repo → Settings → Secrets and variables → Actions → New r
 - `CLOUDFLARE_ACCOUNT_ID` = the account ID
 - `CLOUDFLARE_API_TOKEN` = the API token
 
-## 2. Trigger the first deploy
+## 2. Create the Pages project
 
-The workflow auto-creates the `shariq-dev` Pages project on first run. Easiest trigger: push any commit to `rebuild` (or merge the PR to `main`). Watch the run at GitHub → Actions → "Deploy to Cloudflare Pages".
+`wrangler pages deploy` does NOT auto-create the project — it fails with `Project not found` if the project doesn't exist. Create it once via CLI:
+
+```sh
+wrangler login   # if you haven't already
+wrangler pages project create shariq-dev --production-branch=main
+```
+
+Alternatively, create via dashboard: Workers & Pages → Create application → Pages → Connect to Git → name `shariq-dev`. (CLI is faster.)
+
+## 3. Trigger the first deploy
+
+Easiest trigger: push any commit to `main`, or click "Run workflow" on the "Deploy to Cloudflare Pages" workflow in GitHub Actions. Watch the run at GitHub → Actions.
 
 If it's a PR push, the workflow comments the preview URL back on the PR.
-If it's a `main` push, it deploys to the project's production environment.
+If it's a `main` push, it deploys to the project's production environment at `*.shariq-dev.pages.dev`.
 
-## 3. Verify the preview at `*.pages.dev`
+## 4. Verify the deploy at `*.pages.dev`
 
-The first deploy creates `https://shariq-dev.pages.dev`. Open it:
+The canonical URL is `https://shariq-dev.pages.dev` (each deployment also gets a `<sha>.shariq-dev.pages.dev` URL). Open it:
 
 - Homepage renders, all 4 cells colored, portrait visible.
 - 2–3 posts under `/blog/<slug>`.
@@ -32,7 +43,7 @@ The first deploy creates `https://shariq-dev.pages.dev`. Open it:
 
 If anything looks wrong, fix on a branch and let CF re-deploy.
 
-## 4. Point shariq.dev at Cloudflare Pages
+## 5. Point shariq.dev at Cloudflare Pages
 
 1. In **Cloudflare → Workers & Pages → shariq-dev → Custom domains → Set up a custom domain**.
 2. Add `shariq.dev` and `www.shariq.dev`. CF detects DNS is on the same account and adds records automatically.
@@ -45,7 +56,7 @@ wrangler pages domain add shariq.dev --project-name=shariq-dev
 wrangler pages domain add www.shariq.dev --project-name=shariq-dev
 ```
 
-## 5. Decommission Vercel
+## 6. Decommission Vercel
 
 Only after Cloudflare is live and verified on `shariq.dev`:
 
