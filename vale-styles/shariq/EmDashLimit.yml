@@ -1,0 +1,6 @@
+extends: occurrence
+message: "Too many em-dashes (%s in this file). Cap at 2 per post (docs/EDITORIAL.md §Tics). Replace with commas, parentheses, or periods."
+level: warning
+max: 2
+scope: text
+token: '—'

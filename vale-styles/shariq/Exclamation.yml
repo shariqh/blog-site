@@ -1,0 +1,6 @@
+extends: existence
+message: "Exclamation points are out of voice (docs/EDITORIAL.md §Tics). Reserve for dialogue or genuine surprise."
+level: suggestion
+scope: paragraph
+tokens:
+  - '!\B'

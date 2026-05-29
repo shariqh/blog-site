@@ -1,0 +1,55 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PostHeader from "../../components/PostHeader.astro";
+import Prose from "../../components/Prose.astro";
+import Toc from "../../components/mdx/Toc.astro";
+import Callout from "../../components/mdx/Callout.astro";
+import Youtube from "../../components/mdx/Youtube.astro";
+import Image from "../../components/mdx/Image.astro";
+import { resolveBucket } from "../../lib/buckets";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("writing", ({ data }) => !data.draft);
+  return posts.map((post) => ({
+    params: { slug: post.id.replace(/\.mdx$/, "") },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content, headings, remarkPluginFrontmatter } = await render(post);
+
+const bucket = resolveBucket(post.data.tags);
+const readingMinutes = remarkPluginFrontmatter?.readingTime
+  ? Math.ceil(remarkPluginFrontmatter.readingTime / 60)
+  : undefined;
+---
+<BaseLayout title={post.data.title} description={post.data.summary}>
+  <article class="pb-16">
+    <PostHeader
+      title={post.data.title}
+      date={post.data.date}
+      bucket={bucket.key}
+      bucketLabel={bucket.label}
+      summary={post.data.summary}
+      hero={post.data.hero ? { image: post.data.hero.image, alt: post.data.hero.alt } : null}
+      readingMinutes={readingMinutes}
+    />
+
+    {headings.length > 4 && <Toc headings={headings} />}
+
+    <Prose>
+      <Content components={{ Callout, Youtube, Image }} />
+    </Prose>
+
+    {post.data.canonical && (
+      <p class="mt-12 font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">
+        Originally published at{" "}
+        <a href={post.data.canonical} class="underline decoration-[var(--accent)] underline-offset-4">
+          {new URL(post.data.canonical).hostname}
+        </a>
+      </p>
+    )}
+  </article>
+</BaseLayout>

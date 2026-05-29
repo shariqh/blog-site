@@ -1,0 +1,44 @@
+---
+// Owns the long-form reading typography. All styles target descendants
+// so MDX content (which has no class hooks) gets styled.
+---
+<div class="prose">
+  <slot />
+</div>
+
+<style is:global>
+  @reference "../styles/global.css";
+  .prose {
+    @apply font-sans text-[17px] leading-[1.7] text-[var(--fg)];
+    max-width: 65ch;
+  }
+  .prose h2 {
+    @apply mt-12 mb-4 font-display text-3xl italic leading-tight;
+  }
+  .prose h3 {
+    @apply mt-8 mb-3 font-sans text-xl font-semibold;
+  }
+  .prose p { @apply my-5; }
+  .prose a {
+    @apply underline decoration-[var(--accent)] decoration-2 underline-offset-4 transition-colors;
+  }
+  .prose a:hover { color: var(--accent); }
+  .prose strong { @apply font-semibold; }
+  .prose ul { @apply my-5 list-disc pl-6; }
+  .prose ol { @apply my-5 list-decimal pl-6; }
+  .prose li { @apply my-2; }
+  .prose blockquote {
+    @apply my-6 border-l-2 border-[var(--accent)] pl-4 italic text-[var(--fg-soft)];
+  }
+  .prose code:not(pre code) {
+    @apply rounded bg-[var(--bg-soft)] px-1.5 py-0.5 font-mono text-[0.9em];
+  }
+  .prose pre {
+    @apply my-6 overflow-x-auto rounded-lg p-4 text-sm;
+  }
+  .prose pre code { @apply font-mono; }
+  .prose img { @apply my-6 rounded-lg; }
+  .prose hr {
+    @apply my-12 border-0 border-t border-[color-mix(in_oklab,var(--fg)_15%,transparent)];
+  }
+</style>

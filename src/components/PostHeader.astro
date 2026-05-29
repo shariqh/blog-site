@@ -1,0 +1,38 @@
+---
+import { formatDate } from "../lib/formatDate";
+import { EYEBROW_PREFIX, type BucketKey } from "../lib/buckets";
+
+interface Props {
+  title: string;
+  date: Date;
+  bucket: BucketKey;
+  bucketLabel: string;
+  summary?: string;
+  hero?: { image: ImageMetadata; alt: string } | null;
+  readingMinutes?: number;
+}
+
+const { title, date, bucket, bucketLabel, summary, hero, readingMinutes } = Astro.props;
+
+const { Image } = await import("astro:assets");
+---
+<header class="py-12">
+  <p class="font-mono text-xs uppercase tracking-[0.22em] text-[var(--fg-soft)]">
+    {EYEBROW_PREFIX[bucket]}{bucketLabel.toUpperCase()}
+    <span class="mx-2">·</span>
+    {formatDate(date)}
+    {readingMinutes ? <><span class="mx-2">·</span>{readingMinutes} min read</> : null}
+  </p>
+
+  <h1 class="mt-4 font-display text-4xl italic leading-[1.05] tracking-tight sm:text-5xl">{title}</h1>
+
+  {summary && (
+    <p class="mt-5 max-w-prose font-sans text-lg text-[var(--fg-soft)]">{summary}</p>
+  )}
+
+  {hero && (
+    <div class="mt-8">
+      <Image src={hero.image} alt={hero.alt} class="w-full rounded-lg" />
+    </div>
+  )}
+</header>

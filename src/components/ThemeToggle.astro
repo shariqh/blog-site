@@ -1,0 +1,142 @@
+---
+// Theme is stored in localStorage as 'system' | 'light' | 'dark'.
+// 'system' (default) follows prefers-color-scheme.
+// Icon-only button with dropdown menu; no text → no header layout shift.
+---
+<div class="relative">
+  <button
+    type="button"
+    id="theme-toggle"
+    aria-label="Theme"
+    aria-haspopup="menu"
+    aria-expanded="false"
+    class="flex h-7 w-7 items-center justify-center rounded hover:text-[var(--accent)]"
+  >
+    <!-- Three icons; only the active one is visible. JS swaps via data-theme-effective attr on html. -->
+    <svg data-theme-icon="system" class="hidden h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="4" width="20" height="14" rx="2" />
+      <path d="M8 22h8M12 18v4" />
+    </svg>
+    <svg data-theme-icon="light" class="hidden h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+    <svg data-theme-icon="dark" class="hidden h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  </button>
+
+  <div
+    id="theme-menu"
+    role="menu"
+    aria-labelledby="theme-toggle"
+    hidden
+    class="absolute right-0 top-full z-10 mt-2 w-32 flex-col border border-[var(--fg)] bg-[var(--bg)] text-sm shadow-lg"
+  >
+    {[
+      { value: "system", label: "System" },
+      { value: "light", label: "Light" },
+      { value: "dark", label: "Dark" },
+    ].map((opt) => (
+      <button
+        type="button"
+        role="menuitemradio"
+        data-theme-set={opt.value}
+        class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[color-mix(in_oklab,var(--fg)_10%,transparent)]"
+      >
+        <span data-theme-check class="font-mono text-xs opacity-0">✓</span>
+        {opt.label}
+      </button>
+    ))}
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    const root = document.documentElement;
+
+    function effective(mode) {
+      return mode === "dark" ||
+        (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+        ? "dark"
+        : "light";
+    }
+
+    function updateButtonIcon(mode) {
+      // Choose which icon to show in the button.
+      const which = mode === "system" ? "system" : effective(mode);
+      document.querySelectorAll("[data-theme-icon]").forEach((el) => {
+        el.classList.toggle("hidden", el.getAttribute("data-theme-icon") !== which);
+      });
+    }
+
+    function updateMenuChecks(mode) {
+      document.querySelectorAll("[data-theme-set]").forEach((btn) => {
+        const isActive = btn.getAttribute("data-theme-set") === mode;
+        btn.setAttribute("aria-checked", isActive ? "true" : "false");
+        const check = btn.querySelector("[data-theme-check]");
+        if (check) check.style.opacity = isActive ? "1" : "0";
+      });
+    }
+
+    function apply(mode) {
+      root.classList.toggle("dark", effective(mode) === "dark");
+      updateButtonIcon(mode);
+      updateMenuChecks(mode);
+    }
+
+    function getMenu() { return document.getElementById("theme-menu"); }
+    function getButton() { return document.getElementById("theme-toggle"); }
+
+    function openMenu() {
+      const m = getMenu(), b = getButton();
+      if (!m || !b) return;
+      m.hidden = false;
+      m.style.display = "flex";
+      b.setAttribute("aria-expanded", "true");
+    }
+    function closeMenu() {
+      const m = getMenu(), b = getButton();
+      if (!m || !b) return;
+      m.hidden = true;
+      m.style.display = "";
+      b.setAttribute("aria-expanded", "false");
+    }
+
+    const stored = localStorage.getItem("theme") || "system";
+    apply(stored);
+
+    document.addEventListener("click", (e) => {
+      const target = e.target;
+      if (!target) return;
+
+      const toggleEl = target.closest && target.closest("#theme-toggle");
+      if (toggleEl) {
+        const expanded = toggleEl.getAttribute("aria-expanded") === "true";
+        expanded ? closeMenu() : openMenu();
+        return;
+      }
+
+      const setBtn = target.closest && target.closest("[data-theme-set]");
+      if (setBtn) {
+        const mode = setBtn.getAttribute("data-theme-set");
+        localStorage.setItem("theme", mode);
+        apply(mode);
+        closeMenu();
+        return;
+      }
+
+      // Click outside — close menu.
+      const menuEl = target.closest && target.closest("#theme-menu");
+      if (!menuEl) closeMenu();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMenu();
+    });
+
+    window
+      .matchMedia("(prefers-color-scheme: dark)")
+      .addEventListener("change", () => apply(localStorage.getItem("theme") || "system"));
+  })();
+</script>

@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Hero from "../components/Hero.astro";
+---
+<BaseLayout title="About">
+  <Hero title="About." eyebrow="Shariq Hirani" />
+  <div class="prose max-w-prose pb-16">
+    <p>
+      Engineering leader. I write about leading software teams, building product,
+      and the in-between of tech and being a person. Currently working at Coreworx
+      on the AI side.
+    </p>
+    <p>
+      You can reach me at <a href="mailto:shariq@coreworx.io">shariq@coreworx.io</a>
+      or on the various accounts linked in the footer.
+    </p>
+  </div>
+
+  <style is:global>
+    @reference "../styles/global.css";
+    .prose p { @apply my-5 leading-[1.7]; }
+    .prose a { @apply underline decoration-[var(--accent)] decoration-2 underline-offset-4; }
+  </style>
+</BaseLayout>

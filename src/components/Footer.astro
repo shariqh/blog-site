@@ -1,0 +1,13 @@
+---
+import { SITE } from "../lib/site";
+---
+<footer class="mt-24 border-t border-[color-mix(in_oklab,var(--fg)_15%,transparent)]">
+  <div class="mx-auto flex max-w-3xl flex-col gap-3 px-5 py-8 text-sm sm:flex-row sm:justify-between">
+    <p>&copy; {new Date().getFullYear()} {SITE.author}</p>
+    <p class="flex gap-4">
+      <a href={`mailto:${SITE.email}`} class="hover:text-[var(--accent)]">reply via email</a>
+      <a href={SITE.social.twitter} class="hover:text-[var(--accent)]">twitter</a>
+      <a href="/feed.xml" class="hover:text-[var(--accent)]">rss</a>
+    </p>
+  </div>
+</footer>

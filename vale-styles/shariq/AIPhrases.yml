@@ -1,0 +1,22 @@
+extends: existence
+message: "'%s' reads as an LLM tic. Rewrite more directly (docs/EDITORIAL.md §AI-tell)."
+level: warning
+ignorecase: true
+nonword: false
+tokens:
+  - "I'll be blunt"
+  - "let me be blunt"
+  - "saying out loud"
+  - "it's worth noting"
+  - "in a world where"
+  - "let me think about this"
+  - "not just \\w+, it's"
+  - "that's a real \\w+"
+  - "the truth is"
+  - "to be fair"
+  - "delve into"
+  - "navigate the (complex|landscape|world)"
+  - "at the end of the day"
+  - "in today's fast-paced"
+  - "leverage \\w+ to"
+  - "unlock \\w+ potential"
