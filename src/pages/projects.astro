@@ -36,7 +36,7 @@ const active: Project[] = [
   {
     name: "shariq.dev",
     description:
-      "This site. Astro + Tailwind 4 + MDX, deployed on Cloudflare Pages. The whole rebuild is documented in the blog.",
+      'This site. Astro + Tailwind 4 + MDX, deployed on Cloudflare Pages. The whole rebuild is <a class="underline decoration-[var(--accent)] underline-offset-2 hover:text-[var(--accent)]" href="/blog/rebuilding-shariq-dev">documented in the blog</a>.',
     kind: "site",
     site: "https://shariq.dev",
     repo: "https://github.com/shariqh/blog-site",
@@ -168,9 +168,7 @@ function host(url: string) {
                 </span>
               )}
             </div>
-            <p class="mt-2 max-w-prose text-sm leading-relaxed text-[var(--fg-soft)]">
-              {p.description}
-            </p>
+            <p class="mt-2 max-w-prose text-sm leading-relaxed text-[var(--fg-soft)]" set:html={p.description} />
             <div class="mt-3 flex flex-wrap gap-4 font-mono text-[11px] uppercase tracking-[0.18em]">
               {p.site && (
                 <a

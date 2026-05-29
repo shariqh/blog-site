@@ -1,0 +1,120 @@
+---
+title: 'Rebuilding shariq.dev'
+date: '2026-05-28'
+tags: ['astro', 'cloudflare', 'engineering', 'ai']
+summary: 'The old shariq.dev was a Tailwind/Next.js starter frozen since 2021. I rebuilt it as an AI-drafted, PR-reviewed publishing pipeline on Astro and Cloudflare Pages.'
+---
+
+shariq.dev had been a fork of [`tailwind-nextjs-starter-blog`](https://github.com/timlrx/tailwind-nextjs-starter-blog) since 2021. It worked. It just hadn't moved.
+
+Three things bothered me. First, the stack was old enough that small additions felt expensive. The site ran Next.js 11, Tailwind 2, mdx-bundler. Next 15 was three majors away. Tailwind 4 rewired most of the configuration model. Touching anything risked a chain of upgrades.
+
+Second, the authoring loop was clunky. Write MDX in the repo. Hand-type frontmatter. Push. Hope Vercel didn't choke on something. No preview without running the dev server. Tags meant nothing to the design; every post looked identical.
+
+Third, and most of all, I'd been thinking about the [Claude Agent SDK](https://docs.claude.com/en/docs/claude-code/sdk) and what an AI-drafted blog actually looks like. Not "ChatGPT generates a post," which is worthless. I mean an agent that watches my actual work (recent commits across my repos, ideas dropped in Notion) and proposes drafts you'd consider posting. The old site's workflow couldn't support that. PR-based review wasn't there. Validation wasn't there. The visual system wouldn't tell you what kind of post you were even looking at.
+
+So I rebuilt the whole thing.
+
+## The stack
+
+Astro 6, TypeScript strict, Tailwind 4. Hosted on Cloudflare Pages.
+
+Astro was the obvious choice for a content site. Zero JS by default. Content Collections give you Zod-validated frontmatter, so malformed posts fail the build and can't merge. The MDX integration is built in. None of which is novel; the pitch for Astro on a blog has been the same since v2.
+
+Tailwind 4 is the part that surprised me. The CSS-first `@theme` block removes most of `tailwind.config.js`. Design tokens live directly in the stylesheet:
+
+```css
+@theme {
+  --color-ink: #15233a;
+  --color-ochre: #d49a3a;
+  --color-paper: #f3e8d2;
+  --color-terracotta: #b04a3a;
+}
+```
+
+Anywhere I'd previously written `theme('colors.ink')` I now just write `var(--color-ink)`. The component framework stops being the source of truth for design.
+
+TypeScript was discipline. The schema, the bucket resolver, the post-route props, the SITE config: everything gets typed end-to-end. Strict mode catches things I'd otherwise miss until publish.
+
+## Content shape
+
+Posts live as MDX files in `src/content/writing/`. Each has frontmatter validated by a Zod schema in `src/content.config.ts`:
+
+```ts
+schema: ({ image }) =>
+  z.object({
+    title: z.string(),
+    date: z.coerce.date(),
+    tags: z.array(z.string()).default([]),
+    summary: z.string().max(280),
+    hero: z
+      .object({
+        image: image(),
+        alt: z.string(),
+        prompt: z.string().optional(),
+      })
+      .optional(),
+    canonical: z.string().url().optional(),
+    draft: z.boolean().default(false),
+  })
+```
+
+The `image()` helper types the hero so the post layout gets `ImageMetadata` without `any`. The `prompt` field is intentional: when the agent generates a hero image, the prompt sticks with the post so we can regenerate later without losing the original instruction.
+
+Tags are free-form lowercase strings. A small module at `src/lib/buckets.ts` maps them into a fixed set of five display buckets: Leadership, Engineering, AI, Process, Notes. Each bucket drives a distinct color treatment in the homepage grid and the post-page eyebrow. The agent reads the same module so it knows what to write against.
+
+This separation matters. Tags are content; buckets are design. Adding a tag means typing it on a post. Adding a bucket means a deliberate code change touching the palette, the eyebrow prefix, and the resolver.
+
+## The visual system
+
+Pentagram-magazine: navy, ochre, terracotta, cream. The homepage is a 4-cell art-directed grid. A featured cell spans two columns; three smaller cells run alongside. Each cell takes its color from its post's bucket.
+
+The hard problem was dark mode. In the first pass, the Leadership cell used `--color-ink` (navy) as its background. That's beautiful in light mode: it pops off the cream paper. In dark mode the page background also became `--color-ink`. The Leadership cell disappeared.
+
+The fix was mode-aware bucket colors. In light mode, leadership cells are navy on cream. In dark mode, they invert to cream on navy. Engineering (ochre) and AI (terracotta) keep their colors because both are vibrant enough to read against either background. The bucket has an identity that survives the theme switch.
+
+## Publishing pipeline
+
+I haven't built the agent yet. That's Plan B: a scheduled GitHub Action that runs a TypeScript script using the Claude Agent SDK. The agent will have tools for reading my Notion ideas, scanning recent commits across configured repos, generating heroes, writing MDX, and opening a PR.
+
+What I did build is the scaffolding the agent will hook into. Every push triggers a Cloudflare Pages preview deploy. Every PR gets a preview URL auto-commented (via a GitHub Action lifted from [`lognote`](https://github.com/shariqh/lognote)). The preview renders the post identically to production. Reviewing on a phone is the same as on a laptop.
+
+The reviewer is me. The agent's job is to draft and propose; mine is to read on the preview, edit prose directly in GitHub's web editor, and merge when it sounds right. Merging is publishing.
+
+No CMS. Git is the database. PRs are the editorial workflow. Cloudflare preview deployments are the staging site. No infrastructure to babysit beyond what I already have.
+
+## Editorial discipline
+
+Once the agent starts drafting, the failure mode is obvious: LLM-flavored prose. Em-dashes everywhere. "I'll be blunt about this." "At the end of the day." "Let me think about this for a second."
+
+The defense is [`docs/EDITORIAL.md`](https://github.com/shariqh/blog-site/blob/main/docs/EDITORIAL.md) and [Vale](https://vale.sh). The editorial guide documents voice, accuracy, length-per-bucket, and a list of forbidden phrases. Vale runs in CI on every PR, comments inline on offending lines, and fails the build on errors. The forbidden-phrase list catches the obvious LLM tics:
+
+```yaml
+tokens:
+  - "I'll be blunt"
+  - 'let me be blunt'
+  - 'saying out loud'
+  - "it's worth noting"
+  - 'in a world where'
+  - 'delve into'
+  - 'navigate the (complex|landscape|world)'
+  - 'at the end of the day'
+```
+
+Both files were lifted near-wholesale from [`lognote`](https://github.com/shariqh/lognote)'s editorial setup. The phrases are universal; the bucket mappings, length guidance, and frontmatter spec are this-blog-specific.
+
+I caught one of my own claims with this discipline. The projects page on the new site originally said "the whole rebuild is documented in the blog." It wasn't. That's exactly the aspirational-present-tense thing the editorial guide warns about, and the only fix was actually writing this post.
+
+## Hosting
+
+Production runs on Cloudflare Pages. The previous site was on Vercel, which is a fine product with the best PR-preview UX in the business. The move was driven by consolidation. My DNS already lives on Cloudflare. Workers and Pages are good enough now that there's no reason to split.
+
+The deploy pipeline is, again, a GitHub Action lifted from `lognote`. `cloudflare/wrangler-action@v3` builds and deploys; the preview URL gets commented back on each PR.
+
+One gotcha for anyone copying this pattern: `wrangler pages deploy` does not auto-create the Pages project. The first deploy fails until you run `wrangler pages project create <name> --production-branch=main`. I had a misleading note in my own migration doc that suggested otherwise. Lived experience, not what I expected. That's the editorial discipline this blog is supposed to hold to.
+
+## What's next
+
+The blog is now scaffolded for the thing that motivated the rebuild: an AI-drafted publishing loop. The next step is building Plan B, the agent itself.
+
+I'll write that post after it actually runs.
