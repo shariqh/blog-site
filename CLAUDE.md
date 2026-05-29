@@ -51,6 +51,26 @@ injected into MDX via `<Content components={...} />` in
 - Don't use the Tailwind 3 `tailwind.config.js` pattern — tokens live in
   CSS via `@theme`.
 
+## Writing posts
+
+Prose for public-facing pages (blog posts, about, projects) follows
+`docs/EDITORIAL.md`. When drafting or editing post content, treat that
+file as required reading — it documents voice, AI-tell phrases to
+avoid, em-dash cap, length-per-bucket, and the pre-publish checklist.
+
+Vale runs the pattern-based rules in CI (`.github/workflows/vale.yml`
+
+- `vale-styles/shariq/`). Lint locally:
+
+```sh
+brew install vale
+vale src/content/writing
+```
+
+Vale warnings/suggestions don't block CI; only errors do (today, only
+broken frontmatter). The drafting agent in Plan B is expected to run
+Vale before opening its PR.
+
 ## Deploy
 
 Cloudflare Pages via `.github/workflows/deploy.yml`. `master` → production

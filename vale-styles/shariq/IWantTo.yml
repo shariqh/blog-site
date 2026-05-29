@@ -1,0 +1,8 @@
+extends: existence
+message: "'%s' is throat-clearing. Drop it and just say the thing (docs/EDITORIAL.md §AI-tell)."
+level: suggestion
+ignorecase: true
+tokens:
+  - "I want to (talk|say|share|write|tell|explain|argue)"
+  - "I'd like to (talk|say|share|write|tell|explain)"
+  - "today I'll (talk|share|explain|cover)"
