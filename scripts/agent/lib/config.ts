@@ -8,7 +8,11 @@ function required(key: string): string {
 }
 
 function optional(key: string, fallback: string): string {
-  return process.env[key] ?? fallback
+  // Use the fallback when the var is unset OR an empty string. GitHub Actions
+  // passes `${{ vars.X }}` for an unset repo variable as "" (not undefined),
+  // so `??` would let an empty string through and defeat the default.
+  const val = process.env[key]
+  return val && val.length > 0 ? val : fallback
 }
 
 export const CONFIG = {
