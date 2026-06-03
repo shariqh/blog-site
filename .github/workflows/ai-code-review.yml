@@ -63,7 +63,7 @@ jobs:
         if: steps.guard.outputs.skip == 'false'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install Copilot CLI
         if: steps.guard.outputs.skip == 'false'
