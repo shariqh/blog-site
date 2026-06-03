@@ -17,10 +17,29 @@ const READY_FILTER = {
   select: { equals: 'Ready' },
 }
 
+// Cap drafts per run so a big triage batch doesn't fan out into many model
+// calls (one long, quota-heavy nightly run) all at once. Remaining Ready rows
+// stay Ready and are picked up on the next run.
+const MAX_DRAFTS_PER_RUN = 3
+
 async function main(): Promise<void> {
-  const rows = await queryContentRows(READY_FILTER)
-  console.log(`Found ${rows.length} Ready row(s).`)
-  if (rows.length === 0) return
+  // Oldest-Ready first for a stable, predictable cap order. Safe because a
+  // failed row is moved out of Ready (below), so persistent failures can't keep
+  // refilling the capped slots and starving newer rows.
+  const ready = await queryContentRows(READY_FILTER, [
+    { timestamp: 'created_time', direction: 'ascending' },
+  ])
+  console.log(`Found ${ready.length} Ready row(s).`)
+  if (ready.length === 0) return
+
+  const rows = ready.slice(0, MAX_DRAFTS_PER_RUN)
+  if (ready.length > MAX_DRAFTS_PER_RUN) {
+    console.log(
+      `Capping to ${MAX_DRAFTS_PER_RUN} this run; ${
+        ready.length - MAX_DRAFTS_PER_RUN
+      } more Ready row(s) will draft on the next run.`
+    )
+  }
 
   // Fetch shared context once
   const allCommits = await recentCommits(7)
@@ -43,10 +62,19 @@ async function main(): Promise<void> {
       failed++
       const msg = (err as Error).message
       console.error(`Row ${row.id} (${row.title}) failed: ${msg}`)
+      // Best-effort failure comment.
       try {
         await addPageComment(row.id, `Agent drafting failed: ${msg}`)
       } catch (commentErr) {
-        console.error(`Also failed to post Notion comment: ${(commentErr as Error).message}`)
+        console.error(`Failed to post Notion comment: ${(commentErr as Error).message}`)
+      }
+      // Independently move the row out of Ready so a persistently-failing row
+      // can't keep occupying a cap slot and starving later rows. Runs even if
+      // the comment above failed. Surfaced as Proposed for you to fix + re-flip.
+      try {
+        await updateContentRow(row.id, { stage: 'Proposed' })
+      } catch (stageErr) {
+        console.error(`Failed to reset stage to Proposed: ${(stageErr as Error).message}`)
       }
     }
   }
