@@ -45,6 +45,12 @@ After the embed, write what you couldn't fit in 60 seconds — context, longer d
 
 OUTPUT: Just the MDX file contents. No prose explanation, no markdown fences around the file. Start with the YAML frontmatter, end with the body.
 
+FRONTMATTER FORMATTING (critical — malformed YAML fails the build and the draft is discarded):
+- Wrap the \`title\` and \`summary\` values in double quotes. They frequently contain colons, commas, or apostrophes that break unquoted YAML (e.g. \`summary: "Auth isn't a prompt: here's why"\`).
+- If a value itself contains a double quote, escape it (\\") or wrap the whole value in single quotes instead.
+- \`date\` is an unquoted ISO date: YYYY-MM-DD.
+- \`tags\` is a YAML list, e.g. ['ai', 'engineering'].
+
 # Buckets
 
 Posts are categorized by tags into one of five buckets:
