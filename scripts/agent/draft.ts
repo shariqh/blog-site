@@ -1,0 +1,163 @@
+// scripts/agent/draft.ts
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { runPrompt } from './lib/claude'
+import { queryContentRows, updateContentRow, addPageComment } from './lib/notion'
+import { recentCommits } from './lib/git-scan'
+import { loadEditorialGuide } from './lib/editorial'
+import { buildBlogSystemPrompt, buildBlogUserPrompt, slugify } from './lib/draft-blog'
+import { validateMdxFrontmatter, runVale, formatValeReport } from './lib/validate'
+import { createBranchAndPr } from './lib/pr'
+import type { ContentRow, CommitInfo } from './lib/types'
+
+const READY_FILTER = {
+  property: 'Stage',
+  select: { equals: 'Ready' },
+}
+
+async function main(): Promise<void> {
+  const rows = await queryContentRows(READY_FILTER)
+  console.log(`Found ${rows.length} Ready row(s).`)
+  if (rows.length === 0) return
+
+  // Fetch shared context once
+  const allCommits = await recentCommits(7)
+  const editorialMd = loadEditorialGuide()
+
+  let succeeded = 0
+  let failed = 0
+  for (const row of rows) {
+    try {
+      if (row.kind === 'blog') {
+        await draftBlogRow(row, allCommits, editorialMd)
+        succeeded++
+      } else if (row.kind === 'YT short' || row.kind === 'YT long') {
+        // Stubbed — implemented in Phase 5
+        console.log(`Skipping YT row (Phase 5 not yet implemented): ${row.title}`)
+      } else {
+        console.log(`Skipping unsupported Kind=${row.kind}: ${row.title}`)
+      }
+    } catch (err) {
+      failed++
+      const msg = (err as Error).message
+      console.error(`Row ${row.id} (${row.title}) failed: ${msg}`)
+      try {
+        await addPageComment(row.id, `Agent drafting failed: ${msg}`)
+      } catch (commentErr) {
+        console.error(`Also failed to post Notion comment: ${(commentErr as Error).message}`)
+      }
+    }
+  }
+  console.log(`Done. Succeeded: ${succeeded}, Failed: ${failed}`)
+}
+
+async function draftBlogRow(
+  row: ContentRow,
+  allCommits: CommitInfo[],
+  editorialMd: string
+): Promise<void> {
+  // Filter commits relevant to this row (mentioned by SHA in Source URLs)
+  const relevantShas = new Set(
+    row.sourceUrls.map((u) => u.match(/\/commit\/([a-f0-9]+)/)?.[1]).filter((x): x is string => !!x)
+  )
+  const commits = allCommits.filter((c) => relevantShas.has(c.sha))
+
+  const isDerivative = row.origin === 'Derivative'
+  const sourceVideoUrl = isDerivative
+    ? row.sourceUrls.find((u) => /youtu\.be|youtube\.com/.test(u))
+    : undefined
+
+  const systemPrompt = buildBlogSystemPrompt({
+    editorialMd,
+    isDerivative,
+    sourceVideoUrl,
+  })
+
+  const userPrompt = buildBlogUserPrompt({
+    title: row.title,
+    hint: row.hint,
+    sourceUrls: row.sourceUrls,
+    tags: row.tags,
+    commits,
+    sourceVideoUrl,
+    sourceScript: undefined, // populated below in YT-derivative case if we add it later
+  })
+
+  console.log(`Calling Claude for: ${row.title}`)
+  const mdx = await runPrompt({ systemPrompt, userPrompt })
+
+  // Validate
+  const valid = validateMdxFrontmatter(mdx)
+  if (!valid.ok) {
+    throw new Error(`Frontmatter validation failed: ${valid.error}`)
+  }
+
+  // Write file
+  const slug = slugify(row.title)
+  const filePath = join('src', 'content', 'writing', `${slug}.mdx`)
+  writeFileSync(filePath, mdx)
+
+  // Vale
+  const findings = runVale(filePath)
+  const valeReport = formatValeReport(findings)
+
+  // Stage the file
+  const { spawnSync } = await import('node:child_process')
+  const stageRes = spawnSync('git', ['add', filePath], { encoding: 'utf8' })
+  if (stageRes.status !== 0) throw new Error(`git add failed: ${stageRes.stderr}`)
+
+  // Create branch + PR
+  const branchName = `agent/draft/${slug}`
+  const commitMsg = `draft: ${row.title} (proposed by agent)`
+  const prBody = renderPrBody(row, valeReport)
+  const { prUrl } = createBranchAndPr({
+    branchName,
+    commitMessage: commitMsg,
+    prTitle: commitMsg,
+    prBody,
+  })
+
+  // Update Notion
+  await updateContentRow(row.id, { stage: 'Drafted', draftUrl: prUrl })
+
+  // Return to main branch so the next iteration starts clean
+  spawnSync('git', ['checkout', '-'], { encoding: 'utf8' })
+
+  console.log(`✓ Drafted ${row.title} → ${prUrl}`)
+}
+
+function renderPrBody(row: ContentRow, valeReport: string): string {
+  return `## AI-drafted post
+
+Drafted by the Plan B agent from Notion row [\`${
+    row.title
+  }\`](https://www.notion.so/${row.id.replace(/-/g, '')}).
+
+### Source
+- Hint: ${row.hint || '_(none)_'}
+- Tags: ${row.tags.join(', ') || '_(none)_'}
+- Source URLs: ${row.sourceUrls.length ? row.sourceUrls.join(', ') : '_(none)_'}
+
+### Pre-publish checklist (from docs/EDITORIAL.md)
+
+- [ ] Voice check — sounds like me, not a press release
+- [ ] Accuracy — every claim reflects something I actually did/saw/built
+- [ ] AI-tell sweep (read it out loud)
+- [ ] Length matches bucket
+- [ ] Frontmatter complete
+- [ ] Cloudflare preview reviewed (mobile too)
+
+### Vale report
+
+${valeReport}
+
+---
+
+_When this PR merges to main, please update the Notion row's Published URL to the live shariq.dev URL._
+`
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})
