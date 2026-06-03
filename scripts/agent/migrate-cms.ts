@@ -59,11 +59,11 @@ function extractCmsRow(page: { id: string; properties: Record<string, unknown> }
   const text = (prop: { type: string; [k: string]: unknown } | undefined): string => {
     if (!prop) return ''
     if (prop.type === 'title')
-      return ((prop as { title: Array<{ plain_text: string }> }).title ?? [])
+      return (((prop as unknown) as { title: Array<{ plain_text: string }> }).title ?? [])
         .map((t) => t.plain_text)
         .join('')
     if (prop.type === 'rich_text')
-      return ((prop as { rich_text: Array<{ plain_text: string }> }).rich_text ?? [])
+      return (((prop as unknown) as { rich_text: Array<{ plain_text: string }> }).rich_text ?? [])
         .map((t) => t.plain_text)
         .join('')
     return ''
@@ -72,28 +72,28 @@ function extractCmsRow(page: { id: string; properties: Record<string, unknown> }
     prop: { type: string; [k: string]: unknown } | undefined
   ): T | undefined => {
     if (!prop || prop.type !== 'select') return undefined
-    const sel = (prop as { select: { name: string } | null }).select
+    const sel = ((prop as unknown) as { select: { name: string } | null }).select
     return sel ? (sel.name as T) : undefined
   }
   const multi = <T extends string>(
     prop: { type: string; [k: string]: unknown } | undefined
   ): T[] => {
     if (!prop || prop.type !== 'multi_select') return []
-    return ((prop as { multi_select: Array<{ name: string }> }).multi_select ?? []).map(
-      (m) => m.name as T
-    )
+    return (
+      ((prop as unknown) as { multi_select: Array<{ name: string }> }).multi_select ?? []
+    ).map((m) => m.name as T)
   }
   const url = (prop: { type: string; [k: string]: unknown } | undefined): string | undefined => {
     if (!prop || prop.type !== 'url') return undefined
-    return (prop as { url: string | null }).url ?? undefined
+    return ((prop as unknown) as { url: string | null }).url ?? undefined
   }
   const date = (prop: { type: string; [k: string]: unknown } | undefined): string | undefined => {
     if (!prop || prop.type !== 'date') return undefined
-    return (prop as { date: { start: string } | null }).date?.start
+    return ((prop as unknown) as { date: { start: string } | null }).date?.start
   }
   const num = (prop: { type: string; [k: string]: unknown } | undefined): number | undefined => {
     if (!prop || prop.type !== 'number') return undefined
-    return (prop as { number: number | null }).number ?? undefined
+    return ((prop as unknown) as { number: number | null }).number ?? undefined
   }
   return {
     id: page.id,

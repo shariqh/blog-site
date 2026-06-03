@@ -56,12 +56,12 @@ type NotionPage = {
 function textOf(prop: AnyProp | undefined): string {
   if (!prop) return ''
   if (prop.type === 'title') {
-    return ((prop as { title: Array<{ plain_text: string }> }).title ?? [])
+    return (((prop as unknown) as { title: Array<{ plain_text: string }> }).title ?? [])
       .map((t) => t.plain_text)
       .join('')
   }
   if (prop.type === 'rich_text') {
-    return ((prop as { rich_text: Array<{ plain_text: string }> }).rich_text ?? [])
+    return (((prop as unknown) as { rich_text: Array<{ plain_text: string }> }).rich_text ?? [])
       .map((t) => t.plain_text)
       .join('')
   }
@@ -70,31 +70,31 @@ function textOf(prop: AnyProp | undefined): string {
 
 function selectName<T extends string>(prop: AnyProp | undefined): T | undefined {
   if (!prop || prop.type !== 'select') return undefined
-  const sel = (prop as { select: { name: string } | null }).select
+  const sel = ((prop as unknown) as { select: { name: string } | null }).select
   return sel ? (sel.name as T) : undefined
 }
 
 function multiSelectNames<T extends string>(prop: AnyProp | undefined): T[] {
   if (!prop || prop.type !== 'multi_select') return []
-  return ((prop as { multi_select: Array<{ name: string }> }).multi_select ?? []).map(
+  return (((prop as unknown) as { multi_select: Array<{ name: string }> }).multi_select ?? []).map(
     (m) => m.name as T
   )
 }
 
 function urlOf(prop: AnyProp | undefined): string | undefined {
   if (!prop || prop.type !== 'url') return undefined
-  const v = (prop as { url: string | null }).url
+  const v = ((prop as unknown) as { url: string | null }).url
   return v ?? undefined
 }
 
 function dateStartOf(prop: AnyProp | undefined): string | undefined {
   if (!prop || prop.type !== 'date') return undefined
-  return (prop as { date: { start: string } | null }).date?.start
+  return ((prop as unknown) as { date: { start: string } | null }).date?.start
 }
 
 function relationFirstId(prop: AnyProp | undefined): string | undefined {
   if (!prop || prop.type !== 'relation') return undefined
-  const rel = (prop as { relation: Array<{ id: string }> }).relation
+  const rel = ((prop as unknown) as { relation: Array<{ id: string }> }).relation
   return rel?.[0]?.id
 }
 
