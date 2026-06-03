@@ -1,14 +1,16 @@
 // scripts/agent/draft.ts
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { runPrompt } from './lib/claude'
-import { queryContentRows, updateContentRow, addPageComment } from './lib/notion'
+import { runPrompt, parseJsonResponse } from './lib/claude'
+import { queryContentRows, updateContentRow, addPageComment, replacePageBody } from './lib/notion'
 import { recentCommits } from './lib/git-scan'
-import { loadEditorialGuide } from './lib/editorial'
+import { loadEditorialGuide, loadShortsStyleGuide } from './lib/editorial'
 import { buildBlogSystemPrompt, buildBlogUserPrompt, slugify } from './lib/draft-blog'
+import { buildYtSystemPrompt, buildYtUserPrompt, renderYtScriptToBlocks } from './lib/draft-yt'
+import { recentChannelStats } from './lib/youtube'
 import { validateMdxFrontmatter, runVale, formatValeReport } from './lib/validate'
 import { createBranchAndPr } from './lib/pr'
-import type { ContentRow, CommitInfo } from './lib/types'
+import type { ContentRow, CommitInfo, YTScriptBlocks, YouTubeStat } from './lib/types'
 
 const READY_FILTER = {
   property: 'Stage',
@@ -32,8 +34,8 @@ async function main(): Promise<void> {
         await draftBlogRow(row, allCommits, editorialMd)
         succeeded++
       } else if (row.kind === 'YT short' || row.kind === 'YT long') {
-        // Stubbed — implemented in Phase 5
-        console.log(`Skipping YT row (Phase 5 not yet implemented): ${row.title}`)
+        await draftYtRow(row)
+        succeeded++
       } else {
         console.log(`Skipping unsupported Kind=${row.kind}: ${row.title}`)
       }
@@ -124,6 +126,72 @@ async function draftBlogRow(
   spawnSync('git', ['checkout', '-'], { encoding: 'utf8' })
 
   console.log(`✓ Drafted ${row.title} → ${prUrl}`)
+}
+
+async function draftYtRow(row: ContentRow): Promise<void> {
+  const shortsStyleMd = loadShortsStyleGuide()
+  const stats = await recentChannelStats(30)
+  const perfSignal = buildPerfSignal(row.tools, stats)
+
+  const systemPrompt = buildYtSystemPrompt({
+    shortsStyleMd,
+    kind: row.kind,
+    tools: row.tools,
+  })
+  const userPrompt = buildYtUserPrompt({
+    title: row.title,
+    hint: row.hint,
+    sourceUrls: row.sourceUrls,
+    tools: row.tools,
+    perfSignal,
+  })
+
+  console.log(`Calling Claude for YT: ${row.title}`)
+  const json = await runPrompt({ systemPrompt, userPrompt })
+  const parsed = parseJsonResponse<RawYtScript>(json)
+  const blocks: YTScriptBlocks = {
+    hook: parsed.hook,
+    script: parsed.script,
+    onScreenText: parsed.on_screen_text.map((o) => ({
+      timestampSeconds: o.timestamp_seconds,
+      text: o.text,
+    })),
+    bRoll: parsed.b_roll.map((b) => ({
+      timestampSeconds: b.timestamp_seconds,
+      description: b.description,
+    })),
+    thumbnailPrompt: parsed.thumbnail_prompt,
+    titleVariants: parsed.title_variants,
+    hashtags: parsed.hashtags,
+  }
+  const notionBlocks = renderYtScriptToBlocks(blocks)
+  await replacePageBody(row.id, notionBlocks)
+  await updateContentRow(row.id, { stage: 'Drafted' })
+
+  console.log(`✓ YT script drafted for ${row.title}`)
+}
+
+interface RawYtScript {
+  hook: string
+  script: string
+  on_screen_text: Array<{ timestamp_seconds: number; text: string }>
+  b_roll: Array<{ timestamp_seconds: number; description: string }>
+  thumbnail_prompt: string
+  title_variants: string[]
+  hashtags: string[]
+}
+
+function buildPerfSignal(tools: string[], stats: YouTubeStat[]): string {
+  if (stats.length === 0) return 'No recent video stats available.'
+  const lines: string[] = ['Recent video performance (last 30 days):']
+  for (const s of stats.slice(0, 10)) {
+    lines.push(`- "${s.title}" — ${s.views} views`)
+  }
+  if (tools.length > 0) {
+    lines.push('')
+    lines.push(`Tools this script covers: ${tools.join(', ')}.`)
+  }
+  return lines.join('\n')
 }
 
 function renderPrBody(row: ContentRow, valeReport: string): string {
