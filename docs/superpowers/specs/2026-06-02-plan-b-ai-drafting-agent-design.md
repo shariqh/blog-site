@@ -28,7 +28,7 @@ The agent never publishes anything. Every blog post still flows through your PR 
 
 ```
                   ┌───────────────────────────────────────────┐
-                  │  Notion Content DB                        │
+                  │  Notion CMS DB (restructured in place)    │
                   │   Kind ∈ {blog, YT short, YT long, ...}   │
                   │   Stage = workflow state                  │
                   └───────────────────────────────────────────┘
@@ -82,11 +82,11 @@ drafting shells out to `gh` for PR creation. No MCP servers are spawned in CI.
 
 ## Notion DB redesign
 
-The existing `CMS` database is replaced by a new database called `Content`. The current schema conflates production stage with workflow state and uses a multi-select `Medium` that doesn't compose with the per-artifact lifecycle the agent needs. A cleaner schema saves us from per-Kind branching at every read.
+We restructure the existing `CMS` database **in place** rather than create a parallel `Content` DB. Same row IDs, same DB ID, same Notion views URL — but with cleaner properties for the agent loop. One source of truth, no archive DB to maintain.
 
-**The old `CMS` DB stays around as archive — nothing deletes it.** We just stop writing to it after migration.
+The transformation is split between manual Notion-UI changes (rename property, rename options, add new properties) and a migration script that backfills the new properties on every existing row.
 
-### New schema: `Content`
+### Target schema (after restructure)
 
 | Property           | Type            | Notes                                                                                              |
 | ------------------ | --------------- | -------------------------------------------------------------------------------------------------- |
@@ -120,9 +120,9 @@ The existing `CMS` database is replaced by a new database called `Content`. The 
 
 Blog skips Recorded/Edited; YT uses them. Stage is single-select, so there's no ambiguity at any moment.
 
-### Recommended views to rebuild after migration
+### Recommended views to add (existing views keep working)
 
-Existing Notion views on `CMS` don't migrate. After cutover, recreate manually in `Content`:
+Because we restructure the same DB, your current Notion views on CMS continue working — they reference the same DB ID and the same properties (where renamed, Notion updates view references automatically). Add these new agent-oriented views alongside what you already have:
 
 | View               | Filter                                        | Sort                        |
 | ------------------ | --------------------------------------------- | --------------------------- |
@@ -132,9 +132,36 @@ Existing Notion views on `CMS` don't migrate. After cutover, recreate manually i
 | Ideas inbox        | `Stage = Idea`                                | Created desc                |
 | By Kind            | (no filter)                                   | grouped by Kind, then Stage |
 
-### Migration
+### Manual Notion-UI restructure (one-time, human action)
 
-One-shot script `scripts/agent/migrate-cms.ts`. Two modes:
+Before the migration script runs, restructure the CMS DB schema in Notion's UI:
+
+1. **Rename `Status` → `Stage`.** Notion preserves all existing values automatically.
+2. **Rename Status options to new Stage values:**
+   - `Prepping` → `Idea`
+   - `Ready To Record` → `Ready`
+   - `Recording` → `Recorded`
+   - `Post-Processing` → `Edited`
+   - `Published` stays `Published`
+   - `Abandoned` stays `Abandoned`
+   - `✅` → merge into `Published` (re-tag any rows using ✅, then delete the ✅ option)
+3. **Add new Stage options:** `Proposed`, `Drafted`. These are agent states that don't exist yet.
+4. **Add new property `Kind`** (single-select) with options: `blog`, `YT short`, `YT long`, `podcast`, `presentation`, `IG reel`, `stand up`. Empty initially — migration backfills from Medium.
+5. **Add Origin options:** `Agent Proposed`, `Derivative`. Keep existing `OC`, `x-post:bundle`, `x-post:blog`.
+6. **Add new properties:**
+   - `Source Row` — relation to self (this same DB)
+   - `Cross-post Targets` — multi-select with options `blog`, `YT short`, `YT long`
+   - `Tools` — multi-select (empty pool initially)
+   - `Hint` — text
+   - `Draft URL` — URL
+7. **Optionally rename** `Published Link` → `Published URL` for consistency. Notion preserves values.
+8. **Keep as-is (legacy, agent ignores):** `Medium`, `Type`, `Keywords`, `Source(s)`, `No.`, `Files & Media`. The migration reads these and populates the new properties, but they're not deleted — your historical data stays intact.
+
+After this, share the DB with the `Claude Code MCP` integration (already done, no action needed).
+
+### Migration script
+
+One-shot, in-place: updates existing pages, creates sibling pages only for multi-Medium splits.
 
 ```sh
 npm run migrate:cms -- --dry-run    # transformation report, no writes
@@ -143,35 +170,17 @@ npm run migrate:cms -- --execute    # performs migration after you approve
 
 Transformation rules:
 
-1. **Split multi-Medium rows.** A row with `Medium=[blog, YT short]` becomes two `Content` rows — one per Kind, linked by `Source Row` (the first holds the original page ID; the second is freshly created). The first becomes `Origin=OC` with `Cross-post Targets` populated to the other Kind(s). The second becomes `Origin=Derivative` with `Source Row` pointing back.
-2. **Status → Stage.**
-
-   | Old Status      | New Stage |
-   | --------------- | --------- |
-   | Prepping        | Idea      |
-   | Ready To Record | Ready     |
-   | Recording       | Recorded  |
-   | Post-Processing | Edited    |
-   | Published       | Published |
-   | ✅              | Published |
-   | Abandoned       | Abandoned |
-
-3. **Medium → Kind** (1:1 after splitting).
-4. **Origin → Origin.**
-   - `OC` → `OC`
-   - `x-post:bundle` → `OC` with `Cross-post Targets` populated from the row's Medium
-   - `x-post:blog` → `Derivative`; try title-match within ±60 days to find a likely Source Row
-5. **Carry forward.** Title, Tags, Source(s)→Source URLs, Published Link→Published URL, Keywords→appended to Hint, Publishing→Publishing.
-6. **Drop.** Type (mapped into Tags if a value is set), No., Files & Media.
+1. **Single-Medium rows:** PATCH the existing page. Set `Kind` from the first Medium value, populate `Source URLs` from `Source(s)`, append `Keywords` to `Hint`. (Stage is already correct because Notion renamed it during the UI restructure.) Set Origin if mapping: `x-post:blog` → `Derivative`; everything else unchanged.
+2. **Multi-Medium rows:** PATCH the existing page (becomes primary; `Kind` = first Medium, `Cross-post Targets` = other Mediums). CREATE one new sibling page per additional Medium with `Origin=Derivative` and `Source Row` linking back to the primary.
+3. **`x-post:bundle`** → keep as `OC` but populate `Cross-post Targets` from the other Mediums (for both single and multi rows).
+4. **Drop nothing.** Legacy properties (Medium, Type, Keywords, etc.) remain on rows; the agent just doesn't read them after migration.
 
 The dry-run report flags:
 
-- Rows that will be split (and what each new row will look like)
-- Rows where `x-post:blog` couldn't find a Source Row match (you decide: leave unlinked or skip)
-- Rows where Keywords don't fit cleanly into Hint
-- Any rows that won't migrate at all
+- How many rows will be PATCHed vs how many sibling pages will be CREATED (from multi-Medium splits)
+- Rows where `x-post:blog` would mark Origin=Derivative but no Source Row link can be inferred (left unlinked)
 
-Migration is not idempotent in the strict sense, but it's safe to re-run dry-run as many times as needed; execute mode refuses if `Content` already has rows.
+Execute mode is idempotent against already-migrated rows: it skips PATCH on rows where `Kind` is already populated. Splits are NOT re-run for rows that already have derivative siblings (detected via `Source Row` back-references).
 
 ## Discovery workflow
 
@@ -387,13 +396,13 @@ The agent never invents style rules — it follows what's documented. Updates to
 ### Secrets (`.github/workflows/*.yml` env)
 
 - `CLAUDE_CODE_OAUTH_TOKEN` — subscription auth, obtained via `claude setup-token`
-- `NOTION_TOKEN` — internal Notion integration token, scoped to the new `Content` DB
+- `NOTION_TOKEN` — internal Notion integration token, scoped to the restructured CMS DB
 - `AGENT_GH_TOKEN` — fine-grained PAT with `contents:write` + `pull-requests:write` on this repo (the default `GITHUB_TOKEN` from a cron workflow can't trigger downstream workflows like deploy/Vale CI; a separate PAT can)
 - `YOUTUBE_API_KEY` — YT Data API v3 key for public stats
 
 ### Repo variables
 
-- `NOTION_CONTENT_DB_ID` — set after the new DB is created and the integration is shared
+- `NOTION_CMS_DB_ID` — the existing CMS DB ID (`d25e9f1c0a3345589592fce32f7bc02b`)
 - `YOUTUBE_CHANNEL_ID` — your channel ID
 - `SCAN_REPO_ORG=shariqh`
 - `SCAN_REPO_INCLUDE=blog-site,lognote` — always-on repos
@@ -441,7 +450,7 @@ Observability in v1 = GH Actions run logs + Notion row comments. Both are easy t
 **Integration (manual, gated):**
 
 - Migration dry-run against the real CMS DB; inspect transformation report
-- Migration execute; verify Content DB looks right; verify CMS DB unchanged
+- Migration execute; verify CMS DB rows now have Kind/Stage/Origin/etc populated; spot-check a split row's sibling
 - `workflow_dispatch` discovery once; verify candidates land in Notion
 - Manually flip one Content row to Stage=Ready; `workflow_dispatch` draft; verify either PR opens (blog) or script blocks appear in row body (YT)
 - Enable crons
@@ -451,7 +460,7 @@ Observability in v1 = GH Actions run logs + Notion row comments. Both are easy t
 The implementation plan (next phase, via the writing-plans skill) will sequence these. Rough shape:
 
 1. Write `docs/SHORTS-STYLE.md`
-2. Notion redesign: create `Content` DB by hand in Notion, capture its ID
+2. Notion redesign: manually restructure CMS DB schema (rename Status→Stage with new options, add Kind + 5 new properties, add Origin options)
 3. Migration script: dry-run mode → review → execute mode
 4. Shared lib: `sources/notion.ts`, `sources/git.ts`, `sources/trending.ts`, `sources/youtube.ts`
 5. Drafting: blog branch (MDX + PR) — narrowest path, most existing primitives
