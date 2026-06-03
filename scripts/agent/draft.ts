@@ -62,16 +62,19 @@ async function main(): Promise<void> {
       failed++
       const msg = (err as Error).message
       console.error(`Row ${row.id} (${row.title}) failed: ${msg}`)
+      // Best-effort failure comment.
       try {
         await addPageComment(row.id, `Agent drafting failed: ${msg}`)
-        // Move out of Ready so a persistently-failing row can't occupy a cap
-        // slot every run and starve later rows. Surfaced via the comment above
-        // for you to fix and re-flip to Ready.
+      } catch (commentErr) {
+        console.error(`Failed to post Notion comment: ${(commentErr as Error).message}`)
+      }
+      // Independently move the row out of Ready so a persistently-failing row
+      // can't keep occupying a cap slot and starving later rows. Runs even if
+      // the comment above failed. Surfaced as Proposed for you to fix + re-flip.
+      try {
         await updateContentRow(row.id, { stage: 'Proposed' })
-      } catch (innerErr) {
-        console.error(
-          `Also failed to post Notion comment / reset stage: ${(innerErr as Error).message}`
-        )
+      } catch (stageErr) {
+        console.error(`Failed to reset stage to Proposed: ${(stageErr as Error).message}`)
       }
     }
   }
