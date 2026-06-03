@@ -6,13 +6,17 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
+    "agent:discover": "tsx scripts/agent/discover.ts",
+    "agent:draft": "tsx scripts/agent/draft.ts",
+    "agent:promote": "tsx scripts/agent/promote.ts",
     "astro": "astro",
+    "build": "astro build",
+    "dev": "astro dev",
+    "migrate:cms": "tsx scripts/agent/migrate-cms.ts",
+    "preview": "astro preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:smoke": "playwright test"
+    "test:smoke": "playwright test",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@astrojs/mdx": "^5.0.6",
