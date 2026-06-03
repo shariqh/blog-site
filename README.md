@@ -77,3 +77,9 @@ wrangler pages deploy dist --project-name=shariq-dev --branch=hotfix
 wrangler pages domain add shariq.dev --project-name=shariq-dev
 wrangler pages domain list --project-name=shariq-dev
 ```
+
+## Drafting pipeline
+
+Posts and YouTube scripts are drafted by a Claude-based agent that reads from a Notion DB of ideas + my recent commits + AI/dev tool trends. The agent never publishes — every blog post goes through PR review on Cloudflare Pages preview; every YouTube script lives in Notion for me to record manually.
+
+See [`docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md`](docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md) for the design.
