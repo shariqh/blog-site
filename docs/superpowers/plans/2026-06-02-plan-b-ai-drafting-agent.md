@@ -4,7 +4,7 @@
 
 **Goal:** Ship the v1 AI drafting agent as designed in [2026-06-02-plan-b-ai-drafting-agent-design.md](../specs/2026-06-02-plan-b-ai-drafting-agent-design.md). End state: three GitHub Actions workflows that propose, draft, and promote blog posts + YouTube scripts based on Notion ideas and recent commits, with all output reviewed by the user before publishing.
 
-**Architecture:** Three TypeScript scripts under `scripts/agent/` invoked by separate GitHub Actions workflows on cron + manual dispatch. All call the Claude Agent SDK via subscription OAuth (no per-token billing). Notion is HTTP, GitHub PRs are `gh` CLI. No MCP servers spawned in CI. A new `Content` Notion DB replaces the existing `CMS` DB via a one-shot migration script.
+**Architecture:** Three TypeScript scripts under `scripts/agent/` invoked by separate GitHub Actions workflows on cron + manual dispatch. All call the Claude Agent SDK via subscription OAuth (no per-token billing). Notion is HTTP, GitHub PRs are `gh` CLI. No MCP servers spawned in CI. The existing CMS Notion DB is restructured in place via a one-shot migration script.
 
 **Tech Stack:** Node 24 (current LTS), TypeScript strict, `@anthropic-ai/claude-agent-sdk` (latest), `tsx` (TS runner), Vitest, native `fetch`, `gh` CLI, Vale 3.14.2, Notion HTTP API v2025-09-03, YouTube Data API v3, Hacker News Firebase API.
 
@@ -363,7 +363,7 @@ git commit -m "add agent + migration npm scripts"
 CLAUDE_CODE_OAUTH_TOKEN=
 
 # Notion integration token — create at https://www.notion.so/profile/integrations
-# Share the Content DB with the integration after creating it.
+# Share the CMS DB with the integration after creating it.
 NOTION_TOKEN=
 
 # YouTube Data API v3 key — create at https://console.cloud.google.com/apis/credentials
@@ -374,7 +374,7 @@ YOUTUBE_API_KEY=
 AGENT_GH_TOKEN=
 
 # Config (also settable as GH repo variables in CI)
-NOTION_CONTENT_DB_ID=
+NOTION_CMS_DB_ID=d25e9f1c0a3345589592fce32f7bc02b
 YOUTUBE_CHANNEL_ID=
 SCAN_REPO_ORG=shariqh
 SCAN_REPO_INCLUDE=blog-site,lognote
@@ -423,7 +423,7 @@ function optional(key: string, fallback: string): string {
 export const CONFIG = {
   claudeOauthToken: required('CLAUDE_CODE_OAUTH_TOKEN'),
   notionToken: required('NOTION_TOKEN'),
-  notionContentDbId: required('NOTION_CONTENT_DB_ID'),
+  notionCmsDbId: required('NOTION_CMS_DB_ID'),
   youtubeApiKey: required('YOUTUBE_API_KEY'),
   youtubeChannelId: required('YOUTUBE_CHANNEL_ID'),
   agentGhToken: required('AGENT_GH_TOKEN'),
@@ -431,9 +431,6 @@ export const CONFIG = {
   scanRepoOrg: optional('SCAN_REPO_ORG', 'shariqh'),
   scanRepoInclude: optional('SCAN_REPO_INCLUDE', 'blog-site,lognote').split(','),
   scanRepoActiveDays: parseInt(optional('SCAN_REPO_ACTIVE_DAYS', '30'), 10),
-
-  // Set by `npm run migrate:cms` — old DB to read from once before deprecation.
-  notionLegacyCmsDbId: process.env.NOTION_LEGACY_CMS_DB_ID,
 } as const
 
 export type Config = typeof CONFIG
@@ -444,7 +441,7 @@ export type Config = typeof CONFIG
 Run:
 
 ```bash
-NOTION_TOKEN=x NOTION_CONTENT_DB_ID=x CLAUDE_CODE_OAUTH_TOKEN=x YOUTUBE_API_KEY=x YOUTUBE_CHANNEL_ID=x AGENT_GH_TOKEN=x npx tsx -e "import('./scripts/agent/lib/config.ts').then(m => console.log(Object.keys(m.CONFIG)))"
+NOTION_TOKEN=x NOTION_CMS_DB_ID=x CLAUDE_CODE_OAUTH_TOKEN=x YOUTUBE_API_KEY=x YOUTUBE_CHANNEL_ID=x AGENT_GH_TOKEN=x npx tsx -e "import('./scripts/agent/lib/config.ts').then(m => console.log(Object.keys(m.CONFIG)))"
 ```
 
 Expected: prints the array of config keys.
@@ -580,67 +577,72 @@ git commit -m "add agent shared types"
 
 ## Phase 2: Notion redesign + migration
 
-### Task 2.1: Hand-create the `Content` Notion DB
+### Task 2.1: Restructure the CMS Notion DB schema in place
 
-**This is a manual user action.** Pause for the user to do this before any agent code runs.
+**This is a manual user action in the Notion UI.** Pause for the user to do this before the migration script (Task 2.6) runs.
 
-- [ ] **Step 1: Create the DB**
+The existing CMS DB stays — same ID, same rows, same URLs. We restructure the schema instead of cloning to a new DB.
 
-In Notion:
+- [ ] **Step 1: Rename `Status` → `Stage`**
 
-1. Open your workspace, click `+ New Page`
-2. Select `Database — Full page`
-3. Title it `Content`
-4. Delete the default Name property → keep `Title` (Notion forces a title field; rename if needed)
+In Notion, on the CMS DB:
 
-- [ ] **Step 2: Add properties in this exact order with these exact options**
+- Click the Status property header → ⋯ → Edit property → rename to `Stage`
+- Notion preserves all existing row values automatically
 
-| Property             | Type         | Options                                                                                |
-| -------------------- | ------------ | -------------------------------------------------------------------------------------- |
-| `Kind`               | Select       | `blog`, `YT short`, `YT long`, `podcast`, `presentation`, `IG reel`, `stand up`        |
-| `Stage`              | Select       | `Idea`, `Proposed`, `Ready`, `Drafted`, `Recorded`, `Edited`, `Published`, `Abandoned` |
-| `Origin`             | Select       | `OC`, `Agent Proposed`, `Derivative`                                                   |
-| `Source Row`         | Relation     | Target: this same `Content` DB. Show on related: yes. Limit: 1.                        |
-| `Cross-post Targets` | Multi-select | `blog`, `YT short`, `YT long`                                                          |
-| `Tags`               | Multi-select | (leave empty — agent + you add over time)                                              |
-| `Tools`              | Multi-select | (leave empty)                                                                          |
-| `Hint`               | Text         |                                                                                        |
-| `Source URLs`        | Text         |                                                                                        |
-| `Draft URL`          | URL          |                                                                                        |
-| `Published URL`      | URL          |                                                                                        |
-| `Publishing`         | Date         |                                                                                        |
+- [ ] **Step 2: Rename Status options to new Stage values**
 
-Notion adds `Created` and `Updated` automatically. Don't add `Created time` / `Last edited time` manually.
+For each existing option, edit and rename:
 
-- [ ] **Step 3: Share with Claude Code MCP integration**
+- `Prepping` → `Idea`
+- `Ready To Record` → `Ready`
+- `Recording` → `Recorded`
+- `Post-Processing` → `Edited`
+- `Published` stays `Published`
+- `Abandoned` stays `Abandoned`
+- `✅` → re-tag any rows using ✅ to `Published`, then delete the ✅ option
 
-Top-right `...` → `Connections` → add `Claude Code MCP`. Same integration you connected to the legacy CMS DB.
+- [ ] **Step 3: Add new Stage options**
 
-- [ ] **Step 4: Copy DB ID for env config**
+Add: `Proposed`, `Drafted`. These are agent states that don't exist yet.
 
-Copy the URL of the Content DB page. The DB ID is the 32-char hex segment before `?v=`. Example: `https://www.notion.so/<DB_ID>?v=...`
+- [ ] **Step 4: Add a new property `Kind`**
+
+- Type: Select (single)
+- Options: `blog`, `YT short`, `YT long`, `podcast`, `presentation`, `IG reel`, `stand up`
+- Leave empty — migration will backfill from Medium.
+
+- [ ] **Step 5: Add Origin options**
+
+To the existing `Origin` property, add: `Agent Proposed`, `Derivative`. Keep `OC`, `x-post:bundle`, `x-post:blog`.
+
+- [ ] **Step 6: Add 5 new properties**
+
+- `Source Row` — Relation, target: this same CMS DB, limit 1
+- `Cross-post Targets` — Multi-select, options: `blog`, `YT short`, `YT long`
+- `Tools` — Multi-select (empty pool)
+- `Hint` — Text
+- `Draft URL` — URL
+
+- [ ] **Step 7: Optionally rename `Published Link` → `Published URL`**
+
+Cosmetic. The migration script reads either name.
+
+- [ ] **Step 8: Capture the DB ID**
+
+The CMS DB URL contains the ID — `https://www.notion.so/<DB_ID>?v=...`. It's `d25e9f1c0a3345589592fce32f7bc02b` if you haven't moved the page.
 
 Add to your local `.env.local`:
 
 ```
-NOTION_CONTENT_DB_ID=<that-id>
+NOTION_CMS_DB_ID=d25e9f1c0a3345589592fce32f7bc02b
 ```
 
-Also set in GitHub repo variables (next phase will use it; can do now or later):
+And in GitHub:
 
 ```bash
-gh variable set NOTION_CONTENT_DB_ID --body "<that-id>"
+gh variable set NOTION_CMS_DB_ID --body "d25e9f1c0a3345589592fce32f7bc02b"
 ```
-
-- [ ] **Step 5: Note legacy CMS DB ID**
-
-In `.env.local` add:
-
-```
-NOTION_LEGACY_CMS_DB_ID=d25e9f1c0a3345589592fce32f7bc02b
-```
-
-This is only used by the migration script.
 
 ### Task 2.2: TDD `scripts/agent/lib/dedupe.ts`
 
@@ -1015,7 +1017,7 @@ export function pageToContentRow(page: NotionPage): ContentRow {
 // ---------- Public DB ops ----------
 
 export async function queryContentRows(filter: object, sorts?: object[]): Promise<ContentRow[]> {
-  const dataSourceId = await getDataSourceIdForDb(CONFIG.notionContentDbId)
+  const dataSourceId = await getDataSourceIdForDb(CONFIG.notionCmsDbId)
   const rows: ContentRow[] = []
   let cursor: string | undefined
   do {
@@ -1056,7 +1058,7 @@ export interface CreateRowInput {
 }
 
 export async function createContentRow(input: CreateRowInput): Promise<string> {
-  const dataSourceId = await getDataSourceIdForDb(CONFIG.notionContentDbId)
+  const dataSourceId = await getDataSourceIdForDb(CONFIG.notionCmsDbId)
   const body = {
     parent: { type: 'data_source_id', data_source_id: dataSourceId },
     properties: buildPropertiesPayload(input),
@@ -1451,240 +1453,23 @@ git add scripts/agent/lib/migrate-mapping.ts scripts/agent/lib/types.ts scripts/
 git commit -m "add CMS-to-Content row mapping with tests"
 ```
 
-### Task 2.5: Write `migrate-cms.ts` (dry-run mode)
+### Task 2.5: Write `migrate-cms.ts` (in-place rewrite)
 
 **Files:**
 
-- Create: `scripts/agent/migrate-cms.ts`
+- Create/modify: `scripts/agent/migrate-cms.ts`
+
+The script is an in-place migration: source and destination are the same CMS DB. See the file itself for inline comments on the algorithm. Key points:
+
+- Reads `CONFIG.notionCmsDbId` (was `notionContentDbId`)
+- Idempotent: rows where `Kind` is already set are skipped
+- Single-Medium rows: PATCH the existing page with Kind, Hint, Source URLs
+- Multi-Medium rows: PATCH the primary + CREATE sibling pages with `Origin=Derivative` and `Source Row` → primary's page ID
+- `x-post:blog` rows get `Origin` upgraded to `Derivative`
 
 - [ ] **Step 1: Write the script**
 
-```typescript
-// scripts/agent/migrate-cms.ts
-import { CONFIG } from './lib/config'
-import { mapCmsRowToContentRows } from './lib/migrate-mapping'
-import { createContentRow } from './lib/notion'
-import type { CmsRow, MappedRow, LegacyMedium, LegacyStatus, LegacyOrigin } from './lib/types'
-
-const DRY_RUN = process.argv.includes('--dry-run')
-const EXECUTE = process.argv.includes('--execute')
-
-if (!DRY_RUN && !EXECUTE) {
-  console.error('Usage: npm run migrate:cms -- (--dry-run | --execute)')
-  process.exit(1)
-}
-
-const NOTION_VERSION = '2025-09-03'
-
-async function fetchLegacyCmsRows(legacyDbId: string): Promise<CmsRow[]> {
-  // Get data source for legacy DB
-  const dbRes = await fetch(`https://api.notion.com/v1/databases/${legacyDbId}`, {
-    headers: {
-      Authorization: `Bearer ${CONFIG.notionToken}`,
-      'Notion-Version': NOTION_VERSION,
-    },
-  })
-  if (!dbRes.ok) throw new Error(`Failed to fetch legacy DB: ${dbRes.status}`)
-  const db = (await dbRes.json()) as { data_sources: Array<{ id: string }> }
-  const ds = db.data_sources[0]?.id
-  if (!ds) throw new Error('No data source on legacy CMS DB')
-
-  const rows: CmsRow[] = []
-  let cursor: string | undefined
-  do {
-    const body = JSON.stringify({ start_cursor: cursor, page_size: 100 })
-    const res = await fetch(`https://api.notion.com/v1/data_sources/${ds}/query`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${CONFIG.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json',
-      },
-      body,
-    })
-    if (!res.ok) throw new Error(`Legacy query failed: ${res.status} ${await res.text()}`)
-    const data = (await res.json()) as {
-      results: Array<{ id: string; properties: Record<string, unknown> }>
-      has_more: boolean
-      next_cursor?: string
-    }
-    for (const p of data.results) {
-      rows.push(extractCmsRow(p))
-    }
-    cursor = data.has_more ? data.next_cursor : undefined
-  } while (cursor)
-  return rows
-}
-
-function extractCmsRow(page: { id: string; properties: Record<string, unknown> }): CmsRow {
-  const p = page.properties as Record<string, { type: string; [k: string]: unknown }>
-  const text = (prop: { type: string; [k: string]: unknown } | undefined): string => {
-    if (!prop) return ''
-    if (prop.type === 'title')
-      return ((prop as { title: Array<{ plain_text: string }> }).title ?? [])
-        .map((t) => t.plain_text)
-        .join('')
-    if (prop.type === 'rich_text')
-      return ((prop as { rich_text: Array<{ plain_text: string }> }).rich_text ?? [])
-        .map((t) => t.plain_text)
-        .join('')
-    return ''
-  }
-  const select = <T extends string>(
-    prop: { type: string; [k: string]: unknown } | undefined
-  ): T | undefined => {
-    if (!prop || prop.type !== 'select') return undefined
-    const sel = (prop as { select: { name: string } | null }).select
-    return sel ? (sel.name as T) : undefined
-  }
-  const multi = <T extends string>(
-    prop: { type: string; [k: string]: unknown } | undefined
-  ): T[] => {
-    if (!prop || prop.type !== 'multi_select') return []
-    return ((prop as { multi_select: Array<{ name: string }> }).multi_select ?? []).map(
-      (m) => m.name as T
-    )
-  }
-  const url = (prop: { type: string; [k: string]: unknown } | undefined): string | undefined => {
-    if (!prop || prop.type !== 'url') return undefined
-    return (prop as { url: string | null }).url ?? undefined
-  }
-  const date = (prop: { type: string; [k: string]: unknown } | undefined): string | undefined => {
-    if (!prop || prop.type !== 'date') return undefined
-    return (prop as { date: { start: string } | null }).date?.start
-  }
-  const num = (prop: { type: string; [k: string]: unknown } | undefined): number | undefined => {
-    if (!prop || prop.type !== 'number') return undefined
-    return (prop as { number: number | null }).number ?? undefined
-  }
-  return {
-    id: page.id,
-    title: text(p['Title']),
-    status: select<LegacyStatus>(p['Status']),
-    medium: multi<LegacyMedium>(p['Medium']),
-    origin: select<LegacyOrigin>(p['Origin']),
-    tags: multi<string>(p['Tags']),
-    type: select<string>(p['Type']),
-    keywords: text(p['Keywords']),
-    sources: text(p['Source(s)']),
-    publishedLink: url(p['Published Link']),
-    publishing: date(p['Publishing']),
-    no: num(p['No.']),
-  }
-}
-
-async function main(): Promise<void> {
-  const legacyId = CONFIG.notionLegacyCmsDbId
-  if (!legacyId) {
-    console.error('Set NOTION_LEGACY_CMS_DB_ID in .env.local')
-    process.exit(1)
-  }
-  console.log(`Fetching legacy CMS rows from ${legacyId}...`)
-  const rows = await fetchLegacyCmsRows(legacyId)
-  console.log(`Fetched ${rows.length} legacy rows.`)
-
-  const mapped: Array<{ source: CmsRow; out: MappedRow[] }> = rows.map((r) => ({
-    source: r,
-    out: mapCmsRowToContentRows(r),
-  }))
-
-  // Report
-  const splits = mapped.filter((m) => m.out.length > 1)
-  const totalOutRows = mapped.reduce((s, m) => s + m.out.length, 0)
-
-  console.log('\n=== Migration report ===')
-  console.log(`Input rows:      ${rows.length}`)
-  console.log(`Output rows:     ${totalOutRows}`)
-  console.log(`Rows being split:${splits.length}`)
-  console.log(
-    `New rows created:${totalOutRows - rows.length} (from splits; primary rows reuse original page ID)`
-  )
-
-  if (splits.length > 0) {
-    console.log('\nSplit rows:')
-    for (const s of splits) {
-      console.log(
-        `  ${s.source.title}: ${s.source.medium.join(',')} → ${s.out.map((o) => o.kind).join(',')}`
-      )
-    }
-  }
-
-  if (DRY_RUN) {
-    console.log('\n[dry-run] No writes performed. Re-run with --execute to apply.')
-    return
-  }
-
-  // Execute mode — refuse if Content DB has any rows
-  console.log('\nChecking destination DB is empty...')
-  const dest = await fetch(
-    `https://api.notion.com/v1/data_sources/${await getDataSourceId(CONFIG.notionContentDbId)}/query`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${CONFIG.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ page_size: 1 }),
-    }
-  )
-  if (!dest.ok) throw new Error(`Destination check failed: ${dest.status}`)
-  const destData = (await dest.json()) as { results: unknown[] }
-  if (destData.results.length > 0) {
-    console.error('Destination Content DB is not empty. Aborting to avoid double-import.')
-    process.exit(1)
-  }
-
-  console.log('Executing migration...')
-  let created = 0
-  for (const m of mapped) {
-    // Create primary first; capture its new ID so derivatives in this group
-    // can link to it directly. This avoids the title-collision risk of a
-    // post-hoc title-based linking pass.
-    const newIdsByOriginalPageId = new Map<string, string>()
-    let primaryNewId: string | null = null
-    for (const out of m.out) {
-      const sourceRowId = out.sourceRowOriginalPageId && primaryNewId ? primaryNewId : undefined
-      const id = await createContentRow({
-        title: out.title,
-        kind: out.kind,
-        stage: out.stage,
-        origin: out.origin,
-        crossPostTargets: out.crossPostTargets,
-        tags: out.tags,
-        tools: out.tools,
-        hint: out.hint,
-        sourceUrls: out.sourceUrls,
-        publishedUrl: out.publishedUrl,
-        publishingDate: out.publishingDate,
-        sourceRowId,
-      })
-      if (!out.sourceRowOriginalPageId) primaryNewId = id
-      newIdsByOriginalPageId.set(m.source.id, id)
-      created++
-      if (created % 10 === 0) console.log(`  created ${created} rows...`)
-    }
-  }
-
-  console.log(`Done. Created ${created} rows.`)
-}
-
-async function getDataSourceId(dbId: string): Promise<string> {
-  const dbRes = await fetch(`https://api.notion.com/v1/databases/${dbId}`, {
-    headers: {
-      Authorization: `Bearer ${CONFIG.notionToken}`,
-      'Notion-Version': NOTION_VERSION,
-    },
-  })
-  const db = (await dbRes.json()) as { data_sources: Array<{ id: string }> }
-  return db.data_sources[0].id
-}
-
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
-```
+See `scripts/agent/migrate-cms.ts` — the file reflects the current (in-place) implementation.
 
 - [ ] **Step 2: Test dry-run mode locally**
 
@@ -1694,20 +1479,18 @@ Run:
 npm run migrate:cms -- --dry-run
 ```
 
-Expected: prints `Migration report` with input count, output count, split rows. No Notion writes.
+Expected: prints `=== Migration plan ===` with total rows, already-migrated count, rows to PATCH, siblings to CREATE. No Notion writes.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add scripts/agent/migrate-cms.ts
-git commit -m "add CMS-to-Content migration script with dry-run + execute modes"
+git commit -m "refactor migrate-cms.ts: in-place CMS rewrite (patch existing rows, create siblings)"
 ```
 
 ### Task 2.6: Run the migration (one-time human action)
 
-**This task is for the human, not the agent.**
-
-- [ ] **Step 1: Run dry-run, review output**
+- [ ] **Step 1: Dry-run, review output**
 
 ```bash
 npm run migrate:cms -- --dry-run
@@ -1715,37 +1498,38 @@ npm run migrate:cms -- --dry-run
 
 Confirm:
 
-- Input row count matches what you see in Notion
-- Split rows make sense (multi-medium rows split as expected)
-- No rows missing
+- "Total rows in CMS" matches your row count
+- "Already migrated" is 0 (first run) or non-zero if you've already partially migrated
+- Splits make sense (e.g., a multi-Medium row shows the primary Kind and the sibling Kinds you'd expect)
 
-- [ ] **Step 2: Run execute mode**
+- [ ] **Step 2: Execute**
 
 ```bash
 npm run migrate:cms -- --execute
 ```
 
-Expected: prints "Created N rows. Done." Refuses if Content DB has any rows already.
+Expected: prints "Patched N rows, created M sibling rows."
 
 - [ ] **Step 3: Spot-check in Notion**
 
-Open the `Content` DB. Verify:
+In the CMS DB:
 
-- All rows present with expected Kind/Stage/Origin
-- Split rows show up as separate rows with Source Row relation populated on the derivatives
-- Old `CMS` DB untouched
+- Every row should now have `Kind` populated
+- A multi-Medium row's primary should have `Cross-post Targets` listing the other Mediums
+- New sibling rows should have `Origin=Derivative` and `Source Row` linking to the primary
+- Stage values should match the renamed options
+- Legacy properties (Medium, Type, Keywords, Source(s)) are still present on rows — they're not deleted
 
-- [ ] **Step 4: Build the recommended views in Notion**
+- [ ] **Step 4: Build new agent-facing views**
 
-Manually create these views (Notion UI):
+These views don't replace your existing CMS views; they augment for the agent workflow:
 
-| View               | Filter                                      | Sort                        |
-| ------------------ | ------------------------------------------- | --------------------------- |
-| Triage             | Stage in [Proposed, Ready]                  | Created desc                |
-| In flight          | Stage in [Ready, Drafted, Recorded, Edited] | Updated desc                |
-| Recently published | Stage = Published                           | Publishing desc             |
-| Ideas inbox        | Stage = Idea                                | Created desc                |
-| By Kind            | (no filter)                                 | grouped by Kind, then Stage |
+| View        | Filter                                      | Sort                        |
+| ----------- | ------------------------------------------- | --------------------------- |
+| Triage      | Stage in [Proposed, Ready]                  | Created desc                |
+| In flight   | Stage in [Ready, Drafted, Recorded, Edited] | Updated desc                |
+| Ideas inbox | Stage = Idea                                | Created desc                |
+| By Kind     | (no filter)                                 | grouped by Kind, then Stage |
 
 ---
 
@@ -2988,7 +2772,7 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_CONTENT_DB_ID: ${{ vars.NOTION_CONTENT_DB_ID }}
+          NOTION_CMS_DB_ID: ${{ vars.NOTION_CMS_DB_ID }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           YOUTUBE_CHANNEL_ID: ${{ vars.YOUTUBE_CHANNEL_ID }}
           AGENT_GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
@@ -3018,16 +2802,16 @@ gh secret set NOTION_TOKEN --body "<your notion token>"
 gh secret set YOUTUBE_API_KEY --body "<your YT key>"
 gh secret set AGENT_GH_TOKEN --body "<your fine-grained PAT>"
 
-gh variable set NOTION_CONTENT_DB_ID --body "<content db id>"
+gh variable set NOTION_CMS_DB_ID --body "d25e9f1c0a3345589592fce32f7bc02b"
 gh variable set YOUTUBE_CHANNEL_ID --body "<your channel id>"
 gh variable set SCAN_REPO_ORG --body "shariqh"
 gh variable set SCAN_REPO_INCLUDE --body "blog-site,lognote"
 gh variable set SCAN_REPO_ACTIVE_DAYS --body "30"
 ```
 
-- [ ] **Step 2: Manually set a Content row to Stage=Ready**
+- [ ] **Step 2: Manually set a CMS row to Stage=Ready**
 
-In Notion, pick a Content row with Kind=blog. Set Stage=Ready.
+In Notion, pick a CMS row with Kind=blog. Set Stage=Ready.
 
 - [ ] **Step 3: Trigger the workflow manually**
 
@@ -3373,7 +3157,7 @@ git commit -m "wire YT drafting branch into draft.ts"
 
 **This is a human-action task.**
 
-- [ ] **Step 1: Set a Content row Kind=YT short Stage=Ready in Notion**
+- [ ] **Step 1: Set a CMS row Kind=YT short Stage=Ready in Notion**
 
 - [ ] **Step 2: Trigger workflow_dispatch and watch**
 
@@ -3642,7 +3426,7 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_CONTENT_DB_ID: ${{ vars.NOTION_CONTENT_DB_ID }}
+          NOTION_CMS_DB_ID: ${{ vars.NOTION_CMS_DB_ID }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           YOUTUBE_CHANNEL_ID: ${{ vars.YOUTUBE_CHANNEL_ID }}
           AGENT_GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
@@ -3898,7 +3682,7 @@ jobs:
       - name: Run promotion
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_CONTENT_DB_ID: ${{ vars.NOTION_CONTENT_DB_ID }}
+          NOTION_CMS_DB_ID: ${{ vars.NOTION_CMS_DB_ID }}
           # The rest are unused but required by config.ts:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
@@ -3920,7 +3704,7 @@ git commit -m "add agent-promote GH Actions workflow"
 
 - [ ] **Step 1: Set up test scenario**
 
-In Notion: pick (or create) a Content row with Kind=YT short, Stage=Published, Cross-post Targets=blog. Confirm no existing derivative row points at it.
+In Notion: pick (or create) a CMS row with Kind=YT short, Stage=Published, Cross-post Targets=blog. Confirm no existing derivative row points at it.
 
 - [ ] **Step 2: Trigger workflow**
 
@@ -3954,10 +3738,10 @@ In `CLAUDE.md`, add this section between `## Writing posts` and `## Deploy`:
 Three GHA workflows under `.github/workflows/agent-*.yml` run on cron:
 
 - **agent-discover** — Sunday 03:00 UTC: scans Notion ideas, recent commits, GH trending, HN, and YT performance; proposes up to 3 blog + 3 YT candidates as Notion rows.
-- **agent-draft** — Daily 02:00 UTC: picks up Content rows with `Stage=Ready`. Blog rows → MDX file + PR. YT rows → script blocks written to the Notion row body.
+- **agent-draft** — Daily 02:00 UTC: picks up CMS rows with `Stage=Ready`. Blog rows → MDX file + PR. YT rows → script blocks written to the Notion row body.
 - **agent-promote** — Daily 04:00 UTC: for published YT rows with `Cross-post Targets` includes `blog`, mints a linked blog derivative row in `Stage=Proposed`.
 
-Source of truth for content: Notion DB `Content` (see `docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md`).
+Source of truth for content: Notion CMS DB (see `docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md`).
 
 Local invocation (for prompt iteration without burning CI):
 
@@ -4045,7 +3829,7 @@ Mark Solo todo #37 (Plan B) complete.
 
 The agent is live. Going forward:
 
-- Drop ideas in Notion `Content` DB with `Kind`, `Stage=Idea`
+- Drop ideas in the Notion CMS DB with `Kind`, `Stage=Idea`
 - Each Sunday morning, check the `Triage` view for new candidates
 - Flip `Stage=Ready` on anything you want drafted
 - Wake up Monday to a PR (blog) or filled-in script (YT) waiting for you

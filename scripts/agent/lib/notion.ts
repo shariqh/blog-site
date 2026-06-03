@@ -7,7 +7,7 @@ const VERSION = '2025-09-03'
 // CONFIG is imported lazily via a cached variable so that module load does not
 // call required() — which throws when env vars are absent. The pure
 // row-mapper (pageToContentRow) therefore stays unit-testable without env vars.
-let _config: { notionToken: string; notionContentDbId: string } | undefined
+let _config: { notionToken: string; notionCmsDbId: string } | undefined
 
 async function getConfig() {
   if (!_config) {
@@ -131,7 +131,7 @@ export function pageToContentRow(page: NotionPage): ContentRow {
 
 export async function queryContentRows(filter: object, sorts?: object[]): Promise<ContentRow[]> {
   const cfg = await getConfig()
-  const dataSourceId = await getDataSourceIdForDb(cfg.notionContentDbId)
+  const dataSourceId = await getDataSourceIdForDb(cfg.notionCmsDbId)
   const rows: ContentRow[] = []
   let cursor: string | undefined
   do {
@@ -173,7 +173,7 @@ export interface CreateRowInput {
 
 export async function createContentRow(input: CreateRowInput): Promise<string> {
   const cfg = await getConfig()
-  const dataSourceId = await getDataSourceIdForDb(cfg.notionContentDbId)
+  const dataSourceId = await getDataSourceIdForDb(cfg.notionCmsDbId)
   const body = {
     parent: { type: 'data_source_id', data_source_id: dataSourceId },
     properties: buildPropertiesPayload(input),

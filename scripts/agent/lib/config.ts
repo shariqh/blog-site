@@ -14,7 +14,7 @@ function optional(key: string, fallback: string): string {
 export const CONFIG = {
   claudeOauthToken: required('CLAUDE_CODE_OAUTH_TOKEN'),
   notionToken: required('NOTION_TOKEN'),
-  notionContentDbId: required('NOTION_CONTENT_DB_ID'),
+  notionCmsDbId: required('NOTION_CMS_DB_ID'),
   youtubeApiKey: required('YOUTUBE_API_KEY'),
   youtubeChannelId: required('YOUTUBE_CHANNEL_ID'),
   agentGhToken: required('AGENT_GH_TOKEN'),
@@ -22,9 +22,6 @@ export const CONFIG = {
   scanRepoOrg: optional('SCAN_REPO_ORG', 'shariqh'),
   scanRepoInclude: optional('SCAN_REPO_INCLUDE', 'blog-site,lognote').split(','),
   scanRepoActiveDays: parseInt(optional('SCAN_REPO_ACTIVE_DAYS', '30'), 10),
-
-  // Set by `npm run migrate:cms` — old DB to read from once before deprecation.
-  notionLegacyCmsDbId: process.env.NOTION_LEGACY_CMS_DB_ID,
 } as const
 
 export type Config = typeof CONFIG
