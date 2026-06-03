@@ -198,7 +198,7 @@ jobs:
           # Build each prompt safely: a quoted heredoc (static, no expansion) plus
           # the batch diff appended via `cat` (raw bytes, never shell-parsed).
           : > review.md          # aggregated findings across all batches
-          : > review.err         # last batch's stderr (for the no-output fallback)
+          : > review.failures    # one line per batch whose review CALL failed
           findings=0             # count of batches that returned real findings
 
           for batch in batches/batch_*.diff; do
@@ -232,12 +232,21 @@ jobs:
             # restricts the model to an empty toolset → text-only reasoning.
             # "$(cat prompt.txt)" passes the file as one quoted arg (command-sub
             # output isn't re-parsed, so diff content can't inject shell).
-            copilot -p "$(cat prompt.txt)" \
+            # Track the REAL exit code per batch (not just stderr, which the CLI
+            # also writes on success). A failed call means this batch's files were
+            # NOT reviewed — record it so it can't vanish into a false "clean".
+            if copilot -p "$(cat prompt.txt)" \
               --model "$MODEL" \
               --available-tools '' \
               --no-ask-user \
-              > batch.raw 2> batch.err || true
-            cp batch.err review.err
+              > batch.raw 2> batch.err; then
+              :
+            else
+              code=$?
+              echo "  → batch FAILED (exit $code)"
+              # Leading '%s' so the dash isn't parsed as a printf option.
+              printf '%s\n' "- \`$batch\` — review call failed (exit $code); its files were NOT reviewed" >> review.failures
+            fi
 
             grep -vE '^[[:space:]]*[●└]|^Reviewing the diff' batch.raw > batch.md \
               || cp batch.raw batch.md
@@ -255,16 +264,12 @@ jobs:
             findings=$((findings + 1))
           done
 
-          # All batches clean (or no batches at all) → single clean line.
+          # Clean line only when nothing was flagged. If a batch CALL failed,
+          # review.failures is non-empty and the comment shows an "incomplete
+          # review" banner — so a failed batch can never read as "No issues found".
           if [ "$findings" -eq 0 ]; then
-            # review.err is non-empty only if a batch actually ran and its CLI
-            # call wrote stderr — surfaces a genuine "ran but errored, no
-            # findings" case instead of a false "No issues found".
-            if [ -s review.err ]; then
-              echo "_AI review produced no output. CLI stderr:_" > review.md
-              echo '```' >> review.md
-              tail -c 1500 review.err >> review.md 2>/dev/null || true
-              echo '```' >> review.md
+            if [ -s review.failures ]; then
+              echo "_No findings from the batches that completed (see the incomplete-review note above)._" > review.md
             else
               echo "No issues found." > review.md
             fi
@@ -294,13 +299,25 @@ jobs:
               cat overflow.note
               echo
             fi
+            # Banner when a batch's review CALL failed — those files were not
+            # reviewed, so the result below is incomplete (never a silent clean).
+            if [ -s review.failures ]; then
+              echo "> ⚠️ **Incomplete review** — one or more review calls failed; those files were NOT reviewed:"
+              echo
+              cat review.failures
+              echo
+            fi
             cat review.md
             echo
             echo "_Automated, independent-model review (updated each push). Not a substitute for human judgment._"
           } > comment.md
 
+          # Only ever patch OUR OWN sticky comment: match the marker AND the
+          # author (the default github.token posts as github-actions[bot]). Marker
+          # alone would let any PR participant who includes it have their comment
+          # overwritten by the bot.
           existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n1)
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$MARKER\"))) | .id" | head -n1)
           if [ -n "$existing" ]; then
             jq -n --rawfile body comment.md '{body: $body}' \
               | gh api -X PATCH "repos/$REPO/issues/comments/$existing" --input - >/dev/null
