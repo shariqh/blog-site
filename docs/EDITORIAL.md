@@ -4,6 +4,8 @@ Rules for **any public-facing prose** on shariq.dev: blog posts, the about page,
 
 This document is authoritative. Every writer — human, agent, or hybrid — applies these rules before publishing. The AI drafting agent (Plan B) loads this file into its system prompt as required reading.
 
+For YouTube scripts, the agent loads [`SHORTS-STYLE.md`](./SHORTS-STYLE.md) — same role, different format.
+
 If a rule below is wrong or outdated, **update this file** before writing copy that contradicts it.
 
 ---

@@ -1,0 +1,50 @@
+name: Agent — draft
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Daily 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AGENT_GH_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Vale
+        run: |
+          curl -fsSL -o vale.tar.gz https://github.com/errata-ai/vale/releases/download/v3.14.2/vale_3.14.2_Linux_64-bit.tar.gz
+          tar -xzf vale.tar.gz vale
+          sudo mv vale /usr/local/bin/
+
+      - name: Configure git
+        run: |
+          git config user.name "shariq-dev-agent"
+          git config user.email "agent@shariq.dev"
+
+      - name: Run drafting
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_CMS_DB_ID: ${{ vars.NOTION_CMS_DB_ID }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CHANNEL_ID: ${{ vars.YOUTUBE_CHANNEL_ID }}
+          AGENT_GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          SCAN_REPO_ORG: ${{ vars.SCAN_REPO_ORG }}
+          SCAN_REPO_INCLUDE: ${{ vars.SCAN_REPO_INCLUDE }}
+          SCAN_REPO_ACTIVE_DAYS: ${{ vars.SCAN_REPO_ACTIVE_DAYS }}
+        run: npm run agent:draft

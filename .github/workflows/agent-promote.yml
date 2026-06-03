@@ -1,0 +1,32 @@
+name: Agent — promote
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # Daily 04:00 UTC (2h after draft)
+  workflow_dispatch:
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run promotion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_CMS_DB_ID: ${{ vars.NOTION_CMS_DB_ID }}
+          # The rest are unused by promote.ts but required by config.ts on import:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CHANNEL_ID: ${{ vars.YOUTUBE_CHANNEL_ID }}
+          AGENT_GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+        run: npm run agent:promote

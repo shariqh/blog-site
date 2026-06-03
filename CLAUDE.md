@@ -71,6 +71,31 @@ Vale warnings/suggestions don't block CI; only errors do (today, only
 broken frontmatter). The drafting agent in Plan B is expected to run
 Vale before opening its PR.
 
+## AI drafting agent (Plan B)
+
+Three GHA workflows under `.github/workflows/agent-*.yml` run on cron:
+
+- **agent-discover** — Sunday 03:00 UTC: scans Notion ideas, recent commits, GH trending, HN, and YT performance; proposes up to 3 blog + 3 YT candidates as Notion rows.
+- **agent-draft** — Daily 02:00 UTC: picks up Content rows with `Stage=Ready`. Blog rows → MDX file + PR. YT rows → script blocks written to the Notion row body.
+- **agent-promote** — Daily 04:00 UTC: for published YT rows with `Cross-post Targets` includes `blog`, mints a linked blog derivative row in `Stage=Proposed`.
+
+Source of truth for content: the restructured Notion CMS DB (see `docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md`).
+
+Local invocation (for prompt iteration without burning CI):
+
+```sh
+npm run agent:discover
+npm run agent:draft
+npm run agent:promote
+```
+
+Each reads `.env.local` (see `.env.local.example`).
+
+Style contracts:
+
+- Blog: `docs/EDITORIAL.md`
+- YouTube: `docs/SHORTS-STYLE.md`
+
 ## Deploy
 
 Cloudflare Pages via `.github/workflows/deploy.yml`. `main` → production

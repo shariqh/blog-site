@@ -3,16 +3,20 @@
   "type": "module",
   "version": "0.0.1",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=24"
   },
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
+    "agent:discover": "tsx scripts/agent/discover.ts",
+    "agent:draft": "tsx scripts/agent/draft.ts",
+    "agent:promote": "tsx scripts/agent/promote.ts",
     "astro": "astro",
+    "build": "astro build",
+    "dev": "astro dev",
+    "migrate:cms": "tsx scripts/agent/migrate-cms.ts",
+    "preview": "astro preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:smoke": "playwright test"
+    "test:smoke": "playwright test",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@astrojs/mdx": "^5.0.6",
@@ -36,12 +40,16 @@
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.161",
     "@astrojs/check": "^0.9.9",
     "@playwright/test": "^1.60.0",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "dotenv": "^17.4.2",
+    "gray-matter": "^4.0.3",
     "prettier": "^3.8.3",
     "prettier-plugin-astro": "^0.14.1",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   }
