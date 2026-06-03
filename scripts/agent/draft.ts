@@ -108,22 +108,27 @@ async function draftBlogRow(
   const stageRes = spawnSync('git', ['add', filePath], { encoding: 'utf8' })
   if (stageRes.status !== 0) throw new Error(`git add failed: ${stageRes.stderr}`)
 
-  // Create branch + PR
+  // Create branch + PR, always returning to the originating branch afterwards
   const branchName = `agent/draft/${slug}`
   const commitMsg = `draft: ${row.title} (proposed by agent)`
   const prBody = renderPrBody(row, valeReport)
-  const { prUrl } = createBranchAndPr({
-    branchName,
-    commitMessage: commitMsg,
-    prTitle: commitMsg,
-    prBody,
-  })
 
-  // Update Notion
+  let prUrl: string
+  try {
+    const result = createBranchAndPr({
+      branchName,
+      commitMessage: commitMsg,
+      prTitle: commitMsg,
+      prBody,
+    })
+    prUrl = result.prUrl
+  } finally {
+    // Always return to the originating branch so the next row starts clean
+    spawnSync('git', ['checkout', '-'], { encoding: 'utf8' })
+  }
+
+  // Update Notion (only reached if PR creation succeeded)
   await updateContentRow(row.id, { stage: 'Drafted', draftUrl: prUrl })
-
-  // Return to main branch so the next iteration starts clean
-  spawnSync('git', ['checkout', '-'], { encoding: 'utf8' })
 
   console.log(`✓ Drafted ${row.title} → ${prUrl}`)
 }

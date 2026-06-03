@@ -41,16 +41,7 @@ export function createBranchAndPr(input: PrInput): PrResult {
   if (push.code !== 0) throw new Error(`git push failed: ${push.stderr}`)
 
   // PR
-  const pr = run('gh', [
-    'pr',
-    'create',
-    '--title',
-    input.prTitle,
-    '--body',
-    input.prBody,
-    '--label',
-    'agent-draft',
-  ])
+  const pr = run('gh', ['pr', 'create', '--title', input.prTitle, '--body', input.prBody])
   if (pr.code !== 0) throw new Error(`gh pr create failed: ${pr.stderr}`)
   const url = pr.stdout.trim().split('\n').pop() ?? ''
   if (!url.startsWith('https://')) {

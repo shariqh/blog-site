@@ -1,12 +1,21 @@
 // scripts/agent/discover.ts
 import { runPrompt, parseJsonResponse } from './lib/claude'
-import { queryContentRows, createContentRow } from './lib/notion'
+import { queryContentRows, createContentRow, appendBlocks } from './lib/notion'
 import { recentCommits } from './lib/git-scan'
 import { fetchTrending } from './lib/trending'
 import { recentChannelStats } from './lib/youtube'
 import { loadEditorialGuide, loadShortsStyleGuide } from './lib/editorial'
 import { isTitleDuplicate, hasFullToolsOverlap } from './lib/dedupe'
-import type { ContentRow, Candidate } from './lib/types'
+import type { ContentRow } from './lib/types'
+
+interface RawCandidate {
+  title: string
+  hint: string
+  tags?: string[]
+  tools?: string[]
+  source_urls: string[]
+  rationale: string
+}
 
 async function main(): Promise<void> {
   console.log('Discovery: gathering source material...')
@@ -70,8 +79,8 @@ ${shortsStyleMd}
   console.log('Calling Claude for ranking...')
   const raw = await runPrompt({ systemPrompt, userPrompt })
   const out = parseJsonResponse<{
-    blog_candidates: Candidate[]
-    yt_candidates: Candidate[]
+    blog_candidates: RawCandidate[]
+    yt_candidates: RawCandidate[]
   }>(raw)
 
   // Dedupe + upsert
@@ -175,8 +184,8 @@ function buildDiscoveryUserPrompt(input: DiscoveryUserPromptInput): string {
   return lines.join('\n')
 }
 
-async function createCandidateRow(c: Candidate, kind: 'blog' | 'YT short'): Promise<void> {
-  await createContentRow({
+async function createCandidateRow(c: RawCandidate, kind: 'blog' | 'YT short'): Promise<void> {
+  const newId = await createContentRow({
     title: c.title,
     kind,
     stage: 'Proposed',
@@ -184,8 +193,17 @@ async function createCandidateRow(c: Candidate, kind: 'blog' | 'YT short'): Prom
     tags: c.tags ?? [],
     tools: c.tools ?? [],
     hint: c.hint,
-    sourceUrls: c.sourceUrls,
+    sourceUrls: c.source_urls,
   })
+  if (c.rationale) {
+    await appendBlocks(newId, [
+      {
+        object: 'block',
+        type: 'paragraph',
+        paragraph: { rich_text: [{ type: 'text', text: { content: c.rationale } }] },
+      },
+    ])
+  }
   console.log(`+ ${kind}: ${c.title}`)
 }
 
