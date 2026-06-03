@@ -17,10 +17,24 @@ const READY_FILTER = {
   select: { equals: 'Ready' },
 }
 
+// Cap drafts per run so a big triage batch doesn't fan out into many model
+// calls (one long, quota-heavy nightly run) all at once. Remaining Ready rows
+// stay Ready and are picked up on the next run.
+const MAX_DRAFTS_PER_RUN = 3
+
 async function main(): Promise<void> {
-  const rows = await queryContentRows(READY_FILTER)
-  console.log(`Found ${rows.length} Ready row(s).`)
-  if (rows.length === 0) return
+  const ready = await queryContentRows(READY_FILTER)
+  console.log(`Found ${ready.length} Ready row(s).`)
+  if (ready.length === 0) return
+
+  const rows = ready.slice(0, MAX_DRAFTS_PER_RUN)
+  if (ready.length > MAX_DRAFTS_PER_RUN) {
+    console.log(
+      `Capping to ${MAX_DRAFTS_PER_RUN} this run; ${
+        ready.length - MAX_DRAFTS_PER_RUN
+      } more Ready row(s) will draft on the next run.`
+    )
+  }
 
   // Fetch shared context once
   const allCommits = await recentCommits(7)
