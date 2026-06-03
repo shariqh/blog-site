@@ -23,7 +23,12 @@ const READY_FILTER = {
 const MAX_DRAFTS_PER_RUN = 3
 
 async function main(): Promise<void> {
-  const ready = await queryContentRows(READY_FILTER)
+  // Oldest-Ready first for a stable, predictable cap order. Safe because a
+  // failed row is moved out of Ready (below), so persistent failures can't keep
+  // refilling the capped slots and starving newer rows.
+  const ready = await queryContentRows(READY_FILTER, [
+    { timestamp: 'created_time', direction: 'ascending' },
+  ])
   console.log(`Found ${ready.length} Ready row(s).`)
   if (ready.length === 0) return
 
@@ -59,8 +64,14 @@ async function main(): Promise<void> {
       console.error(`Row ${row.id} (${row.title}) failed: ${msg}`)
       try {
         await addPageComment(row.id, `Agent drafting failed: ${msg}`)
-      } catch (commentErr) {
-        console.error(`Also failed to post Notion comment: ${(commentErr as Error).message}`)
+        // Move out of Ready so a persistently-failing row can't occupy a cap
+        // slot every run and starve later rows. Surfaced via the comment above
+        // for you to fix and re-flip to Ready.
+        await updateContentRow(row.id, { stage: 'Proposed' })
+      } catch (innerErr) {
+        console.error(
+          `Also failed to post Notion comment / reset stage: ${(innerErr as Error).message}`
+        )
       }
     }
   }
