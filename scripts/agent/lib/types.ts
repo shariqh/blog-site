@@ -89,3 +89,67 @@ export interface YouTubeStat {
   likes: number
   publishedAt: string
 }
+
+export type LegacyStatus =
+  | 'Prepping'
+  | 'Ready To Record'
+  | 'Recording'
+  | 'Post-Processing'
+  | 'Published'
+  | 'Abandoned'
+  | '✅'
+
+export type LegacyMedium =
+  | 'blog'
+  | 'youtube'
+  | 'YT short'
+  | 'podcast'
+  | 'presentation'
+  | 'IG reel'
+  | 'stand up'
+
+export type LegacyOrigin = 'OC' | 'x-post:bundle' | 'x-post:blog'
+
+export interface CmsRow {
+  id: string
+  title: string
+  status?: LegacyStatus
+  medium: LegacyMedium[]
+  origin?: LegacyOrigin
+  tags: string[]
+  type?: string
+  keywords: string
+  sources: string
+  publishedLink?: string
+  publishing?: string
+  no?: number
+}
+
+export interface MappedRow {
+  // The new row's intended properties (no ID — caller assigns)
+  title: string
+  kind: Kind
+  stage: Stage
+  origin: Origin
+  crossPostTargets: CrossPostTarget[]
+  tags: string[]
+  tools: string[]
+  hint: string
+  sourceUrls: string[]
+  publishedUrl?: string
+  publishingDate?: string
+  // Bookkeeping for derivatives:
+  // If the row was split, the first piece keeps the original Notion page ID
+  // and this is null. The subsequent piece(s) are NEW rows; this points at
+  // the original page ID to install as Source Row after creation.
+  sourceRowOriginalPageId?: string
+}
+
+export interface MigrationReport {
+  totalInputRows: number
+  rowsKept: number
+  rowsSplit: number
+  newRowsCreated: number
+  abandoned: number
+  unresolvedXPostBlog: string[] // titles where Source Row couldn't be matched
+}
