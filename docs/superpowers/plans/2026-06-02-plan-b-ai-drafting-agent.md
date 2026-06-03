@@ -624,6 +624,12 @@ To the existing `Origin` property, add: `Agent Proposed`, `Derivative`. Keep `OC
 - `Hint` — Text
 - `Draft URL` — URL
 
+- [ ] **Step 6.5: (Recommended) Add a `Site` property for future multi-site support**
+
+- Type: Select (single)
+- Options: `shariq.dev` (set as default for all existing rows)
+- Cost today: ~10 seconds in the UI; cost later: trivial agent filter when a second site (e.g., lognote) joins. The agent doesn't read this property in v1, but adding it now means future multi-site is a drop-in instead of a schema-migration project. Skip if you're sure no other sites will publish through this DB.
+
 - [ ] **Step 7: Optionally rename `Published Link` → `Published URL`**
 
 Cosmetic. The migration script reads either name.
