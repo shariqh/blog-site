@@ -6,7 +6,7 @@
 
 **Architecture:** Three TypeScript scripts under `scripts/agent/` invoked by separate GitHub Actions workflows on cron + manual dispatch. All call the Claude Agent SDK via subscription OAuth (no per-token billing). Notion is HTTP, GitHub PRs are `gh` CLI. No MCP servers spawned in CI. A new `Content` Notion DB replaces the existing `CMS` DB via a one-shot migration script.
 
-**Tech Stack:** Node 22, TypeScript strict, `@anthropic-ai/claude-agent-sdk`, `tsx` (TS runner), Vitest, native `fetch`, `gh` CLI, Vale, Notion HTTP API v2025-09-03, YouTube Data API v3, Hacker News Firebase API.
+**Tech Stack:** Node 24 (current LTS), TypeScript strict, `@anthropic-ai/claude-agent-sdk` (latest), `tsx` (TS runner), Vitest, native `fetch`, `gh` CLI, Vale 3.14.2, Notion HTTP API v2025-09-03, YouTube Data API v3, Hacker News Firebase API.
 
 **Out of scope (deferred to v2):** hero image generation; Notion webhooks (replaces hourly poll); blog→YT derivative direction; podcast/presentation/IG-reel drafting (schema reserves Kind slots but no per-Kind drafting code).
 
@@ -207,6 +207,90 @@ git commit -m "add SHORTS-STYLE.md for YT script generation"
 ---
 
 ## Phase 1: Scaffolding, deps, config
+
+### Task 1.0: Bump project to Node 24 LTS
+
+The existing site is pinned to Node 22. Bring the whole project to the current Active LTS (Node 24) so the agent and the site share one runtime. Node 22 stays in maintenance until April 2027 but Node 24 has been LTS since October 2025 — no reason to lag.
+
+**Files:**
+
+- Modify: `package.json` (engines field)
+- Modify: `.github/workflows/deploy.yml`
+- Modify: `.github/workflows/ci.yml`
+
+- [ ] **Step 1: Bump `engines.node` in `package.json`**
+
+In `package.json`, find:
+
+```json
+"engines": {
+  "node": ">=22.12.0"
+}
+```
+
+Replace with:
+
+```json
+"engines": {
+  "node": ">=24"
+}
+```
+
+- [ ] **Step 2: Bump deploy workflow**
+
+In `.github/workflows/deploy.yml`, find:
+
+```yaml
+node-version: '22'
+```
+
+Replace with:
+
+```yaml
+node-version: '24'
+```
+
+- [ ] **Step 3: Bump CI workflow**
+
+In `.github/workflows/ci.yml`, find:
+
+```yaml
+node-version: '22'
+```
+
+Replace with:
+
+```yaml
+node-version: '24'
+```
+
+- [ ] **Step 4: Verify locally**
+
+Run:
+
+```bash
+node --version
+```
+
+If you're on Node < 24, install via `nvm` / `fnm` / your version manager.
+
+Then verify the full build + tests still pass:
+
+```bash
+npm ci
+npm run astro check
+npm test
+npm run build
+```
+
+Expected: all PASS. If anything breaks on Node 24, fix before continuing.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add package.json .github/workflows/deploy.yml .github/workflows/ci.yml
+git commit -m "bump project to Node 24 LTS (was 22)"
+```
 
 ### Task 1.1: Install dependencies
 
@@ -2884,14 +2968,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
       - name: Install Vale
         run: |
-          curl -fsSL -o vale.tar.gz https://github.com/errata-ai/vale/releases/download/v3.9.1/vale_3.9.1_Linux_64-bit.tar.gz
+          curl -fsSL -o vale.tar.gz https://github.com/errata-ai/vale/releases/download/v3.14.2/vale_3.14.2_Linux_64-bit.tar.gz
           tar -xzf vale.tar.gz vale
           sudo mv vale /usr/local/bin/
 
@@ -3549,7 +3633,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -3806,7 +3890,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci
