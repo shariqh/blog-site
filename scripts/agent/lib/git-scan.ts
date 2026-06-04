@@ -18,6 +18,8 @@ interface GhCommitFile {
 
 interface GhRepo {
   name: string
+  full_name: string
+  owner: { login: string }
   pushed_at: string
   private: boolean
 }
@@ -60,17 +62,22 @@ async function reposInScope(): Promise<string[]> {
 }
 
 async function activeRepos(): Promise<string[]> {
-  const url = `${GH_API}/users/${CONFIG.scanRepoOrg}/repos?per_page=100&sort=pushed&type=public`
+  // /user/repos with affiliation=owner returns the token owner's repos —
+  // private AND public — so private-repo commits come into scope. Other
+  // accounts' repos are never returned by this endpoint.
+  const url = `${GH_API}/user/repos?affiliation=owner&per_page=100&sort=pushed`
   const res = await fetch(url, { headers: ghHeaders() })
   if (!res.ok) {
-    console.warn(`Failed to list ${CONFIG.scanRepoOrg} repos: ${res.status}`)
+    console.warn(`Failed to list owned repos: ${res.status}`)
     return []
   }
   const repos = (await res.json()) as GhRepo[]
   const cutoff = Date.now() - CONFIG.scanRepoActiveDays * 86_400_000
   return repos
-    .filter((r) => !r.private && new Date(r.pushed_at).getTime() >= cutoff)
-    .map((r) => `${CONFIG.scanRepoOrg}/${r.name}`)
+    .filter(
+      (r) => r.owner.login === CONFIG.scanRepoOrg && new Date(r.pushed_at).getTime() >= cutoff
+    )
+    .map((r) => r.full_name)
 }
 
 async function fetchCommits(repo: string, sinceISO: string): Promise<CommitInfo[]> {
