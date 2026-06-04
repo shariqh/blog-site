@@ -66,12 +66,21 @@ export interface YTScriptBlocks {
   hashtags: string[]
 }
 
+export interface CommitFile {
+  filename: string
+  status: string // "added" | "modified" | "removed" | "renamed" | ...
+  additions: number
+  deletions: number
+  patch?: string // absent for binary / too-large files
+}
+
 export interface CommitInfo {
   repo: string // e.g. "shariqh/lognote"
   sha: string
   message: string
   date: string
-  filesChanged: string[]
+  files: CommitFile[] // full list, with diffs — used for drafting diff blocks
+  filesChanged: string[] // names only, capped — used by discovery (unchanged)
   url: string
 }
 

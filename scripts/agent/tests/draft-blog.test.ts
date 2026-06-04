@@ -44,6 +44,15 @@ describe('buildBlogUserPrompt', () => {
           sha: 'abc1234567890def1234567890def1234567890',
           message: 'feat: add logging',
           date: '2026-06-01T00:00:00Z',
+          files: [
+            {
+              filename: 'src/log.ts',
+              status: 'added',
+              additions: 10,
+              deletions: 0,
+              patch: '@@ -0,0 +1,2 @@\n+export const log = () => {}\n',
+            },
+          ],
           filesChanged: ['src/log.ts'],
           url: 'https://github.com/shariqh/lognote/commit/abc',
         },
