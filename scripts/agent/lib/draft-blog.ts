@@ -2,6 +2,10 @@ import { BUCKETS } from './bucket'
 import type { CommitInfo } from './types'
 import { buildDiffBlock } from './diff-filter'
 
+// Max number of cited commits to render full diffs for in one draft prompt.
+// Per-commit size is already capped in diff-filter; this bounds the count.
+const MAX_DIFF_COMMITS = 8
+
 export function slugify(title: string): string {
   return title
     .toLowerCase()
@@ -123,8 +127,16 @@ export function buildBlogUserPrompt(input: BlogUserPromptInput): string {
   if (input.commits.length) {
     lines.push('## Diffs of referenced commits')
     lines.push('')
-    for (const c of input.commits) {
+    // buildDiffBlock caps size per commit; cap the COUNT here so a row citing
+    // many commits can't balloon the prompt. Realistic rows cite 1–3.
+    const diffCommits = input.commits.slice(0, MAX_DIFF_COMMITS)
+    for (const c of diffCommits) {
       lines.push(buildDiffBlock(c))
+      lines.push('')
+    }
+    const overflow = input.commits.length - diffCommits.length
+    if (overflow > 0) {
+      lines.push(`_(${overflow} more referenced commit(s) omitted from diffs for length)_`)
       lines.push('')
     }
   }

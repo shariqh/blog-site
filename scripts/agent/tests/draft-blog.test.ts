@@ -66,4 +66,34 @@ describe('buildBlogUserPrompt', () => {
     expect(up).toContain('```diff')
     expect(up).toContain('export const log = () => {}')
   })
+
+  it('caps the number of commits rendered as diffs and notes the overflow', () => {
+    const commits = Array.from({ length: 10 }, (_, i) => ({
+      repo: 'shariqh/lognote',
+      sha: `${i}`.repeat(40),
+      message: `feat: change ${i}`,
+      date: '2026-06-01T00:00:00Z',
+      files: [
+        {
+          filename: `src/f${i}.ts`,
+          status: 'modified',
+          additions: 1,
+          deletions: 0,
+          patch: `@@ @@\n+x${i}`,
+        },
+      ],
+      filesChanged: [`src/f${i}.ts`],
+      url: `https://github.com/shariqh/lognote/commit/${i}`,
+    }))
+    const up = buildBlogUserPrompt({
+      title: 'A post',
+      hint: '',
+      sourceUrls: [],
+      tags: [],
+      commits,
+    })
+    // 10 cited, cap is 8 → 8 diff fences + a "2 more ... omitted" note.
+    expect(up.match(/```diff/g)?.length).toBe(8)
+    expect(up).toContain('2 more referenced commit(s) omitted from diffs for length')
+  })
 })
