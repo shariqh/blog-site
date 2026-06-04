@@ -63,5 +63,7 @@ describe('buildBlogUserPrompt', () => {
     expect(up).toContain('https://x.com')
     expect(up).toContain('feat: add logging')
     expect(up).toContain('src/log.ts')
+    expect(up).toContain('```diff')
+    expect(up).toContain('export const log = () => {}')
   })
 })

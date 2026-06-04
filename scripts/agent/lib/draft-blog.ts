@@ -1,5 +1,6 @@
 import { BUCKETS } from './bucket'
 import type { CommitInfo } from './types'
+import { buildDiffBlock } from './diff-filter'
 
 export function slugify(title: string): string {
   return title
@@ -117,6 +118,15 @@ export function buildBlogUserPrompt(input: BlogUserPromptInput): string {
       if (c.filesChanged.length) lines.push(`  files: ${c.filesChanged.slice(0, 5).join(', ')}`)
     }
     lines.push('')
+  }
+
+  if (input.commits.length) {
+    lines.push('## Diffs of referenced commits')
+    lines.push('')
+    for (const c of input.commits) {
+      lines.push(buildDiffBlock(c))
+      lines.push('')
+    }
   }
 
   lines.push(`Today's date: ${new Date().toISOString().slice(0, 10)}`)
