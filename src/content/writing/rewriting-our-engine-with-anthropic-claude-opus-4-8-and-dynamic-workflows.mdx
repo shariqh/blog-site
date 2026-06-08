@@ -3,7 +3,7 @@ title: "Rewriting Our Engine with Anthropic's Claude Opus 4.8 and Dynamic Workfl
 date: '2026-06-08'
 tags: ['ai', 'engineering', 'claude']
 summary: "I rewrote lognote's engine from Python to Swift one module at a time — built with Anthropic's Claude Opus 4.8 through Claude Code and dynamic multi-agent workflows, with the old Python pipeline as a byte-for-byte reference and a different frontier model reviewing every PR."
-draft: true
+draft: false
 ---
 
 lognote records both sides of a meeting on your Mac, transcribes it on-device, and writes the notes into your own vault. For most of its life the part that did the work, the transcription and summarization engine, was Python. It leaned on MLX-Whisper, a couple of large vendor SDKs, and a 1.2GB virtual environment to do its job.
