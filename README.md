@@ -24,8 +24,8 @@ Posts live in `src/content/writing/`. Frontmatter is Zod-validated at build
 time (see `src/content.config.ts`). Tags map to display buckets in
 `src/lib/buckets.ts`. URLs are `/blog/<filename-without-extension>`.
 
-The AI drafting agent is set up in a separate workflow (Plan B). For now,
-write MDX, commit, push, merge.
+You can write a post by hand (create the MDX, commit, push, open a PR), or
+let the drafting agent write one for you — see [Content workflow](#content-workflow).
 
 ## Deploy (Cloudflare Pages via GitHub Actions)
 
@@ -78,8 +78,70 @@ wrangler pages domain add shariq.dev --project-name=shariq-dev
 wrangler pages domain list --project-name=shariq-dev
 ```
 
-## Drafting pipeline
+## Content workflow
 
-Posts and YouTube scripts are drafted by a Claude-based agent that reads from a Notion DB of ideas + my recent commits + AI/dev tool trends. The agent never publishes — every blog post goes through PR review on Cloudflare Pages preview; every YouTube script lives in Notion for me to record manually.
+All content — blog posts and YouTube scripts — is planned in a **Notion CMS
+database**. That DB is the control panel: I add and triage ideas there, and a
+nightly Claude-based agent does discovery and drafting off it. **Nothing
+publishes automatically.** Blog drafts arrive as PRs (with a Cloudflare preview)
+for me to review and merge; YouTube scripts land in the Notion row for me to record.
 
-See [`docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md`](docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md) for the design.
+Each row moves through a **Stage**:
+
+| Stage         | Meaning                                                               |
+| ------------- | --------------------------------------------------------------------- |
+| **Idea**      | A raw seed. Not a commitment — the agent reads these for inspiration. |
+| **Proposed**  | A candidate in triage, waiting for a yes/no (mine or the agent's).    |
+| **Ready**     | Approved — the agent drafts it on the next run.                       |
+| **Drafted**   | Agent opened a PR (blog) or wrote the script into the row (YouTube).  |
+| **Published** | Live.                                                                 |
+| **Abandoned** | Killed; the agent won't resurface it.                                 |
+
+### Add an idea
+
+Make a new row, set **Kind** (`blog`, `YT short`, `YT long`), a **Title**, and a
+one-line **Hint**. Then:
+
+- **Want it drafted now?** Set **Stage = Ready** — the agent picks it up next run.
+- **Just a seed?** Set **Stage = Idea** — no draft yet, but discovery reads it and
+  may spin a sharper candidate into triage.
+
+The **Hint is the field that matters most** — it's what actually steers the draft.
+Put the _point_ there (the decision, the gotcha, the angle), not just a topic.
+
+### Pull in one of my commits
+
+In a Ready row's **Source URLs**, paste a GitHub commit link
+(`.../commit/<sha>`). If it's a recent commit (last ~week) in a repo I own —
+public or private — the agent attaches the real diff to the draft, filtered down
+to the meaningful changes. Older commits, or repos I don't own, won't pull, so
+it's worth capturing the Hint while the work is fresh.
+
+### Triage, kill, or refine
+
+- **Triage:** candidates sit in **Proposed**. Flip the good ones to **Ready** and
+  the agent drafts them.
+- **Don't like it?** Set **Stage = Abandoned** (cleaner than deleting — the agent
+  won't propose it again).
+- **Needs work?** Edit the **Hint / Title** in place, or send it back to **Idea**
+  for discovery to reshape on the next run.
+
+### Schedule
+
+The agent runs on GitHub Actions cron (it never publishes — it only proposes and drafts):
+
+- **Discover** (weekly) — scans Notion ideas, my recent commits, and dev-tool
+  trends; proposes new candidates into triage.
+- **Draft** (daily) — turns **Ready** rows into PRs / scripts.
+- **Promote** (daily) — mints blog-derivative rows from published YouTube videos.
+
+To run a step by hand for testing (needs a local `.env.local` — see
+`.env.local.example`):
+
+```sh
+npm run agent:discover
+npm run agent:draft
+npm run agent:promote
+```
+
+Design details: [`docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md`](docs/superpowers/specs/2026-06-02-plan-b-ai-drafting-agent-design.md).

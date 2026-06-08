@@ -1,6 +1,6 @@
 // scripts/agent/lib/git-scan.ts
 import { CONFIG } from './config'
-import type { CommitInfo } from './types'
+import type { CommitInfo, CommitFile } from './types'
 
 interface GhCommit {
   sha: string
@@ -10,10 +10,16 @@ interface GhCommit {
 
 interface GhCommitFile {
   filename: string
+  status: string
+  additions: number
+  deletions: number
+  patch?: string
 }
 
 interface GhRepo {
   name: string
+  full_name: string
+  owner: { login: string }
   pushed_at: string
   private: boolean
 }
@@ -56,17 +62,22 @@ async function reposInScope(): Promise<string[]> {
 }
 
 async function activeRepos(): Promise<string[]> {
-  const url = `${GH_API}/users/${CONFIG.scanRepoOrg}/repos?per_page=100&sort=pushed&type=public`
+  // /user/repos with affiliation=owner returns the token owner's repos —
+  // private AND public — so private-repo commits come into scope. Other
+  // accounts' repos are never returned by this endpoint.
+  const url = `${GH_API}/user/repos?affiliation=owner&per_page=100&sort=pushed`
   const res = await fetch(url, { headers: ghHeaders() })
   if (!res.ok) {
-    console.warn(`Failed to list ${CONFIG.scanRepoOrg} repos: ${res.status}`)
+    console.warn(`Failed to list owned repos: ${res.status}`)
     return []
   }
   const repos = (await res.json()) as GhRepo[]
   const cutoff = Date.now() - CONFIG.scanRepoActiveDays * 86_400_000
   return repos
-    .filter((r) => !r.private && new Date(r.pushed_at).getTime() >= cutoff)
-    .map((r) => `${CONFIG.scanRepoOrg}/${r.name}`)
+    .filter(
+      (r) => r.owner.login === CONFIG.scanRepoOrg && new Date(r.pushed_at).getTime() >= cutoff
+    )
+    .map((r) => r.full_name)
 }
 
 async function fetchCommits(repo: string, sinceISO: string): Promise<CommitInfo[]> {
@@ -82,17 +93,27 @@ async function fetchCommits(repo: string, sinceISO: string): Promise<CommitInfo[
       sha: c.sha,
       message: c.commit.message,
       date: c.commit.author.date,
-      filesChanged: files.slice(0, 10),
+      files,
+      filesChanged: files.map((f) => f.filename).slice(0, 10),
       url: c.html_url,
     })
   }
   return results
 }
 
-async function fetchFiles(repo: string, sha: string): Promise<string[]> {
+async function fetchFiles(repo: string, sha: string): Promise<CommitFile[]> {
   const url = `${GH_API}/repos/${repo}/commits/${sha}`
   const res = await fetch(url, { headers: ghHeaders() })
-  if (!res.ok) return []
+  if (!res.ok) {
+    console.warn(`Failed to fetch files for ${repo}@${sha}: ${res.status}`)
+    return []
+  }
   const data = (await res.json()) as { files?: GhCommitFile[] }
-  return (data.files ?? []).map((f) => f.filename)
+  return (data.files ?? []).map((f) => ({
+    filename: f.filename,
+    status: f.status,
+    additions: f.additions,
+    deletions: f.deletions,
+    patch: f.patch,
+  }))
 }
