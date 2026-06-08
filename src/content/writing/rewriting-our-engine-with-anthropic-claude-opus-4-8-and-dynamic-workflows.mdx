@@ -1,0 +1,98 @@
+---
+title: "Rewriting Our Engine with Anthropic's Claude Opus 4.8 and Dynamic Workflows"
+date: '2026-06-08'
+tags: ['ai', 'engineering', 'claude']
+summary: "I rewrote lognote's engine from Python to Swift one module at a time — built with Anthropic's Claude Opus 4.8 through Claude Code and dynamic multi-agent workflows, with the old Python pipeline as a byte-for-byte reference and a different frontier model reviewing every PR."
+draft: false
+---
+
+[lognote](https://lognote.dev/?utm_source=shariq.dev&utm_medium=blog&utm_campaign=engine-rewrite) records both sides of a meeting on your Mac, transcribes it on-device, and writes the notes into your own vault. For most of its life the part that did the work, the transcription and summarization engine, was Python. It leaned on MLX-Whisper, a couple of large vendor SDKs, and a 1.2GB virtual environment to do its job.
+
+I just finished rewriting that engine in Swift. The native binary that replaces the whole Python stack started at 3MB and, once the on-device summarizer was linked in, settled at 67MB. It replaces a 1.2GB virtual environment. And because the native machine-learning libraries I now build on support much older versions of macOS than the Python wheels did, the engine's OS floor dropped by roughly twelve major releases. The same code now runs on Macs that were never going to meet the old requirement.
+
+This post is not really about Swift. It is about how the rewrite got done: one module at a time, with the old engine kept alive as a byte-for-byte reference, the legwork built with Anthropic's Claude Opus 4.8 through Claude Code in dynamic multi-agent workflows, and a separate frontier model reviewing every change before a human merged it. The method made the rewrite fast and close to painless, and it caught a bug that nothing else did.
+
+## Prove it, don't argue it
+
+The decision to go native could have been a long debate. Instead I settled it with two throwaway proofs of concept.
+
+The first one validated the boring-but-fatal part of shipping a native Mac app: signing, hardened runtime, notarization, the whole Apple distribution round trip, end to end. The second validated that a native transcription path produced output at least as good as the Python one. It did. On the spike's measurements it was a little cleaner.
+
+Both proofs passed, so the decision made itself. The framing was simple: if you can prove it works all the way through, there is no reason not to build it. Prove the riskiest unknown first with a cheap disposable spike. That habit shows up again and again below.
+
+## The old engine as the source of truth
+
+The dangerous way to rewrite a working system is the big bang: build the replacement in the dark, flip the switch, and pray. You get a long stretch where nothing works until everything works, and you have no way to tell a port bug from a design change.
+
+I did the opposite. The migration ran module by module. For each piece, the new Swift code had to produce output that matched the old Python code's output for the same input, and I kept the Python pipeline running the whole time as a live reference and an instant rollback. At every step the product still worked and still shipped. There was never a window where the engine was half-rewritten and unusable.
+
+The mechanism underneath this is a parity harness, and it is the spine of the entire project. It works like this:
+
+1. Generate synthetic test inputs.
+2. Run the real Python module on them and freeze its output as a golden file.
+3. Require the new Swift module to reproduce that output, byte for byte.
+
+Any difference is a port bug, and it shows up the instant it is introduced. The old engine is more than documentation of the intended behavior. It is runnable code I can re-run at any time to regenerate the goldens, so the claim that the Swift engine matches the old one never goes stale.
+
+One subtlety worth keeping: byte-for-byte is the right bar for anything a human reads, like the Markdown that lands in your notes. For data that another program parses, matching the meaning is enough, and chasing exact byte equality there would have been wasted effort. I drew that line deliberately and resisted the urge to over-engineer past it.
+
+## Agents do the legwork, I set direction
+
+Each task in the migration plan ran through the same dynamic workflow, no human in the middle. Anthropic's Claude Opus 4.8, driven through Claude Code, fanned out into purpose-built agents: an implementer that wrote the change, a reviewer that checked it against the spec, and a second reviewer that checked it for code quality, with the fix-ups looping until it was clean. I set the direction and gated the merges. The agents did everything between gates, and most tasks landed in a single pass.
+
+Some of the more interesting bugs got caught here, before any human looked. One reviewer found a unit test that passed for the wrong reason. Another found documentation comments that claimed more than the code delivered. A final pass ran adversarial probes against the reference, feeding deliberately weird inputs (odd punctuation, unusual Unicode, awkward whitespace) to find places where the Swift and Python behaviors quietly diverged.
+
+This is what "AI-native development" looked like in practice for me. Not a single prompt that emits a finished system, but a structured loop where the expensive, exhaustive work (write it, review it, attack it, fix it) is delegated, and I spend my attention on direction and judgment.
+
+## A different AI reviews every PR
+
+Every pull request was reviewed by a separate frontier model before I merged it. Not the same model that wrote the code. A different one, running independently on each change. One AI builds it, a different AI reviews it, a human gates the merge.
+
+That second reviewer caught things the green checkmarks never would have.
+
+Early on, it flagged a confidentiality landmine that had nothing to do with code correctness: a spec instruction, meant for future sessions, that would have built a test corpus out of real private meeting recordings. A passing test suite would never have caught that. It is a process bug, not a logic bug, and it was exactly the kind of thing an independent reviewer reading for intent will notice.
+
+Later, on the cloud-summary code, the suite was green, the two-stage review was done, and the reviewer still found two real defects. One was a line that would crash the entire process if someone pasted a server address with a stray space in it, which violated a hard rule of mine: summarization is best-effort and must never take down the pipeline that lands your transcript. The other was subtler. The reviewer reproduced a deadlock under thread-pool pressure that the tests had only survived because the development machine happened to have spare cores. Both bugs sat on the default code path. Neither was visible from a passing suite.
+
+## The bug that beat the whole gauntlet
+
+The case for "run the real thing" came at the very end. If you think a green build means done, this is the story I would point you to.
+
+The native summarizer had passed everything. Unit tests, green. Two-stage code review, done. A live integration test that loads the on-device model and generates a real summary in under five seconds, green. By every signal I had, it worked.
+
+Then the cutover's own smoke test hung. Not failed. Hung. For six hours, at zero percent CPU, the on-device summary path, which is the default, no-API-key path most users would hit, sat frozen. The model never even finished loading.
+
+A dedicated investigation agent reproduced it and pulled a stack trace before anyone changed a line. The cause was a hand-rolled bridge between asynchronous and synchronous code in the command-line entry point. It parked the main thread to wait for a result, but the on-device model loader needs that same main thread to keep doing work. The two waited on each other forever.
+
+It was the same class of bug a reviewer had flagged six tasks earlier, in a completely different spot. The footgun bit twice, and the second time it bit in the one place no test reached: the gap between the test harness's execution context and the command-line program's hand-written bridge. The tests ran the code in a context where the bug could not manifest. The real binary did not.
+
+I fixed it by keeping the main thread alive and pumping its work instead of dead-blocking it, then confirmed the default path produced a real summary and exited cleanly. The lesson: a green suite proves the happy path in the harness's world. It does not prove the real binary works in the real execution context. You have to run the actual thing, the way it actually ships.
+
+## When the reference runs out
+
+The parity harness has a hard limit, and the summarizer is where I hit it.
+
+Phases one through three were deterministic. Same input, same output, every time, which is exactly what a byte-for-byte reference needs. Summarization is the one module in the engine that is not deterministic. It asks a language model for prose, and prose varies run to run. You cannot diff a paragraph against a golden file when the paragraph is allowed to be different every time.
+
+So the discipline did not get abandoned. It retreated to the deterministic core. The summarizer still makes a pile of deterministic decisions around the non-deterministic text: which provider gets selected for a given configuration, which on-device model size gets chosen for a given transcript length, what the failure record looks like when something goes wrong, what exit code each scenario returns. All of that is still pinned against the Python reference, byte for byte. Only the generated prose is allowed to float free.
+
+I made that guard non-tautological the hard way. A reviewer deliberately mutated one of the pinned values, watched the test fail on the drift, then restored it, proving the test actually catches a regression rather than passing no matter what. The rule: when a byte-for-byte reference can no longer cover a module, it retreats to the deterministic decisions that module still makes, and only the genuinely random part escapes the net.
+
+## What native actually cost
+
+Native is not free, so here is what it cost as well as what it saved.
+
+Going native shrank some things dramatically. The bulk of the 1.2GB virtual environment is gone — the vendor SDKs and the summarization runtime, replaced by a single signed binary (a thin Python layer still lingers for transcription rollback and a few glue scripts). The transcription path dropped its entire dependency on external audio tooling and now does everything through Apple's own frameworks. The OS floor dropped by about twelve major releases, which is the biggest practical win, because it means the engine runs on whatever Apple Silicon Mac someone already owns (M1 or later, on macOS 14.4 or newer) instead of demanding the newest one.
+
+It also grew some things. Linking the on-device summarizer in took the binary from 3MB to 67MB, a roughly twentyfold jump, because the native machine-learning runtime is a large library surface even though the model weights themselves are byte-identical to the ones the Python path used. The build got heavier too, pulling in a multi-hundred-megabyte toolchain component and a larger dependency graph than the lean transcription engine needed. The honest summary is that native is smaller in the dimension that matters to a user (no virtual environment, no Python runtime, a much smaller total install) and heavier in dimensions that matter to whoever builds and ships it.
+
+## What I would take to the next rewrite
+
+A few things generalized cleanly out of this:
+
+- **Settle native-vs-rewrite questions with a disposable proof, not a meeting.** The riskiest unknown is cheap to test and expensive to assume.
+- **Keep the thing you are replacing alive as the reference.** A working old system that you can re-run on demand is the strongest correctness check you will ever have, and it makes every port bug obvious the moment it appears.
+- **Let one AI build and a different AI review, and keep a human on the merge.** The independent reviewer caught a privacy landmine, a crash, a deadlock, and a tautological test, none of which a passing suite would have shown.
+- **Run the real binary in its real context before you call it done.** A green suite, a code review, and an integration test still let a six-hour deadlock through, because all three ran in a context where the bug could not surface.
+
+The engine is fully native now. The Python pipeline that served as the reference has done its job and stepped aside. And the most valuable artifact from the whole migration is not the Swift code. It is the discipline: prove it first, diff it against a known-good baseline, let a second mind review it, and never trust a green checkmark over the real thing running for real.
