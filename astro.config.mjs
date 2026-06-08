@@ -1,7 +1,6 @@
 import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
-import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 
 import remarkMath from "remark-math";
@@ -14,7 +13,7 @@ import { SITE } from "./src/lib/site.ts";
 
 export default defineConfig({
   site: SITE.url,
-  integrations: [mdx(), sitemap(), react()],
+  integrations: [mdx(), sitemap()],
   markdown: {
     remarkPlugins: [remarkMath, remarkReadingTime],
     rehypePlugins: [
