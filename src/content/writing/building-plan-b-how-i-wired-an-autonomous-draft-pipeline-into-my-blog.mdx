@@ -1,0 +1,68 @@
+---
+title: "Building Plan B: how I wired an autonomous draft pipeline into my blog"
+date: 2026-06-03
+summary: "Three GitHub Actions workflows, a Notion CMS handoff, and the Claude Agent SDK form the draft pipeline I built for this blog. Here's the discover → draft → promote loop from the inside: what each step does, where Notion fits, and what broke in CI first."
+tags: [engineering, ai, agents, process]
+---
+
+The blog was publishing roughly once a month. Not because the ideas weren't there (I keep a Notion database of them), but because the gap between "this might be worth writing" and "this is ready to publish" was wide enough that most ideas just sat. Plan B is my attempt to close that gap with agents.
+
+## Three workflows, one loop
+
+**agent-discover** runs Sunday mornings at 3:00 UTC. It scans my Notion ideas database, recent commits in the blog repo, GitHub trending, Hacker News, and YouTube video performance data. From that sweep it proposes up to three blog candidates and three YouTube candidates, writing each back to Notion as a new row with `Stage=Proposed`.
+
+**agent-draft** runs daily at 2:00 UTC. It queries Notion for rows where `Stage=Ready` — meaning I've reviewed a proposal and promoted it. Blog rows get a full MDX file generated and opened as a pull request against the repo. YouTube rows get a script written directly into the Notion row body.
+
+**agent-promote** runs daily at 4:00 UTC. It checks for published YouTube rows that have `blog` in their `Cross-post Targets` field, then creates a derivative blog row in Notion at `Stage=Proposed`, pre-filled with the video title, angle, and a link back to the source.
+
+The loop runs in the background. Discovery surfaces candidates on Sunday. I review and promote the ones that look right. The draft agent picks them up in the next morning's run. If a YouTube video hits and needs a blog companion, promote mints the Notion row automatically.
+
+## Why Notion
+
+The alternative was building a dashboard. Some admin UI where I could review agent proposals and flip a toggle. I don't want to build that, and more importantly, I wouldn't use it consistently. Notion is already where my ideas live, which means the editorial queue ends up in one place rather than split across two tools.
+
+The agents write to Notion. I review and promote from my phone. Adding a `Stage` select field to an existing database took about five minutes. That low setup cost matters: the fewer new tools in the loop, the fewer places a review falls through.
+
+One design constraint I held: the agents propose, I approve. `Stage=Ready` is a manual gate before any draft gets generated. This isn't about distrust of the output quality — it's about not shipping drafts for ideas I wouldn't have chosen myself. The automation handles mechanical work; editorial judgment stays mine.
+
+Flat files as the handoff layer was another option I considered. The agents could write proposal Markdown files to a `/proposals` folder and I'd merge the ones I wanted drafted. Simpler to debug, but it fractures the idea-to-draft timeline across repo state rather than a queryable database. Notion's structured fields (`Stage`, `Content Type`, `Cross-post Targets`) are what make the promote workflow possible at all.
+
+## How the Agent SDK fits in
+
+`agent-draft` doesn't call the API once and dump output into a file. It uses the Claude Agent SDK to run a drafting loop that reads the editorial style guide, pulls relevant source material, generates a draft, and checks it before committing.
+
+The agent loads `docs/EDITORIAL.md` as part of the system prompt, so constraints about AI-tell phrases, em-dash limits, and length targets are active during generation, not applied in a post-processing pass. It also reads `src/lib/buckets.ts` to understand how tags map to display buckets before assigning them to the post.
+
+After drafting, it runs Vale against the file and reads the output. Vale flags prose issues as suggestions rather than errors (errors are reserved for broken frontmatter), so the agent's job is to catch the obvious lints before the PR opens. Anything Vale still flags surfaces as inline PR comments from CI, which I review before merging.
+
+The tool-use loop is what separates this from a one-shot prompt. The agent reads files from the repo, checks the bucket map, runs a shell command to lint, reads the output, revises the draft, runs Vale again. Each tool call returns structured output the agent can reason about. That back-and-forth is what gets it close to publishable rather than just technically valid frontmatter.
+
+## What broke in CI
+
+Three things failed before the first successful end-to-end run.
+
+**Empty-string env vars.** The workflow populates secrets as environment variables. I was guarding against missing config with `if (!process.env.NOTION_TOKEN)`, which evaluates to `false` when the variable is an empty string. The check passed, the agent ran without credentials, and it failed downstream in an unhelpful place. Changed to `if (!process.env.NOTION_TOKEN?.trim())` and the guard actually works now. Annoying to diagnose when the surface symptom is "agent silently produced nothing."
+
+**Snake-case property names from the Notion API.** I was destructuring Notion page properties with camelCase keys because that felt right for TypeScript — `stageSelect`, `contentType`. Notion returns properties using whatever case you used when naming the database fields, which in my case was title-case display names like `Stage` and `Content Type`. The property accessor returned `undefined` silently, so the agent received an empty idea list and generated nothing. Fixed by aligning the keys to Notion's actual response shape and wrapping the parse in a Zod schema so a mismatch surfaces as an explicit error rather than a mysteriously empty list.
+
+**The `finally`-wrapped git push.** After the agent runs, the workflow pushes a branch and opens a PR. I had the push in a `finally` block, reasoning that partial output is better than nothing. What actually happened: the agent failed before writing anything, `finally` ran anyway, pushed an empty branch, and CI opened a PR with no file changes while reporting success. Moved the push back into the happy path, added explicit error logging before re-throwing, and now CI marks the run failed when it actually fails.
+
+## What's working
+
+Discovery runs without me. Every Monday I have a handful of Notion rows at `Stage=Proposed` that I didn't generate myself. Most aren't right, but a few always are. Reviewing the list takes two minutes.
+
+The draft quality is good enough that I'm mostly editing rather than rewriting. The editorial constraints in the system prompt seem to hold: I haven't seen the worst AI-tell patterns in the generated drafts, and Vale is catching em-dash overuse reliably.
+
+## What's still rough
+
+The discover agent doesn't carry a window of recently published posts, so it can propose topics I already covered. Adding the last N post titles to the discovery context is straightforward; it just hasn't happened yet.
+
+The promote workflow is the least exercised. It has generated a derivative Notion row from a published YouTube video, but I haven't run it enough to know where the edge cases are.
+
+Vale occasionally flags content inside inline code spans as prose violations. The config needs a more precise rule to skip those, not just fenced code blocks. One-line fix, kept deprioritizing it.
+
+## The actual value
+
+Shipping a post without touching it isn't the goal. My name is on these, and the manual review gate exists for a reason. The value is narrower: an idea I found interesting can become a first draft I can edit in the time CI takes to run. That's a different kind of leverage from end-to-end automation.
+
+The pipeline is running. It's not done.
