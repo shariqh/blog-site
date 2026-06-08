@@ -6,7 +6,7 @@ summary: "I rewrote lognote's engine from Python to Swift one module at a time â
 draft: false
 ---
 
-lognote records both sides of a meeting on your Mac, transcribes it on-device, and writes the notes into your own vault. For most of its life the part that did the work, the transcription and summarization engine, was Python. It leaned on MLX-Whisper, a couple of large vendor SDKs, and a 1.2GB virtual environment to do its job.
+[lognote](https://lognote.dev/?utm_source=shariq.dev&utm_medium=blog&utm_campaign=engine-rewrite) records both sides of a meeting on your Mac, transcribes it on-device, and writes the notes into your own vault. For most of its life the part that did the work, the transcription and summarization engine, was Python. It leaned on MLX-Whisper, a couple of large vendor SDKs, and a 1.2GB virtual environment to do its job.
 
 I just finished rewriting that engine in Swift. The native binary that replaces the whole Python stack started at 3MB and, once the on-device summarizer was linked in, settled at 67MB. It replaces a 1.2GB virtual environment. And because the native machine-learning libraries I now build on support much older versions of macOS than the Python wheels did, the engine's OS floor dropped by roughly twelve major releases. The same code now runs on Macs that were never going to meet the old requirement.
 
