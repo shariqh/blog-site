@@ -25,7 +25,11 @@ const readingMinutes = remarkPluginFrontmatter?.readingTime
   ? Math.ceil(remarkPluginFrontmatter.readingTime / 60)
   : undefined;
 ---
-<BaseLayout title={post.data.title} description={post.data.summary}>
+<BaseLayout
+  title={post.data.title}
+  description={post.data.summary}
+  canonical={post.data.canonical}
+>
   <article class="pb-16">
     <PostHeader
       title={post.data.title}

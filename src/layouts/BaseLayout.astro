@@ -11,11 +11,15 @@ import { SITE } from "../lib/site";
 interface Props {
   title?: string;
   description?: string;
+  // External canonical URL for cross-posts where this page is a COPY of content
+  // published elsewhere. Omit on original content (defaults to this page's URL).
+  canonical?: string;
 }
 
-const { title, description = SITE.description } = Astro.props;
+const { title, description = SITE.description, canonical: canonicalOverride } = Astro.props;
 const fullTitle = title ? `${title} — ${SITE.title}` : SITE.title;
-const canonical = new URL(Astro.url.pathname, SITE.url).toString();
+const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
+const canonical = canonicalOverride ?? pageUrl;
 ---
 <!doctype html>
 <html lang="en">
@@ -30,7 +34,7 @@ const canonical = new URL(Astro.url.pathname, SITE.url).toString();
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={canonical} />
+    <meta property="og:url" content={pageUrl} />
 
     <!-- GoatCounter — privacy-friendly analytics (no cookies, no PII).
          count.js auto-skips localhost, so no prod-only guard is needed. -->
