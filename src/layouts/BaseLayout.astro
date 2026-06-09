@@ -31,6 +31,15 @@ const canonical = new URL(Astro.url.pathname, SITE.url).toString();
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
+
+    <!-- GoatCounter — privacy-friendly analytics (no cookies, no PII).
+         count.js auto-skips localhost, so no prod-only guard is needed. -->
+    <script
+      is:inline
+      data-goatcounter="https://shariq-blog.goatcounter.com/count"
+      async
+      src="//gc.zgo.at/count.js"></script>
+
     <script is:inline>
       // Apply theme before first paint to avoid FOUC.
       (function () {
