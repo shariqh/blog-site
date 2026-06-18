@@ -43,7 +43,6 @@ const readingMinutes = remarkPluginFrontmatter?.readingTime
       bucket={bucket.key}
       bucketLabel={bucket.label}
       summary={post.data.summary}
-      hero={post.data.hero ? { image: post.data.hero.image, alt: post.data.hero.alt } : null}
       readingMinutes={readingMinutes}
     />
 
