@@ -1,0 +1,36 @@
+---
+interface Props {
+  buckets: { key: string; label: string }[];
+}
+const { buckets } = Astro.props;
+---
+<div class="filters" data-filters>
+  <button class="pill active" data-filter="all">All</button>
+  {buckets.map((b) => <button class="pill" data-filter={b.key}>{b.label}</button>)}
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-filters]").forEach((bar) => {
+    const pills = [...bar.querySelectorAll<HTMLButtonElement>(".pill")];
+    const cards = [...document.querySelectorAll<HTMLElement>("[data-bucket]")];
+    bar.addEventListener("click", (e) => {
+      const pill = (e.target as HTMLElement).closest<HTMLButtonElement>(".pill");
+      if (!pill) return;
+      const key = pill.dataset.filter!;
+      pills.forEach((p) => p.classList.toggle("active", p === pill));
+      cards.forEach((c) => {
+        c.style.display = key === "all" || c.dataset.bucket === key ? "" : "none";
+      });
+    });
+  });
+</script>
+
+<style>
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 48px; }
+  .pill { font-family: var(--font-mono); font-size: 12px; padding: 8px 16px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent); background: none; color: inherit; opacity: .7; cursor: pointer; transition: all .15s; }
+  @media (prefers-reduced-motion: reduce) {
+    .pill { transition: none; }
+  }
+  .pill.active { background: var(--color-terracotta); border-color: var(--color-terracotta); color: var(--color-paper); opacity: 1; }
+  .pill:not(.active):hover { border-color: var(--fg); opacity: 1; }
+</style>

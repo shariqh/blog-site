@@ -1,0 +1,31 @@
+---
+import { resolveCover } from "../lib/cover";
+interface Props {
+  data: { hero?: { image?: string; alt?: string }; tags?: string[] };
+}
+const cover = resolveCover(Astro.props.data);
+---
+{
+  cover.kind === "image" ? (
+    <img class="cover" src={cover.src} alt={cover.alt} width="600" height="400" loading="lazy" />
+  ) : (
+    <div class:list={["cover", "ph", `ph-${cover.bucket}`]}>
+      <svg viewBox="0 0 120 80" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="34" cy="40" r="18"></circle>
+        <path d="M12 70 q26 -30 60 -12 t40 -20"></path>
+        <circle cx="92" cy="30" r="9" fill="currentColor" stroke="none"></circle>
+      </svg>
+    </div>
+  )
+}
+
+<style>
+  .cover { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ph { display: grid; place-items: center; color: var(--color-paper); }
+  .ph svg { width: 50%; opacity: 0.6; }
+  .ph-leadership { background: var(--color-ink); }
+  .ph-engineering { background: var(--color-ochre); color: var(--color-ink); }
+  .ph-ai { background: var(--color-terracotta); }
+  .ph-process { background: var(--color-ink-soft); }
+  .ph-notes { background: var(--color-ink-soft); }
+</style>

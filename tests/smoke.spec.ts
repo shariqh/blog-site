@@ -45,6 +45,20 @@ test('RSS feed serves', async ({ request }) => {
   expect(res.headers()['content-type']).toMatch(/xml/)
 })
 
+test('blog listing renders + filters', async ({ page }) => {
+  await page.goto('/blog')
+  await expect(page.locator('h1')).toContainText(['Blog'])
+  await expect(page.locator('.featured')).toBeVisible()
+  // All + 5 buckets = 6 pills
+  await expect(page.locator('[data-filter]')).toHaveCount(6)
+  const cards = page.locator('[data-bucket]')
+  const total = await cards.count()
+  expect(total).toBeGreaterThan(0)
+  await page.locator('[data-filter="engineering"]').click()
+  // after filtering to Engineering, at least one card visible
+  await expect(page.locator('[data-bucket]:visible').first()).toBeVisible()
+})
+
 for (const slug of SLUGS) {
   test(`/blog/${slug} renders`, async ({ page }) => {
     const res = await page.goto(`/blog/${slug}`)
