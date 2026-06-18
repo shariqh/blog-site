@@ -17,6 +17,7 @@
 .DS_Store
 .idea
 .superpowers/
+sdd/
 
 # debug
 *.log
