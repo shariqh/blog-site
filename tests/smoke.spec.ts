@@ -26,7 +26,7 @@ test('homepage renders the zine hero', async ({ page }) => {
   await expect(page.locator('h1')).toContainText(['Shariq'])
   await expect(page.locator('[data-deck] .deck img')).toHaveCount(5)
   await expect(page.locator('.featured')).toBeVisible()
-  await expect(page.getByText('I build things, break a few')).toBeVisible()
+  await expect(page.getByText('I build a few things, and break a lot of things')).toBeVisible()
 })
 
 test('header nav + footer socials', async ({ page }) => {

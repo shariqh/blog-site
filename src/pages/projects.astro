@@ -1,115 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Hero from "../components/Hero.astro";
-
-type ProjectKind = "product" | "tool" | "site" | "learn" | "talk";
-
-interface Project {
-  name: string;
-  description: string;
-  kind: ProjectKind;
-  /** Public-facing site, if any. */
-  site?: string;
-  /** GitHub repo, if open source. Omit for closed-source products. */
-  repo?: string;
-  /** Optional badge text like "active" / "archived" / a year. */
-  status?: string;
-}
-
-const active: Project[] = [
-  {
-    name: "lognote",
-    description:
-      "Local audio transcription + summarization for Mac. Records mic + system audio, runs MLX-Whisper on-device, lands a Markdown transcript and summary in your notes.",
-    kind: "product",
-    site: "https://lognote.dev",
-    status: "active",
-  },
-  {
-    name: "unrivaledpro",
-    description:
-      "Reviews and deals on gaming peripherals — chairs, speakers, power banks, and the gear in between.",
-    kind: "product",
-    site: "https://unrivaledpro.com",
-    status: "active",
-  },
-  {
-    name: "portalrewards",
-    description:
-      "A gateway for brands to build consumer loyalty programs. Users scan to earn rewards and redeem them for brand prizes.",
-    kind: "product",
-    site: "https://portalrewards.com",
-    status: "active",
-  },
-  {
-    name: "shariq.dev",
-    description:
-      'This site. Astro + Tailwind 4 + MDX, deployed on Cloudflare Pages. The whole rebuild is <a class="underline decoration-[var(--accent)] underline-offset-2 hover:text-[var(--accent)]" href="/blog/rebuilding-shariq-dev">documented in the blog</a>.',
-    kind: "site",
-    site: "https://shariq.dev",
-    repo: "https://github.com/shariqh/blog-site",
-    status: "active",
-  },
-];
-
-const built: Project[] = [
-  {
-    name: "home-server-docker-compose",
-    description:
-      "A collection of docker-compose files I use to run my home server. With comments.",
-    kind: "tool",
-    repo: "https://github.com/shariqh/home-server-docker-compose",
-  },
-  {
-    name: "myspace",
-    description: "A personal sandbox / landing page from a while back.",
-    kind: "site",
-    site: "https://shariqh.github.io/myspace/",
-    repo: "https://github.com/shariqh/myspace",
-  },
-  {
-    name: "coffee-ui",
-    description: "Coffee-themed UI experiments.",
-    kind: "site",
-    site: "https://coffee-ui.vercel.app",
-    repo: "https://github.com/shariqh/coffee-ui",
-  },
-  {
-    name: "bullmq + bull-board + redis docker starter",
-    description: "Quickstart for running BullMQ with Bull-Board behind Redis, in Docker.",
-    kind: "tool",
-    repo: "https://github.com/shariqh/bullmq_bull-board_redis_docker_starter",
-  },
-];
-
-const talks: Project[] = [
-  {
-    name: "DevOps intro",
-    description: "Internal presentation introducing DevOps practices.",
-    kind: "talk",
-    repo: "https://github.com/shariqh/presentation_devops",
-  },
-  {
-    name: "JUnit + Mockito intro",
-    description: "Internal presentation on Java unit testing.",
-    kind: "talk",
-    repo: "https://github.com/shariqh/presentation_junit-mockito-intro",
-  },
-  {
-    name: "Managing in high-turnover environments",
-    description: "Internal presentation on engineering management during attrition.",
-    kind: "talk",
-    repo: "https://github.com/shariqh/presentation_managing-in-high-turnover",
-  },
-];
-
-function host(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
+import { active, built, talks, host } from "../lib/projects";
 ---
 <BaseLayout title="Projects">
   <Hero title="Projects." eyebrow="Building, built, talked about" />
@@ -169,6 +61,6 @@ function host(url: string) {
   ))}
 
   <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--fg-soft)]">
-    Want to prune this list? Edit <code>src/pages/projects.astro</code>.
+    Want to prune this list? Edit <code>src/lib/projects.ts</code>.
   </p>
 </BaseLayout>

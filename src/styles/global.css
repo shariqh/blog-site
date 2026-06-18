@@ -18,7 +18,7 @@
 /* Light is default; dark inverts. */
 @layer base {
   :root {
-    --bg: #faf8f3;
+    --bg: #ffffff;
     --surface: #ffffff;
     --bg-soft: var(--color-paper-soft);
     --fg: var(--color-ink);
@@ -35,26 +35,6 @@
     --bucket-notes-fg: var(--color-ink);
 
     color-scheme: light;
-  }
-
-  :root.dark {
-    --bg: var(--color-ink);
-    --bg-soft: var(--color-ink-soft);
-    --surface: #1c2c44;
-    --fg: var(--color-paper);
-    --fg-soft: var(--color-paper-soft);
-    --accent: var(--color-ochre);
-    --accent-alt: var(--color-terracotta);
-
-    /* In dark mode, the navy buckets invert to cream so they stand out from the navy bg. */
-    --bucket-leadership-bg: var(--color-paper);
-    --bucket-leadership-fg: var(--color-ink);
-    --bucket-process-bg: var(--color-paper-soft);
-    --bucket-process-fg: var(--color-ink);
-    --bucket-notes-bg: var(--color-ink-soft);
-    --bucket-notes-fg: var(--color-paper);
-
-    color-scheme: dark;
   }
 
   html {

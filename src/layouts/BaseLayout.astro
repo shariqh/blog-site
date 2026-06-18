@@ -48,17 +48,6 @@ const canonical = canonicalOverride ?? pageUrl;
       async
       src="//gc.zgo.at/count.js"></script>
 
-    <script is:inline>
-      // Apply theme before first paint to avoid FOUC.
-      (function () {
-        const stored = localStorage.getItem("theme") || "system";
-        const dark =
-          stored === "dark" ||
-          (stored === "system" &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.classList.toggle("dark", dark);
-      })();
-    </script>
   </head>
   <body>
     <Header />
