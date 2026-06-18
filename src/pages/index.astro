@@ -58,9 +58,8 @@ const m = HOME.manifesto;
     <ul class="built">
       {active.map((p) => (
         <li>
-          <a class="built-link" href={p.site ?? p.repo} target="_blank" rel="noopener">
-            <span class="t">{p.name}</span><span class="d" set:html={p.description} />
-          </a>
+          <a class="built-name" href={p.site ?? p.repo} target="_blank" rel="noopener">{p.name}</a>
+          <p class="built-desc" set:html={p.description} />
         </li>
       ))}
     </ul>
@@ -109,11 +108,11 @@ const m = HOME.manifesto;
   .built-wrap { margin-bottom: 110px; }
   .built-wrap .h { font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .5; margin-bottom: 8px; }
   .built { list-style: none; padding: 0; }
-  .built li { display: flex; align-items: baseline; gap: 18px; padding: 18px 0; border-bottom: 1px dashed color-mix(in oklab, var(--fg) 22%, transparent); }
-  .built li .t { font-family: var(--font-display); font-style: italic; font-size: 26px; min-width: 240px; }
-  .built li .d { font-size: 15px; opacity: .65; }
-  .built-link { display: block; color: inherit; text-decoration: none; }
-  .built-link:hover .t { color: var(--color-terracotta); }
+  .built li { padding: 18px 0; border-bottom: 1px dashed color-mix(in oklab, var(--fg) 22%, transparent); }
+  .built-name { display: inline-block; font-family: var(--font-display); font-style: italic; font-size: 26px; color: inherit; text-decoration: none; }
+  .built-name:hover { color: var(--color-terracotta); }
+  .built-desc { margin-top: 6px; font-size: 15px; opacity: .7; max-width: 60ch; line-height: 1.5; }
+  .built-desc :global(a) { color: var(--color-terracotta); text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
 
   @media (max-width: 880px) {
     .hero { grid-template-columns: 1fr; }
@@ -123,8 +122,6 @@ const m = HOME.manifesto;
     h1 { font-size: 60px; }
     .manifesto { font-size: 34px; }
     .right-now li { font-size: 28px; }
-    .built li { flex-direction: column; gap: 2px; }
-    .built li .t { min-width: 0; }
   }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 </style>
