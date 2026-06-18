@@ -321,11 +321,20 @@ type Cover =
   | { kind: 'image'; src: string; alt: string }
   | { kind: 'placeholder'; bucket: BucketKey }
 
-// Trust only same-origin asset paths under /static/ (the documented cover dir):
-// rejects scheme/protocol-relative/data: URLs AND arbitrary same-origin routes,
-// because frontmatter (incl. agent-drafted) is untrusted.
+// Frontmatter (incl. agent-drafted) is untrusted. Confine cover images to the
+// site's static image dir. Reject scheme/protocol-relative URLs and query/hash,
+// then check the BROWSER-NORMALIZED pathname (so '/static/../admin' can't slip
+// through) against a strict prefix plus a raster image extension.
 function isLocalImagePath(src: string): boolean {
-  return src.startsWith('/static/')
+  if (!src.startsWith('/') || src.startsWith('//')) return false
+  if (src.includes('?') || src.includes('#') || src.includes('\\')) return false
+  let pathname: string
+  try {
+    pathname = new URL(src, 'https://shariq.dev').pathname
+  } catch {
+    return false
+  }
+  return pathname.startsWith('/static/images/') && /\.(png|jpe?g|webp|avif|gif)$/i.test(pathname)
 }
 
 export function resolveCover(data: {
@@ -380,10 +389,15 @@ export type DeckPos = 'front' | 'next' | 'next2' | 'prev' | 'prev2' | 'hide'
 export function deckClass(n: number, i: number, len: number): DeckPos {
   const rel = (n - i + len) % len
   if (rel === 0) return 'front'
-  if (rel === 1) return 'next'
-  if (rel === 2) return 'next2'
-  if (rel === len - 1) return 'prev'
-  if (rel === len - 2) return 'prev2'
+  const forward = rel
+  const backward = len - rel
+  if (forward <= backward) {
+    if (forward === 1) return 'next'
+    if (forward === 2) return 'next2'
+    return 'hide'
+  }
+  if (backward === 1) return 'prev'
+  if (backward === 2) return 'prev2'
   return 'hide'
 }
 ```
