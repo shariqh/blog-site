@@ -18,7 +18,8 @@
 /* Light is default; dark inverts. */
 @layer base {
   :root {
-    --bg: var(--color-paper);
+    --bg: #faf8f3;
+    --surface: #ffffff;
     --bg-soft: var(--color-paper-soft);
     --fg: var(--color-ink);
     --fg-soft: var(--color-ink-soft);
@@ -39,6 +40,7 @@
   :root.dark {
     --bg: var(--color-ink);
     --bg-soft: var(--color-ink-soft);
+    --surface: #1c2c44;
     --fg: var(--color-paper);
     --fg-soft: var(--color-paper-soft);
     --accent: var(--color-ochre);

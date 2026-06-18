@@ -9,5 +9,6 @@ export const SITE = {
     github: 'https://github.com/shariqh',
     linkedin: 'https://www.linkedin.com/in/shariqhirani',
     instagram: 'https://www.instagram.com/shariqhiraniphoto',
+    youtube: 'https://www.youtube.com/@shariqhirani',
   },
 } as const

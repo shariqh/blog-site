@@ -9,14 +9,18 @@ import ContactModal from "../components/ContactModal.astro";
 import { SITE } from "../lib/site";
 
 interface Props {
-  title?: string;
-  description?: string;
-  // External canonical URL for cross-posts where this page is a COPY of content
-  // published elsewhere. Omit on original content (defaults to this page's URL).
-  canonical?: string;
+  title?: string
+  description?: string
+  canonical?: string
+  width?: 'prose' | 'wide'
 }
 
-const { title, description = SITE.description, canonical: canonicalOverride } = Astro.props;
+const {
+  title,
+  description = SITE.description,
+  canonical: canonicalOverride,
+  width = 'prose',
+} = Astro.props
 const fullTitle = title ? `${title} — ${SITE.title}` : SITE.title;
 const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
 const canonical = canonicalOverride ?? pageUrl;
@@ -58,7 +62,12 @@ const canonical = canonicalOverride ?? pageUrl;
   </head>
   <body>
     <Header />
-    <main class="mx-auto max-w-3xl px-5">
+    <main
+      class:list={[
+        "mx-auto px-5",
+        width === "wide" ? "max-w-[1100px]" : "max-w-3xl",
+      ]}
+    >
       <slot />
     </main>
     <Footer />

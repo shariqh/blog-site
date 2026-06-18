@@ -26,6 +26,16 @@ test('homepage renders', async ({ page }) => {
   await expect(page.locator('h1')).toContainText(['Writing'])
 })
 
+test('header nav + footer socials', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('header nav')).toContainText(['Blog'])
+  await expect(page.locator('header nav')).toContainText(['Projects'])
+  const footer = page.locator('footer')
+  await expect(footer).toContainText(['GitHub'])
+  await expect(footer).toContainText(['YouTube'])
+  await expect(footer).toContainText(['LinkedIn'])
+})
+
 test('RSS feed serves', async ({ request }) => {
   const res = await request.get('/feed.xml')
   expect(res.status()).toBe(200)
