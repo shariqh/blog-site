@@ -38,5 +38,8 @@ const { href, category, title, hook, cta = "Read it" } = Astro.props;
   .more .dot { width: 42px; height: 42px; border-radius: 999px; background: var(--color-ochre); color: var(--color-ink); display: grid; place-items: center; font-size: 18px; transition: transform .15s; }
   .featured:hover .more .dot { transform: translateX(4px); }
   .art { background: linear-gradient(135deg, color-mix(in oklab, var(--color-paper) 88%, var(--color-ink)), var(--color-paper)); display: grid; place-items: center; }
+  @media (prefers-reduced-motion: reduce) {
+    .more .dot { transition: none; }
+  }
   @media (max-width: 760px) { .featured { grid-template-columns: 1fr; } }
 </style>
