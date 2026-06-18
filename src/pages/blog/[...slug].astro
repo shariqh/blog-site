@@ -8,6 +8,7 @@ import Callout from "../../components/mdx/Callout.astro";
 import Youtube from "../../components/mdx/Youtube.astro";
 import Image from "../../components/mdx/Image.astro";
 import { resolveBucket } from "../../lib/buckets";
+import CoverImage from "../../components/CoverImage.astro";
 
 export async function getStaticPaths() {
   const posts = await getCollection("writing", ({ data }) => !data.draft);
@@ -31,6 +32,11 @@ const readingMinutes = remarkPluginFrontmatter?.readingTime
   canonical={post.data.canonical}
 >
   <article class="pb-16">
+    {post.data.hero?.image && (
+      <div class="post-cover">
+        <CoverImage data={post.data} />
+      </div>
+    )}
     <PostHeader
       title={post.data.title}
       date={post.data.date}
@@ -57,3 +63,7 @@ const readingMinutes = remarkPluginFrontmatter?.readingTime
     )}
   </article>
 </BaseLayout>
+
+<style>
+  .post-cover { aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; margin-bottom: 32px; }
+</style>
