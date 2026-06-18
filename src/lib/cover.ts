@@ -4,24 +4,23 @@ type Cover =
   | { kind: 'image'; src: string; alt: string }
   | { kind: 'placeholder'; bucket: BucketKey }
 
-// Only same-origin, root-relative paths are trusted as cover images. The drafting
-// agent ingests untrusted external content, so reject absolute/scheme URLs
-// (https:, data:, javascript:) and protocol-relative ('//host') to avoid emitting
-// attacker-controlled <img src> that leaks reader metadata or loads hostile content.
-function isLocalImagePath(src: string): boolean {
-  // Frontmatter (incl. agent-drafted) is untrusted. Confine cover images to the
-  // site's static image dir. Reject scheme/protocol-relative URLs and query/hash,
-  // then check the BROWSER-NORMALIZED pathname (so '/static/../admin' can't slip
-  // through) against a strict prefix plus a raster image extension.
-  if (!src.startsWith('/') || src.startsWith('//')) return false
-  if (src.includes('?') || src.includes('#') || src.includes('\\')) return false
+// Frontmatter (incl. agent-drafted) is untrusted. Confine cover images to the
+// site's static image dir. Reject scheme/protocol-relative URLs, query/hash,
+// backslashes, and percent-encoding (which could smuggle encoded traversal),
+// then validate the BROWSER-NORMALIZED pathname against a strict prefix + raster
+// extension, and return that normalized path (never the raw input) as the src.
+function safeLocalImage(src: string): string | null {
+  if (!src.startsWith('/') || src.startsWith('//')) return null
+  if (/[%\\?#]/.test(src)) return null
   let pathname: string
   try {
     pathname = new URL(src, 'https://shariq.dev').pathname
   } catch {
-    return false
+    return null
   }
-  return pathname.startsWith('/static/images/') && /\.(png|jpe?g|webp|avif|gif)$/i.test(pathname)
+  if (!pathname.startsWith('/static/images/')) return null
+  if (!/\.(png|jpe?g|webp|avif|gif)$/i.test(pathname)) return null
+  return pathname
 }
 
 export function resolveCover(data: {
@@ -29,8 +28,9 @@ export function resolveCover(data: {
   tags?: string[]
 }): Cover {
   const image = data.hero?.image
-  if (image && isLocalImagePath(image)) {
-    return { kind: 'image', src: image, alt: data.hero?.alt ?? '' }
+  if (image) {
+    const safe = safeLocalImage(image)
+    if (safe) return { kind: 'image', src: safe, alt: data.hero?.alt ?? '' }
   }
   return { kind: 'placeholder', bucket: resolveBucket(data.tags ?? []).key }
 }

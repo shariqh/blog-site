@@ -40,4 +40,12 @@ describe('resolveCover', () => {
     expect(resolveCover({ hero: { image: '/static/images/blog/x/cover.txt' }, tags: [] }))
       .toEqual({ kind: 'placeholder', bucket: 'notes' })
   })
+  it('rejects a percent-encoded traversal under /static/images → placeholder', () => {
+    expect(resolveCover({ hero: { image: '/static/images/%2e%2e/admin/secret.png' }, tags: ['ai'] }))
+      .toEqual({ kind: 'placeholder', bucket: 'ai' })
+  })
+  it('rejects any percent-encoding in the path → placeholder', () => {
+    expect(resolveCover({ hero: { image: '/static/images/blog/a%2fb/cover.png' }, tags: [] }))
+      .toEqual({ kind: 'placeholder', bucket: 'notes' })
+  })
 })
