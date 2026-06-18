@@ -18,4 +18,23 @@ describe('resolveCover', () => {
     const r = resolveCover({ hero: { image: '/x.png' }, tags: [] })
     expect(r).toEqual({ kind: 'image', src: '/x.png', alt: '' })
   })
+  it('rejects an absolute https hero.image (untrusted) → placeholder', () => {
+    const r = resolveCover({ hero: { image: 'https://evil.example.com/x.png' }, tags: ['docker'] })
+    expect(r).toEqual({ kind: 'placeholder', bucket: 'engineering' })
+  })
+  it('rejects a protocol-relative hero.image → placeholder', () => {
+    const r = resolveCover({ hero: { image: '//evil.example.com/x.png' }, tags: ['ai'] })
+    expect(r).toEqual({ kind: 'placeholder', bucket: 'ai' })
+  })
+  it('rejects a data: URI hero.image → placeholder', () => {
+    const r = resolveCover({ hero: { image: 'data:image/png;base64,AAAA' }, tags: [] })
+    expect(r).toEqual({ kind: 'placeholder', bucket: 'notes' })
+  })
+  it('accepts a root-relative local path', () => {
+    const r = resolveCover({
+      hero: { image: '/static/images/blog/x/cover.png', alt: 'C' },
+      tags: [],
+    })
+    expect(r).toEqual({ kind: 'image', src: '/static/images/blog/x/cover.png', alt: 'C' })
+  })
 })

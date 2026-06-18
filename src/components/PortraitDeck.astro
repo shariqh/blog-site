@@ -10,7 +10,7 @@ const len = portraits.length;
   <div class="deck">
     {
       portraits.map((p, n) => (
-        <img class={deckClass(n, 0, len)} src={p.src} alt={p.alt} width="600" height="800" loading="eager" />
+        <img class={deckClass(n, 0, len)} src={p.src} alt={p.alt} width="600" height="800" loading={n === 0 ? "eager" : "lazy"} decoding="async" />
       ))
     }
   </div>
