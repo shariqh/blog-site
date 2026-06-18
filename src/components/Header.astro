@@ -1,8 +1,18 @@
 ---
 import { SITE } from "../lib/site";
+
+interface Props {
+  width?: "prose" | "wide";
+}
+const { width = "prose" } = Astro.props;
 ---
 <header class="w-full border-b border-[color-mix(in_oklab,var(--fg)_15%,transparent)]">
-  <div class="mx-auto flex max-w-3xl items-center justify-between px-5 py-5">
+  <div
+    class:list={[
+      "mx-auto flex items-center justify-between px-5 py-5",
+      width === "wide" ? "max-w-[1100px]" : "max-w-3xl",
+    ]}
+  >
     <a href="/" class="font-display text-lg italic tracking-tight">{SITE.title}</a>
     <nav class="flex items-center gap-6 text-sm">
       <a href="/blog" class="hover:text-[var(--accent)]">Blog</a>

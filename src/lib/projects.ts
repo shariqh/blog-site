@@ -3,6 +3,8 @@ export type ProjectKind = "product" | "tool" | "site" | "learn" | "talk";
 export interface Project {
   name: string;
   description: string;
+  /** Short one-line blurb for compact contexts (e.g. the homepage "built" list). */
+  blurb?: string;
   kind: ProjectKind;
   /** Public-facing site, if any. */
   site?: string;
@@ -15,6 +17,7 @@ export interface Project {
 export const active: Project[] = [
   {
     name: "lognote",
+    blurb: "Local transcription & summarization for Mac.",
     description:
       "Local audio transcription + summarization for Mac. Records mic + system audio, runs MLX-Whisper on-device, lands a Markdown transcript and summary in your notes.",
     kind: "product",
@@ -23,6 +26,7 @@ export const active: Project[] = [
   },
   {
     name: "unrivaledpro",
+    blurb: "Reviews & deals on gaming peripherals.",
     description:
       "Reviews and deals on gaming peripherals — chairs, speakers, power banks, and the gear in between.",
     kind: "product",
@@ -31,6 +35,7 @@ export const active: Project[] = [
   },
   {
     name: "portalrewards",
+    blurb: "A loyalty-rewards gateway for brands.",
     description:
       "A gateway for brands to build consumer loyalty programs. Users scan to earn rewards and redeem them for brand prizes.",
     kind: "product",
@@ -39,6 +44,7 @@ export const active: Project[] = [
   },
   {
     name: "shariq.dev",
+    blurb: "This site — Astro, Tailwind &amp; MDX.",
     description:
       'This site. Astro + Tailwind 4 + MDX, deployed on Cloudflare Pages. The whole rebuild is <a class="underline decoration-[var(--accent)] underline-offset-2 hover:text-[var(--accent)]" href="/blog/rebuilding-shariq-dev">documented in the blog</a>.',
     kind: "site",

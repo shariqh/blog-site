@@ -50,7 +50,7 @@ const canonical = canonicalOverride ?? pageUrl;
 
   </head>
   <body>
-    <Header />
+    <Header width={width} />
     <main
       class:list={[
         "mx-auto px-5",
@@ -59,7 +59,7 @@ const canonical = canonicalOverride ?? pageUrl;
     >
       <slot />
     </main>
-    <Footer />
+    <Footer width={width} />
     <ContactModal />
   </body>
 </html>
