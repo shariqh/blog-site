@@ -55,8 +55,12 @@ test('blog listing renders + filters', async ({ page }) => {
   const total = await cards.count()
   expect(total).toBeGreaterThan(0)
   await page.locator('[data-filter="engineering"]').click()
-  // after filtering to Engineering, at least one card visible
-  await expect(page.locator('[data-bucket]:visible').first()).toBeVisible()
+  const visible = page.locator('[data-bucket]:visible')
+  const vCount = await visible.count()
+  expect(vCount).toBeGreaterThan(0)
+  for (let k = 0; k < vCount; k++) {
+    await expect(visible.nth(k)).toHaveAttribute('data-bucket', 'engineering')
+  }
 })
 
 for (const slug of SLUGS) {

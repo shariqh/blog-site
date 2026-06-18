@@ -6,7 +6,7 @@
 `design-samples/homepage-zine.html` (homepage),
 `design-samples/blog-calm-split.html` (blog page).
 These static HTML files are the canonical reference for layout, spacing, and
-motion. They are NOT shipped — they're discarded once the real Astro build matches.
+motion. They are NOT shipped — they're discarded once the real Astro build matches. These mockups were removed from the repo after the production build matched them; they remain in git history.
 
 ---
 
@@ -152,8 +152,9 @@ homepage; this moves it to its own route.)
 2. **Blog header** — eyebrow `Writing` (mono), **`The Blog`** (Fraunces) + one
    intro line.
 3. **Filter pills** — `All` + the 5 buckets; active pill = terracotta. v1:
-   client-side filtering of the rendered list (All by default), built as
-   progressive enhancement so it works without JS (e.g. links/anchors fallback).
+   client-side filtering of the rendered list (All by default), built as a
+   client-side JS enhancement; without JS the grid still renders ALL posts
+   (content fully accessible), and JS adds instant bucket filtering.
 4. **Featured card** — the shared split dark panel for the latest post (ochre
    round CTA, line-art half).
 5. **Grid** — calm 3-column image cards: cover image (3:2, rounded) → category

@@ -27,7 +27,7 @@ const slug = (id: string) => `/blog/${id.replace(/\.mdx$/, "")}`;
   <FilterPills buckets={bucketList} />
 
   {featured && fb && (
-    <div class="featured-wrap">
+    <div class="featured-wrap" data-bucket={fb.key}>
       <FeaturedCard
         href={slug(featured.id)}
         category={`${fb.label} · Featured`}
