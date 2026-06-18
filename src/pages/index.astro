@@ -32,7 +32,7 @@ const m = HOME.manifesto;
   </p>
 
   <section class="right-now">
-    <p class="h">Right now</p>
+    <h2 class="h">Right now</h2>
     <ul>
       {HOME.rightNow.map((line, idx) => (
         <li><span class="n">{String(idx + 1).padStart(2, "0")}</span>{line}</li>
@@ -50,7 +50,7 @@ const m = HOME.manifesto;
   )}
 
   <section class="built-wrap">
-    <p class="h">Lately I've built</p>
+    <h2 class="h">Lately I've built</h2>
     <ul class="built">
       {HOME.built.map((b) => (
         <li><span class="t">{b.title}</span><span class="d">{b.desc}</span></li>

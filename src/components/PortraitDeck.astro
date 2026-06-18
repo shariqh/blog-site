@@ -29,6 +29,7 @@ const len = portraits.length;
     let timer: ReturnType<typeof setInterval> | undefined;
     slides.forEach((_, n) => {
       const b = document.createElement("button");
+      b.type = "button"
       b.setAttribute("aria-label", `Show portrait ${n + 1}`)
       b.addEventListener("click", () => {
         i = n;
