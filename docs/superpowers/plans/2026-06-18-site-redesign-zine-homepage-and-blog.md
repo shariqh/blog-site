@@ -321,12 +321,21 @@ type Cover =
   | { kind: 'image'; src: string; alt: string }
   | { kind: 'placeholder'; bucket: BucketKey }
 
+// Trust only same-origin asset paths under /static/ (the documented cover dir):
+// rejects scheme/protocol-relative/data: URLs AND arbitrary same-origin routes,
+// because frontmatter (incl. agent-drafted) is untrusted.
+function isLocalImagePath(src: string): boolean {
+  return src.startsWith('/static/')
+}
+
 export function resolveCover(data: {
   hero?: { image?: string; alt?: string }
   tags?: string[]
 }): Cover {
   const image = data.hero?.image
-  if (image) return { kind: 'image', src: image, alt: data.hero?.alt ?? '' }
+  if (image && isLocalImagePath(image)) {
+    return { kind: 'image', src: image, alt: data.hero?.alt ?? '' }
+  }
   return { kind: 'placeholder', bucket: resolveBucket(data.tags ?? []).key }
 }
 ```
@@ -738,9 +747,14 @@ test('blog listing renders + filters', async ({ page }) => {
   const cards = page.locator('[data-bucket]')
   const total = await cards.count()
   expect(total).toBeGreaterThan(0)
-  await page.locator('[data-filter="ai"]').click()
-  // after filtering to AI, at least one card hidden (unless every post is AI)
-  await expect(page.locator('[data-bucket]:visible').first()).toBeVisible()
+  // Filter to a bucket that has grid cards, then assert every visible card matches.
+  await page.locator('[data-filter="engineering"]').click()
+  const visible = page.locator('[data-bucket]:visible')
+  const vCount = await visible.count()
+  expect(vCount).toBeGreaterThan(0)
+  for (let k = 0; k < vCount; k++) {
+    await expect(visible.nth(k)).toHaveAttribute('data-bucket', 'engineering')
+  }
 })
 ```
 
