@@ -79,5 +79,6 @@ const len = portraits.length;
   .carousel .dots button.active { background: var(--color-terracotta); width: 20px; }
   @media (prefers-reduced-motion: reduce) {
     .carousel .deck img { transition: none; }
+    .carousel .deck img:not(.front) { opacity: 0; }
   }
 </style>

@@ -9,7 +9,9 @@ type Cover =
 // (https:, data:, javascript:) and protocol-relative ('//host') to avoid emitting
 // attacker-controlled <img src> that leaks reader metadata or loads hostile content.
 function isLocalImagePath(src: string): boolean {
-  return src.startsWith('/') && !src.startsWith('//')
+  // Trust only same-origin asset paths under /static/ (the documented cover dir).
+  // Rejects scheme/protocol-relative/data: URLs AND arbitrary same-origin routes.
+  return src.startsWith('/static/')
 }
 
 export function resolveCover(data: {

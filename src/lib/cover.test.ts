@@ -3,8 +3,8 @@ import { resolveCover } from './cover'
 
 describe('resolveCover', () => {
   it('uses hero.image when present', () => {
-    const r = resolveCover({ hero: { image: '/x.png', alt: 'X' }, tags: ['ai'] })
-    expect(r).toEqual({ kind: 'image', src: '/x.png', alt: 'X' })
+    const r = resolveCover({ hero: { image: '/static/x.png', alt: 'X' }, tags: ['ai'] })
+    expect(r).toEqual({ kind: 'image', src: '/static/x.png', alt: 'X' })
   })
   it('falls back to a bucket placeholder when no image', () => {
     const r = resolveCover({ tags: ['docker'] })
@@ -15,8 +15,12 @@ describe('resolveCover', () => {
     expect(r).toEqual({ kind: 'placeholder', bucket: 'notes' })
   })
   it('empty alt defaults to empty string', () => {
-    const r = resolveCover({ hero: { image: '/x.png' }, tags: [] })
-    expect(r).toEqual({ kind: 'image', src: '/x.png', alt: '' })
+    const r = resolveCover({ hero: { image: '/static/x.png' }, tags: [] })
+    expect(r).toEqual({ kind: 'image', src: '/static/x.png', alt: '' })
+  })
+  it('rejects a same-origin path outside /static/ → placeholder', () => {
+    const r = resolveCover({ hero: { image: '/admin/secret' }, tags: ['docker'] })
+    expect(r).toEqual({ kind: 'placeholder', bucket: 'engineering' })
   })
   it('rejects an absolute https hero.image (untrusted) → placeholder', () => {
     const r = resolveCover({ hero: { image: 'https://evil.example.com/x.png' }, tags: ['docker'] })
