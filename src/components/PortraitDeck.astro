@@ -1,0 +1,80 @@
+---
+import { deckClass } from "../lib/carousel";
+interface Props {
+  portraits: { src: string; alt: string }[];
+}
+const { portraits } = Astro.props;
+const len = portraits.length;
+---
+<div class="carousel" data-deck>
+  <div class="deck">
+    {
+      portraits.map((p, n) => (
+        <img class={deckClass(n, 0, len)} src={p.src} alt={p.alt} width="600" height="800" loading="eager" />
+      ))
+    }
+  </div>
+  <div class="dots"></div>
+</div>
+
+<script>
+  import { deckClass } from "../lib/carousel";
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.querySelectorAll<HTMLElement>("[data-deck]").forEach((root) => {
+    const slides = [...root.querySelectorAll<HTMLImageElement>(".deck img")];
+    const dotsWrap = root.querySelector<HTMLElement>(".dots")!;
+    const len = slides.length;
+    if (!len) return;
+    let i = 0;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    slides.forEach((_, n) => {
+      const b = document.createElement("button");
+      b.addEventListener("click", () => {
+        i = n;
+        render();
+        restart();
+      });
+      dotsWrap.appendChild(b);
+    });
+    const dots = [...dotsWrap.children];
+    function render() {
+      slides.forEach((s, n) => {
+        s.className = deckClass(n, i, len);
+      });
+      dots.forEach((d, n) => d.classList.toggle("active", n === i));
+    }
+    function advance() {
+      i = (i + 1) % len;
+      render();
+    }
+    function restart() {
+      if (reduce) return;
+      clearInterval(timer);
+      timer = setInterval(advance, 3800);
+    }
+    render();
+    if (!reduce) {
+      restart();
+      root.addEventListener("mouseenter", () => clearInterval(timer));
+      root.addEventListener("mouseleave", restart);
+    }
+  });
+</script>
+
+<style>
+  .carousel { position: relative; width: 300px; align-self: stretch; display: flex; flex-direction: column; justify-content: flex-start; }
+  .carousel .deck { position: relative; width: 300px; aspect-ratio: 3 / 4; }
+  .carousel .deck img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 20px;
+    transform-origin: center center; backface-visibility: hidden;
+    box-shadow: 0 24px 50px -24px color-mix(in oklab, var(--fg) 50%, transparent);
+    transition: transform .65s cubic-bezier(.22,.61,.36,1), opacity .45s ease, filter .55s ease; }
+  .carousel .deck img.front { transform: rotate(0) translate(0,0) scale(1); opacity: 1; z-index: 6; filter: none; }
+  .carousel .deck img.next  { transform: rotate(9deg)   translate(38px, -14px)  scale(.9);  opacity: 1; z-index: 5; filter: brightness(.84) saturate(.92) blur(.4px); }
+  .carousel .deck img.prev  { transform: rotate(-9deg)  translate(-38px, -14px) scale(.9);  opacity: 1; z-index: 4; filter: brightness(.8)  saturate(.92) blur(.4px); }
+  .carousel .deck img.next2 { transform: rotate(18deg)  translate(74px, -30px)  scale(.8);  opacity: 1; z-index: 3; filter: brightness(.66) saturate(.84) blur(1.4px); }
+  .carousel .deck img.prev2 { transform: rotate(-18deg) translate(-74px, -30px) scale(.8);  opacity: 1; z-index: 2; filter: brightness(.62) saturate(.84) blur(1.4px); }
+  .carousel .deck img.hide  { transform: scale(.78); opacity: 0; z-index: 1; }
+  .carousel .dots { position: absolute; top: 100%; left: 0; right: 0; display: flex; gap: 7px; justify-content: center; margin-top: 18px; }
+  .carousel .dots button { width: 7px; height: 7px; border-radius: 999px; border: 0; padding: 0; cursor: pointer; background: color-mix(in oklab, var(--fg) 22%, transparent); transition: all .2s; }
+  .carousel .dots button.active { background: var(--color-terracotta); width: 20px; }
+</style>

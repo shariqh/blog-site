@@ -21,9 +21,12 @@ function walkMdx(dir: string, prefix = ''): string[] {
 
 const SLUGS = walkMdx('src/content/writing')
 
-test('homepage renders', async ({ page }) => {
+test('homepage renders the zine hero', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('h1')).toContainText(['Writing'])
+  await expect(page.locator('h1')).toContainText(['Shariq'])
+  await expect(page.locator('[data-deck] .deck img')).toHaveCount(5)
+  await expect(page.locator('.featured')).toBeVisible()
+  await expect(page.getByText('I build things, break a few')).toBeVisible()
 })
 
 test('header nav + footer socials', async ({ page }) => {
