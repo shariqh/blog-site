@@ -2,12 +2,14 @@
 import { resolveCover } from "../lib/cover";
 interface Props {
   data: { hero?: { image?: string; alt?: string }; tags?: string[] };
+  priority?: boolean;
 }
-const cover = resolveCover(Astro.props.data);
+const { data, priority = false } = Astro.props;
+const cover = resolveCover(data);
 ---
 {
   cover.kind === "image" ? (
-    <img class="cover" src={cover.src} alt={cover.alt} width="600" height="400" loading="lazy" />
+    <img class="cover" src={cover.src} alt={cover.alt} width="600" height="400" loading={priority ? "eager" : "lazy"} fetchpriority={priority ? "high" : undefined} />
   ) : (
     <div class:list={["cover", "ph", `ph-${cover.bucket}`]}>
       <svg viewBox="0 0 120 80" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">

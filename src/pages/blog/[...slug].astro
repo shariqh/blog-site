@@ -34,7 +34,7 @@ const readingMinutes = remarkPluginFrontmatter?.readingTime
   <article class="pb-16">
     {post.data.hero?.image && (
       <div class="post-cover">
-        <CoverImage data={post.data} />
+        <CoverImage data={post.data} priority />
       </div>
     )}
     <PostHeader

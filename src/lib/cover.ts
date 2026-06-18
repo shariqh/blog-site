@@ -9,9 +9,19 @@ type Cover =
 // (https:, data:, javascript:) and protocol-relative ('//host') to avoid emitting
 // attacker-controlled <img src> that leaks reader metadata or loads hostile content.
 function isLocalImagePath(src: string): boolean {
-  // Trust only same-origin asset paths under /static/ (the documented cover dir).
-  // Rejects scheme/protocol-relative/data: URLs AND arbitrary same-origin routes.
-  return src.startsWith('/static/')
+  // Frontmatter (incl. agent-drafted) is untrusted. Confine cover images to the
+  // site's static image dir. Reject scheme/protocol-relative URLs and query/hash,
+  // then check the BROWSER-NORMALIZED pathname (so '/static/../admin' can't slip
+  // through) against a strict prefix plus a raster image extension.
+  if (!src.startsWith('/') || src.startsWith('//')) return false
+  if (src.includes('?') || src.includes('#') || src.includes('\\')) return false
+  let pathname: string
+  try {
+    pathname = new URL(src, 'https://shariq.dev').pathname
+  } catch {
+    return false
+  }
+  return pathname.startsWith('/static/images/') && /\.(png|jpe?g|webp|avif|gif)$/i.test(pathname)
 }
 
 export function resolveCover(data: {

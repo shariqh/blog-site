@@ -29,6 +29,7 @@ const len = portraits.length;
     let timer: ReturnType<typeof setInterval> | undefined;
     slides.forEach((_, n) => {
       const b = document.createElement("button");
+      b.setAttribute("aria-label", `Show portrait ${n + 1}`)
       b.addEventListener("click", () => {
         i = n;
         render();
@@ -41,7 +42,12 @@ const len = portraits.length;
       slides.forEach((s, n) => {
         s.className = deckClass(n, i, len);
       });
-      dots.forEach((d, n) => d.classList.toggle("active", n === i));
+      dots.forEach((d, n) => {
+        const active = n === i
+        d.classList.toggle("active", active)
+        if (active) d.setAttribute("aria-current", "true")
+        else d.removeAttribute("aria-current")
+      });
     }
     function advance() {
       i = (i + 1) % len;
