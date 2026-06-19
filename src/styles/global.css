@@ -19,7 +19,6 @@
 @layer base {
   :root {
     --bg: #ffffff;
-    --surface: #ffffff;
     --bg-soft: var(--color-paper-soft);
     --fg: var(--color-ink);
     --fg-soft: var(--color-ink-soft);
