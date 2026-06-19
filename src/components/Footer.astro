@@ -1,18 +1,8 @@
 ---
 import { SITE } from "../lib/site";
-
-interface Props {
-  width?: "prose" | "wide";
-}
-const { width = "prose" } = Astro.props;
 ---
 <footer class="mt-24 border-t border-[color-mix(in_oklab,var(--fg)_15%,transparent)]">
-  <div
-    class:list={[
-      "mx-auto flex flex-col gap-3 px-5 py-8 text-sm sm:flex-row sm:justify-between",
-      width === "wide" ? "max-w-[1100px]" : "max-w-3xl",
-    ]}
-  >
+  <div class="mx-auto flex max-w-[1100px] flex-col gap-3 px-5 py-8 text-sm sm:flex-row sm:justify-between">
     <p>&copy; {new Date().getFullYear()} {SITE.author}</p>
     <p class="flex flex-wrap gap-4">
       <a href={SITE.social.twitter} class="hover:text-[var(--accent)]">X / Twitter</a>
