@@ -2,41 +2,334 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
 ---
-<BaseLayout title="About">
+<BaseLayout title="About" width="wide">
   <PageHeader eyebrow="Shariq Hirani" title="About" />
 
-  <div class="about-prose pb-16">
-    <p>
-      Senior Solutions Engineer at GitHub, founder, and habitual builder. I write here about the work and the in-between — shipping software, the teams that build it, and the AI shift happening in real time.
-    </p>
+  <!-- INTRO: statement + facts rail -->
+  <section class="intro">
+    <div class="rise d1">
+      <p class="statement">I build software for a living, and <span class="u">a few too many things</span> on the side.</p>
+      <p class="lede">Senior Solutions Engineer at GitHub, founder, and habitual builder. I write here about the work and the in-between — shipping products, the teams that build them, and the AI shift happening in real time. Mostly I'm just curious, and bad at leaving things alone. Find the output on <a href="/projects">projects</a>.</p>
+    </div>
+    <aside class="facts rise d2">
+      <dl>
+        <div><dt>Role</dt><dd>Senior Solutions Engineer, GitHub</dd></div>
+        <div><dt>Building</dt><dd><span class="live">lognote — local transcription for meetings</span></dd></div>
+        <div><dt>Also shipped</dt><dd>unrivaledpro · portalrewards</dd></div>
+        <div><dt>Writes about</dt><dd>Engineering, teams, the AI shift</dd></div>
+        <div><dt>Off the clock</dt><dd>DJ sets, hiking, cooking, an over-built home server</dd></div>
+        <div><dt>Experience</dt><dd>10+ yrs — architecture, distributed systems, infra, platform</dd></div>
+      </dl>
+    </aside>
+  </section>
 
-    <p>
-      I've spent over a decade in engineering — across architecture, distributed systems, infrastructure, and platform — moving between hands-on building and leading teams, and lately shipping my own products. The themes I keep coming back to:
-    </p>
+  <!-- BELIEFS -->
+  <section class="sec">
+    <span class="mono-label">What I keep coming back to</span>
+    <div class="beliefs">
+      <div class="belief"><span class="no">01</span><h3>How engineering teams <em>actually</em> run — versus how they're written about.</h3></div>
+      <div class="belief"><span class="no">02</span><h3>Shipping fast vs. shipping right is really a fight about risk tolerance, not technique.</h3></div>
+      <div class="belief"><span class="no">03</span><h3>AI tooling only counts when it holds up under real, sustained use — not demos.</h3></div>
+      <div class="belief"><span class="no">04</span><h3>The leap from senior engineer to lead is asymmetric — and the move <em>back</em> is under-discussed.</h3></div>
+    </div>
+  </section>
 
-    <ul>
-      <li>How engineering teams <em>actually</em> run, vs how they're written about.</li>
-      <li>The line between shipping fast and shipping right — and why most of the disagreement here is really about risk tolerance, not technique.</li>
-      <li>What AI tooling looks like when it holds up under real, sustained use — not demos, not press releases.</li>
-      <li>Career arcs in tech: the asymmetric leap from senior engineer to lead, and the under-discussed move <em>back</em> down the ladder when leadership stops fitting.</li>
-    </ul>
+  <!-- OFF THE CLOCK -->
+  <section class="sec otc">
+    <span class="mono-label">Off the clock</span>
+    <div class="strip">
+      <div class="card">
+        <img src="/static/images/home/portrait-4.jpg" alt="Shariq DJ-ing" />
+        <div class="cap">Behind the decks.</div>
+      </div>
+      <div class="card">
+        <img src="/static/images/home/portrait-2.jpg" alt="Shariq off-grid in Nusa Penida" />
+        <div class="cap">Off-grid — Nusa Penida.</div>
+      </div>
+      <div class="card">
+        <img src="/static/images/home/portrait-3.jpg" alt="Key lime pie baking project" />
+        <div class="cap">Overcommitting to a key lime pie.</div>
+      </div>
+      <div class="card">
+        <img src="/static/images/home/portrait-5.jpg" alt="Serious burger moment" />
+        <div class="cap">Serious about a good burger.</div>
+      </div>
+      <div class="card">
+        <img src="/static/images/home/portrait-1.jpg" alt="Shariq on stage" />
+        <div class="cap">On stage, now and then.</div>
+      </div>
+    </div>
+    <p class="hint">↑ hover to straighten</p>
+  </section>
 
-    <p>
-      Lately I'm building <a href="https://lognote.dev">lognote</a> (local transcription and summarization for meetings) and a few other things over on <a href="/projects">projects</a>.
-    </p>
-  </div>
-
-  <style is:global>
-    @reference "../styles/global.css";
-    .about-prose {
-      @apply max-w-prose font-sans text-[16px] leading-[1.7];
-    }
-    .about-prose p { @apply my-5; }
-    .about-prose ul { @apply my-5 list-disc space-y-2 pl-6; }
-    .about-prose a {
-      @apply underline decoration-[var(--accent)] decoration-2 underline-offset-4 transition-colors;
-    }
-    .about-prose a:hover { color: var(--accent); }
-    .about-prose em { @apply italic; }
-  </style>
+  <!-- CURRENTLY + STACK -->
+  <section class="sec" style="border-bottom:none">
+    <div class="now-grid">
+      <div class="now">
+        <h3>Currently building</h3>
+        <p><a href="https://lognote.dev" target="_blank" rel="noopener">lognote</a> — a local-first Mac app that records your meetings, transcribes them on-device with MLX-Whisper, and drops a clean Markdown summary into your notes. Private by default.</p>
+      </div>
+      <div class="now">
+        <h3>Tools I reach for</h3>
+        <div class="stack">
+          <span>TypeScript</span><span>Astro</span><span>Docker</span><span>MLX-Whisper</span><span>Claude</span><span>Redis</span><span>Postgres</span><span>Cloudflare</span>
+        </div>
+      </div>
+    </div>
+  </section>
 </BaseLayout>
+
+<style>
+  .mono-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    opacity: .55;
+  }
+
+  /* intro: statement + facts rail */
+  .intro {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 56px;
+    align-items: start;
+    padding: 26px 0 80px;
+    border-bottom: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
+  }
+  .statement {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 40px;
+    line-height: 1.12;
+    letter-spacing: -.02em;
+    max-width: 18ch;
+  }
+  .statement .u {
+    background: linear-gradient(transparent 62%, color-mix(in oklab, var(--color-ochre) 55%, transparent) 62%);
+  }
+  .lede {
+    margin-top: 22px;
+    font-size: 17px;
+    line-height: 1.65;
+    max-width: 52ch;
+    color: var(--fg-soft);
+  }
+  .lede a {
+    color: var(--color-terracotta);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 3px;
+  }
+
+  .facts {
+    border-left: 2px solid var(--color-ochre);
+    padding-left: 22px;
+  }
+  .facts dl {
+    display: grid;
+    gap: 16px;
+  }
+  .facts dt {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    opacity: .5;
+    margin-bottom: 3px;
+  }
+  .facts dd {
+    font-size: 15px;
+    line-height: 1.4;
+  }
+  .facts dd .live {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .facts dd .live::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--color-terracotta);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 60%, transparent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 55%, transparent); }
+    70%  { box-shadow: 0 0 0 8px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+
+  /* beliefs */
+  .sec {
+    padding: 72px 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
+  }
+  .sec > .mono-label {
+    display: block;
+    margin-bottom: 30px;
+  }
+  .beliefs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 48px;
+  }
+  .belief {
+    padding: 24px 0;
+    border-top: 1px dashed color-mix(in oklab, var(--fg) 20%, transparent);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 18px;
+    align-items: start;
+    transition: all .2s;
+  }
+  .belief .no {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--color-ochre);
+    padding-top: 8px;
+  }
+  .belief h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 22px;
+    line-height: 1.25;
+    letter-spacing: -.01em;
+  }
+  .belief:hover {
+    padding-left: 8px;
+  }
+  .belief:hover h3 {
+    color: var(--color-terracotta);
+  }
+
+  /* off the clock — interactive photo strip */
+  .otc .strip {
+    display: flex;
+    gap: 0;
+    padding: 30px 0 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .otc .card {
+    width: 200px;
+    aspect-ratio: 3/4;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    flex: none;
+    box-shadow: 0 16px 36px -22px rgba(21, 35, 58, .6);
+    transition: transform .35s cubic-bezier(.22, .61, .36, 1), z-index 0s;
+    cursor: default;
+  }
+  .otc .card:nth-child(1) { transform: rotate(-7deg) translateY(8px);  margin-right: -26px; z-index: 1; }
+  .otc .card:nth-child(2) { transform: rotate(4deg);                   margin-right: -26px; z-index: 2; }
+  .otc .card:nth-child(3) { transform: rotate(-3deg) translateY(6px);  margin-right: -26px; z-index: 3; }
+  .otc .card:nth-child(4) { transform: rotate(6deg) translateY(2px);   margin-right: -26px; z-index: 2; }
+  .otc .card:nth-child(5) { transform: rotate(-5deg) translateY(10px); z-index: 1; }
+  .otc .card:hover {
+    transform: rotate(0) translateY(-12px) scale(1.08);
+    z-index: 10;
+  }
+  .otc .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .otc .card .cap {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 26px 14px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .04em;
+    color: #fff;
+    background: linear-gradient(transparent, rgba(21, 35, 58, .82));
+    opacity: 0;
+    transition: opacity .25s;
+  }
+  .otc .card:hover .cap {
+    opacity: 1;
+  }
+  .otc .hint {
+    text-align: center;
+    margin-top: 22px;
+    font-size: 13px;
+    color: var(--fg-soft);
+    opacity: .7;
+  }
+
+  /* currently + stack */
+  .now-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+  }
+  .now h3 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 26px;
+    margin-bottom: 14px;
+  }
+  .now p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--fg-soft);
+    max-width: 42ch;
+  }
+  .now a {
+    color: var(--color-terracotta);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 3px;
+  }
+  .stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .stack span {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent);
+  }
+
+  /* staggered load */
+  .rise {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: rise .7s cubic-bezier(.22, .61, .36, 1) forwards;
+  }
+  @keyframes rise {
+    to { opacity: 1; transform: none; }
+  }
+  .d1 { animation-delay: .05s; }
+  .d2 { animation-delay: .15s; }
+
+  /* responsive */
+  @media (max-width: 860px) {
+    .intro,
+    .beliefs,
+    .now-grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+    .statement { font-size: 30px; }
+    .otc .card { margin-right: -40px !important; }
+  }
+
+  /* reduced-motion: kill animations and reset photo card transforms */
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; }
+    .otc .card { transform: none !important; }
+  }
+</style>
