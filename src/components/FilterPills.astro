@@ -12,7 +12,8 @@ const { buckets } = Astro.props;
 <script>
   document.querySelectorAll<HTMLElement>("[data-filters]").forEach((bar) => {
     const pills = [...bar.querySelectorAll<HTMLButtonElement>(".pill")];
-    const scope = bar.closest("[data-filter-scope]") ?? document;
+    const scope = bar.closest("[data-filter-scope]");
+    if (!scope) return;
     const cards = [...scope.querySelectorAll<HTMLElement>("[data-bucket]")];
     bar.addEventListener("click", (e) => {
       const pill = (e.target as HTMLElement).closest<HTMLButtonElement>(".pill");

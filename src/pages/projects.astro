@@ -3,8 +3,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
 import { active, built, talks, host, safeHref } from "../lib/projects";
 
-const spotlight = active[0];
-const shipping = active.slice(1);
+const spotlight = active.find((p) => p.name === "lognote") ?? active[0];
+const shipping = active.filter((p) => p !== spotlight);
 const shippingCount = String(shipping.length).padStart(2, "0");
 const builtCount = String(built.length).padStart(2, "0");
 const talksCount = String(talks.length).padStart(2, "0");

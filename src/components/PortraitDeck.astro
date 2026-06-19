@@ -25,6 +25,7 @@ const len = portraits.length;
     const dotsWrap = root.querySelector<HTMLElement>(".dots")!;
     const len = slides.length;
     if (!len) return;
+    if (reduce) return;
     let i = 0;
     let timer: ReturnType<typeof setInterval> | undefined;
     let hovered = false;
