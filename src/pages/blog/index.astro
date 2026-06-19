@@ -24,35 +24,37 @@ const slug = (id: string) => `/blog/${id.replace(/\.mdx$/, "")}`;
     <p class="lead">Notes from inside the work — engineering, leading teams, and the AI shift happening in real time.</p>
   </section>
 
-  <FilterPills buckets={bucketList} />
+  <div data-filter-scope>
+    <FilterPills buckets={bucketList} />
 
-  {featured && fb && (
-    <div class="featured-wrap" data-bucket={fb.key}>
-      <FeaturedCard
-        href={slug(featured.id)}
-        category={`${fb.label} · Featured`}
-        title={featured.data.title}
-        hook={featured.data.summary}
-        cta="Read full article"
-      />
-    </div>
-  )}
-
-  <div class="grid3">
-    {rest.map((post) => {
-      const b = resolveBucket(post.data.tags);
-      return (
-        <PostCard
-          href={slug(post.id)}
-          title={post.data.title}
-          date={post.data.date}
-          bucketKey={b.key}
-          bucketLabel={b.label}
-          summary={post.data.summary}
-          coverData={post.data}
+    {featured && fb && (
+      <div class="featured-wrap" data-bucket={fb.key}>
+        <FeaturedCard
+          href={slug(featured.id)}
+          category={`${fb.label} · Featured`}
+          title={featured.data.title}
+          hook={featured.data.summary}
+          cta="Read full article"
         />
-      );
-    })}
+      </div>
+    )}
+
+    <div class="grid3">
+      {rest.map((post) => {
+        const b = resolveBucket(post.data.tags);
+        return (
+          <PostCard
+            href={slug(post.id)}
+            title={post.data.title}
+            date={post.data.date}
+            bucketKey={b.key}
+            bucketLabel={b.label}
+            summary={post.data.summary}
+            coverData={post.data}
+          />
+        );
+      })}
+    </div>
   </div>
 </BaseLayout>
 

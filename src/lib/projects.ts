@@ -44,9 +44,9 @@ export const active: Project[] = [
   },
   {
     name: "shariq.dev",
-    blurb: "This site — Astro, Tailwind &amp; MDX.",
+    blurb: "This site — Astro, Tailwind & MDX.",
     description:
-      'This site. Astro + Tailwind 4 + MDX, deployed on Cloudflare Pages. The whole rebuild is <a class="underline decoration-[var(--accent)] underline-offset-2 hover:text-[var(--accent)]" href="/blog/rebuilding-shariq-dev">documented in the blog</a>.',
+      "This site. Astro + Tailwind 4 + MDX on Cloudflare Pages — the rebuild is documented on the blog.",
     kind: "site",
     site: "https://shariq.dev",
     repo: "https://github.com/shariqh/blog-site",
@@ -110,5 +110,16 @@ export function host(url: string): string {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
     return url;
+  }
+}
+
+/** Only allow http(s) project URLs into hrefs (defends against javascript:/data: values). */
+export function safeHref(url?: string): string | undefined {
+  if (!url) return undefined
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' || u.protocol === 'http:' ? url : undefined
+  } catch {
+    return undefined
   }
 }

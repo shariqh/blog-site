@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
-import { active, built, talks, host } from "../lib/projects";
+import { active, built, talks, host, safeHref } from "../lib/projects";
 
 const spotlight = active[0];
 const shipping = active.slice(1);
@@ -17,7 +17,8 @@ const talksCount = String(talks.length).padStart(2, "0");
   />
 
   <!-- SPOTLIGHT -->
-  <a class="spot rise d1" href={spotlight.site} target="_blank" rel="noopener">
+  {spotlight && (
+  <a class="spot rise d1" href={safeHref(spotlight.site)} target="_blank" rel="noopener">
     <div class="panel">
       <span class="ey">Currently building</span>
       <h2>{spotlight.name}</h2>
@@ -41,6 +42,7 @@ const talksCount = String(talks.length).padStart(2, "0");
       </svg>
     </div>
   </a>
+  )}
 
   <!-- SHIPPING -->
   <div class="sec-h rise d2">
@@ -52,7 +54,7 @@ const talksCount = String(talks.length).padStart(2, "0");
     {shipping.map((p, i) => (
       <a
         class={`card rise d${i + 3}`}
-        href={p.site ?? p.repo}
+        href={safeHref(p.site ?? p.repo)}
         target="_blank"
         rel="noopener"
         style={`--accent: ${["var(--color-terracotta)","var(--color-ochre)","var(--color-ink)"][i % 3]}`}
@@ -62,7 +64,7 @@ const talksCount = String(talks.length).padStart(2, "0");
           {p.status && <span class="status">● {p.status}</span>}
         </div>
         <h3>{p.name}</h3>
-        <p class="desc" set:html={p.blurb ?? p.description} />
+        <p class="desc">{p.blurb ?? p.description}</p>
         <div class="links">
           {p.site && <span>{host(p.site)} ↗</span>}
           {p.repo && <span>github ↗</span>}
@@ -84,7 +86,7 @@ const talksCount = String(talks.length).padStart(2, "0");
         <span class="q-name">{p.name}</span>
         <span class="q-desc">{p.description}</span>
         {p.repo && (
-          <a class="q-link" href={p.repo} target="_blank" rel="noopener">github ↗</a>
+          <a class="q-link" href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>
         )}
       </div>
     ))}
@@ -102,7 +104,7 @@ const talksCount = String(talks.length).padStart(2, "0");
         <span class="t-name">{p.name}</span>
         <span class="t-desc">{p.description}</span>
         {p.repo && (
-          <a href={p.repo} target="_blank" rel="noopener">github ↗</a>
+          <a href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>
         )}
       </div>
     ))}

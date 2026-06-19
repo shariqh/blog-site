@@ -15,7 +15,7 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
-/* Light is default; dark inverts. */
+/* Light theme only — dark mode was intentionally removed. */
 @layer base {
   :root {
     --bg: #ffffff;

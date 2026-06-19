@@ -27,6 +27,7 @@ const len = portraits.length;
     if (!len) return;
     let i = 0;
     let timer: ReturnType<typeof setInterval> | undefined;
+    let hovered = false;
     slides.forEach((_, n) => {
       const b = document.createElement("button");
       b.type = "button"
@@ -55,15 +56,15 @@ const len = portraits.length;
       render();
     }
     function restart() {
-      if (reduce) return;
+      if (reduce || hovered) return;
       clearInterval(timer);
       timer = setInterval(advance, 3800);
     }
     render();
     if (!reduce) {
       restart();
-      root.addEventListener("mouseenter", () => clearInterval(timer));
-      root.addEventListener("mouseleave", restart);
+      root.addEventListener("mouseenter", () => { hovered = true; clearInterval(timer); });
+      root.addEventListener("mouseleave", () => { hovered = false; restart(); });
     }
   });
 </script>
