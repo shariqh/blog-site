@@ -1,9 +1,9 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import Hero from "../components/Hero.astro";
+import PageHeader from "../components/PageHeader.astro";
 ---
 <BaseLayout title="About">
-  <Hero title="About." eyebrow="Shariq Hirani" />
+  <PageHeader eyebrow="Shariq Hirani" title="About" />
 
   <div class="about-prose pb-16">
     <p>
@@ -33,7 +33,7 @@ import Hero from "../components/Hero.astro";
       <button
         type="button"
         data-contact-trigger
-        class="inline-flex items-center gap-2 border-2 border-[var(--fg)] bg-[var(--accent)] px-5 py-2 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-ink)] shadow-[4px_4px_0_0_var(--fg)] transition-transform hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_var(--fg)]"
+        class="inline-flex items-center gap-2 rounded-full bg-[var(--color-ochre)] px-5 py-2.5 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-ink)] transition-transform hover:-translate-y-0.5"
       >
         Get in touch <span aria-hidden="true">→</span>
       </button>

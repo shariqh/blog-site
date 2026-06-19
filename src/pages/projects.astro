@@ -1,14 +1,14 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import Hero from "../components/Hero.astro";
+import PageHeader from "../components/PageHeader.astro";
 import { active, built, talks, host } from "../lib/projects";
 ---
 <BaseLayout title="Projects">
-  <Hero title="Projects." eyebrow="Building, built, talked about" />
-
-  <p class="mb-12 max-w-prose font-sans text-[var(--fg-soft)]">
-    Things I'm building, things I've built, and a few talks. Closed-source products link to their sites; open-source ones link to their repo and (if there's one) their live site.
-  </p>
+  <PageHeader
+    eyebrow="Building, built, talked about"
+    title="Projects"
+    lead="Things I'm building, things I've built, and a few talks. Closed-source products link to their site; open-source ones link to the repo and (if there is one) the live site."
+  />
 
   {[
     { heading: "Active", items: active },
@@ -24,35 +24,17 @@ import { active, built, talks, host } from "../lib/projects";
         </span>
       </div>
 
-      <ul class="space-y-3">
+      <ul class="proj-list">
         {section.items.map((p) => (
-          <li class="group border-2 border-[var(--fg)] p-5 transition-transform hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_var(--fg)]">
-            <div class="flex flex-wrap items-baseline justify-between gap-3">
-              <h3 class="font-display text-xl italic">{p.name}</h3>
-              {p.status && (
-                <span class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--accent)]">
-                  ● {p.status}
-                </span>
-              )}
+          <li class="proj">
+            <div class="proj-head">
+              <a class="proj-name" href={p.site ?? p.repo} target="_blank" rel="noopener">{p.name}</a>
+              {p.status && <span class="proj-status">● {p.status}</span>}
             </div>
-            <p class="mt-2 max-w-prose text-sm leading-relaxed text-[var(--fg-soft)]" set:html={p.description} />
-            <div class="mt-3 flex flex-wrap gap-4 font-mono text-[11px] uppercase tracking-[0.18em]">
-              {p.site && (
-                <a
-                  href={p.site}
-                  class="underline decoration-[var(--accent)] underline-offset-4 hover:text-[var(--accent)]"
-                >
-                  {host(p.site)} ↗
-                </a>
-              )}
-              {p.repo && (
-                <a
-                  href={p.repo}
-                  class="underline decoration-[var(--accent)] underline-offset-4 hover:text-[var(--accent)]"
-                >
-                  github ↗
-                </a>
-              )}
+            <p class="proj-desc" set:html={p.description} />
+            <div class="proj-links">
+              {p.site && <a href={p.site} target="_blank" rel="noopener">{host(p.site)} ↗</a>}
+              {p.repo && <a href={p.repo} target="_blank" rel="noopener">github ↗</a>}
             </div>
           </li>
         ))}
@@ -64,3 +46,17 @@ import { active, built, talks, host } from "../lib/projects";
     Want to prune this list? Edit <code>src/lib/projects.ts</code>.
   </p>
 </BaseLayout>
+
+<style>
+  .proj-list { list-style: none; padding: 0; }
+  .proj { padding: 22px 0; border-bottom: 1px dashed color-mix(in oklab, var(--fg) 18%, transparent); }
+  .proj-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+  .proj-name { font-family: var(--font-display); font-style: italic; font-size: 24px; color: inherit; text-decoration: none; }
+  .proj-name:hover { color: var(--color-terracotta); }
+  .proj-status { font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--color-ochre); }
+  .proj-desc { margin-top: 8px; max-width: 60ch; font-size: 15px; line-height: 1.6; color: var(--fg-soft); }
+  .proj-desc :global(a) { color: var(--color-terracotta); text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
+  .proj-links { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 18px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; }
+  .proj-links a { text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 4px; }
+  .proj-links a:hover { color: var(--color-terracotta); }
+</style>
