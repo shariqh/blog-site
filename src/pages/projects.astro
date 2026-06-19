@@ -52,25 +52,22 @@ const talksCount = String(talks.length).padStart(2, "0");
   </div>
   <div class="grid3">
     {shipping.map((p, i) => (
-      <a
+      <div
         class={`card rise d${i + 3}`}
-        href={safeHref(p.site ?? p.repo)}
-        target="_blank"
-        rel="noopener"
         style={`--accent: ${["var(--color-terracotta)","var(--color-ochre)","var(--color-ink)"][i % 3]}`}
       >
         <div class="top">
           <span class="kind">{p.kind}</span>
           {p.status && <span class="status">● {p.status}</span>}
         </div>
-        <h3>{p.name}</h3>
+        <h3><a class="card-name-link" href={safeHref(p.site ?? p.repo)} target="_blank" rel="noopener">{p.name}</a></h3>
         <p class="desc">{p.blurb ?? p.description}</p>
         <div class="links">
-          {p.site && <span>{host(p.site)} ↗</span>}
-          {p.repo && <span>github ↗</span>}
+          {p.site && <a href={safeHref(p.site)} target="_blank" rel="noopener">{host(p.site)} ↗</a>}
+          {p.repo && <a href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>}
         </div>
         <span class="card-arrow" aria-hidden="true">↗</span>
-      </a>
+      </div>
     ))}
   </div>
 
@@ -85,9 +82,10 @@ const talksCount = String(talks.length).padStart(2, "0");
       <div class="quest">
         <span class="q-name">{p.name}</span>
         <span class="q-desc">{p.description}</span>
-        {p.repo && (
-          <a class="q-link" href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>
-        )}
+        <div class="q-links">
+          {p.site && <a class="q-link" href={safeHref(p.site)} target="_blank" rel="noopener">{host(p.site)} ↗</a>}
+          {p.repo && <a class="q-link" href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>}
+        </div>
       </div>
     ))}
   </div>
@@ -272,10 +270,9 @@ const talksCount = String(talks.length).padStart(2, "0");
     display: flex;
     flex-direction: column;
     transition: transform .2s, box-shadow .2s, border-color .2s;
-    text-decoration: none;
-    color: inherit;
     position: relative;
     overflow: hidden;
+    cursor: default;
   }
   .card::before {
     content: "";
@@ -318,7 +315,11 @@ const talksCount = String(talks.length).padStart(2, "0");
     font-size: 24px;
     margin: 14px 0 8px;
   }
-  .card:hover h3 {
+  .card-name-link {
+    text-decoration: none;
+    color: inherit;
+  }
+  .card:hover .card-name-link {
     color: var(--accent, var(--color-terracotta));
   }
   .card .desc {
@@ -335,10 +336,14 @@ const talksCount = String(talks.length).padStart(2, "0");
     font-size: 11px;
     letter-spacing: .08em;
   }
-  .card .links span {
+  .card .links a {
     text-decoration: underline;
     text-decoration-color: var(--color-ochre);
     text-underline-offset: 4px;
+    color: inherit;
+  }
+  .card .links a:hover {
+    color: var(--color-terracotta);
   }
 
   /* card hover-move arrow */
@@ -377,6 +382,11 @@ const talksCount = String(talks.length).padStart(2, "0");
   .quest .q-desc {
     font-size: 14px;
     color: var(--fg-soft);
+  }
+  .quest .q-links {
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
   }
   .quest .q-link {
     font-family: var(--font-mono);
