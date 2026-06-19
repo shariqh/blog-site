@@ -2,61 +2,457 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
 import { active, built, talks, host } from "../lib/projects";
+
+const spotlight = active[0];
+const shipping = active.slice(1);
+const shippingCount = String(shipping.length).padStart(2, "0");
+const builtCount = String(built.length).padStart(2, "0");
+const talksCount = String(talks.length).padStart(2, "0");
 ---
-<BaseLayout title="Projects">
+<BaseLayout title="Projects" width="wide">
   <PageHeader
     eyebrow="Building, built, talked about"
     title="Projects"
-    lead="Things I'm building, things I've built, and a few talks. Closed-source products link to their site; open-source ones link to the repo and (if there is one) the live site."
+    lead="Things I'm building, things I've built, and a few talks. Products link to their site; open-source bits link to the repo."
   />
 
-  {[
-    { heading: "Active", items: active },
-    { heading: "Built", items: built },
-    { heading: "Talks", items: talks },
-  ].map((section) => (
-    <section class="mb-16">
-      <div class="mb-6 flex items-center gap-4">
-        <h2 class="font-display text-2xl italic">{section.heading}</h2>
-        <span class="h-px flex-1 bg-[color-mix(in_oklab,var(--fg)_20%,transparent)]"></span>
-        <span class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--fg-soft)]">
-          {String(section.items.length).padStart(2, "0")}
-        </span>
+  <!-- SPOTLIGHT -->
+  <a class="spot rise d1" href={spotlight.site} target="_blank" rel="noopener">
+    <div class="panel">
+      <span class="ey">Currently building</span>
+      <h2>{spotlight.name}</h2>
+      <p>{spotlight.description}</p>
+      <div class="chips">
+        <span>Swift</span><span>MLX-Whisper</span><span>macOS</span><span>local-first</span>
       </div>
+      <span class="cta">
+        <span class="dot">↗</span> Visit {spotlight.name}
+      </span>
+    </div>
+    <div class="art">
+      <svg width="150" height="92" viewBox="0 0 150 92" aria-hidden="true">
+        <rect class="bar b1" x="6"   y="30" width="11" height="32" rx="5" fill="#15233a"/>
+        <rect class="bar b2" x="26"  y="18" width="11" height="56" rx="5" fill="#15233a"/>
+        <rect class="bar b3" x="46"  y="8"  width="11" height="76" rx="5" fill="#d49a3a"/>
+        <rect class="bar b4" x="66"  y="20" width="11" height="52" rx="5" fill="#15233a"/>
+        <rect class="bar b5" x="86"  y="32" width="11" height="28" rx="5" fill="#15233a"/>
+        <rect class="bar b6" x="106" y="16" width="11" height="60" rx="5" fill="#b04a3a"/>
+        <rect class="bar b1" x="126" y="34" width="11" height="24" rx="5" fill="#15233a"/>
+      </svg>
+    </div>
+  </a>
 
-      <ul class="proj-list">
-        {section.items.map((p) => (
-          <li class="proj">
-            <div class="proj-head">
-              <a class="proj-name" href={p.site ?? p.repo} target="_blank" rel="noopener">{p.name}</a>
-              {p.status && <span class="proj-status">● {p.status}</span>}
-            </div>
-            <p class="proj-desc" set:html={p.description} />
-            <div class="proj-links">
-              {p.site && <a href={p.site} target="_blank" rel="noopener">{host(p.site)} ↗</a>}
-              {p.repo && <a href={p.repo} target="_blank" rel="noopener">github ↗</a>}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  ))}
+  <!-- SHIPPING -->
+  <div class="sec-h rise d2">
+    <span class="mono-label">Shipping</span>
+    <span class="rule"></span>
+    <span class="count">{shippingCount}</span>
+  </div>
+  <div class="grid3">
+    {shipping.map((p, i) => (
+      <a
+        class={`card rise d${i + 3}`}
+        href={p.site ?? p.repo}
+        target="_blank"
+        rel="noopener"
+        style={`--accent: ${["var(--color-terracotta)","var(--color-ochre)","var(--color-ink)"][i % 3]}`}
+      >
+        <div class="top">
+          <span class="kind">{p.kind}</span>
+          {p.status && <span class="status">● {p.status}</span>}
+        </div>
+        <h3>{p.name}</h3>
+        <p class="desc" set:html={p.blurb ?? p.description} />
+        <div class="links">
+          {p.site && <span>{host(p.site)} ↗</span>}
+          {p.repo && <span>github ↗</span>}
+        </div>
+        <span class="card-arrow" aria-hidden="true">↗</span>
+      </a>
+    ))}
+  </div>
 
-  <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--fg-soft)]">
-    Want to prune this list? Edit <code>src/lib/projects.ts</code>.
+  <!-- SIDE QUESTS -->
+  <div class="sec-h rise d-quests">
+    <span class="mono-label">Side quests</span>
+    <span class="rule"></span>
+    <span class="count">{builtCount}</span>
+  </div>
+  <div class="quests rise d-quests">
+    {built.map((p) => (
+      <div class="quest">
+        <span class="q-name">{p.name}</span>
+        <span class="q-desc">{p.description}</span>
+        {p.repo && (
+          <a class="q-link" href={p.repo} target="_blank" rel="noopener">github ↗</a>
+        )}
+      </div>
+    ))}
+  </div>
+
+  <!-- TALKS -->
+  <div class="sec-h rise d-talks">
+    <span class="mono-label">Talks</span>
+    <span class="rule"></span>
+    <span class="count">{talksCount}</span>
+  </div>
+  <div class="talks rise d-talks">
+    {talks.map((p) => (
+      <div class="talk">
+        <span class="t-name">{p.name}</span>
+        <span class="t-desc">{p.description}</span>
+        {p.repo && (
+          <a href={p.repo} target="_blank" rel="noopener">github ↗</a>
+        )}
+      </div>
+    ))}
+  </div>
+
+  <p class="mono-label footer-note">
+    Prune the list in <code>src/lib/projects.ts</code>.
   </p>
 </BaseLayout>
 
 <style>
-  .proj-list { list-style: none; padding: 0; }
-  .proj { padding: 22px 0; border-bottom: 1px dashed color-mix(in oklab, var(--fg) 18%, transparent); }
-  .proj-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
-  .proj-name { font-family: var(--font-display); font-style: italic; font-size: 24px; color: inherit; text-decoration: none; }
-  .proj-name:hover { color: var(--color-terracotta); }
-  .proj-status { font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--color-ochre); }
-  .proj-desc { margin-top: 8px; max-width: 60ch; font-size: 15px; line-height: 1.6; color: var(--fg-soft); }
-  .proj-desc :global(a) { color: var(--color-terracotta); text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
-  .proj-links { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 18px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; }
-  .proj-links a { text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 4px; }
-  .proj-links a:hover { color: var(--color-terracotta); }
+  .mono-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    opacity: .55;
+  }
+
+  /* spotlight */
+  .spot {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    border-radius: 24px;
+    overflow: hidden;
+    margin: 44px 0 64px;
+    min-height: 320px;
+    box-shadow: 0 28px 60px -34px rgba(21,35,58,.45);
+    text-decoration: none;
+    color: inherit;
+  }
+  .spot .panel {
+    background: var(--color-ink, #15233a);
+    color: #f3e8d2;
+    padding: 46px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .spot .ey {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--color-ochre);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .spot .ey::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-terracotta);
+    box-shadow: 0 0 0 0 rgba(176,74,58,.6);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(176,74,58,.55); }
+    70%  { box-shadow: 0 0 0 9px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  .spot h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 40px;
+    letter-spacing: -.02em;
+    margin: 14px 0 0;
+  }
+  .spot p {
+    margin-top: 14px;
+    font-size: 14.5px;
+    line-height: 1.6;
+    opacity: .76;
+    max-width: 42ch;
+  }
+  .spot .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 20px;
+  }
+  .spot .chips span {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(243,232,210,.25);
+  }
+  .spot .cta {
+    margin-top: 26px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    color: inherit;
+  }
+  .spot .cta .dot {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: var(--color-ochre);
+    color: var(--color-ink, #15233a);
+    display: grid;
+    place-items: center;
+    font-size: 17px;
+    transition: transform .15s;
+  }
+  .spot:hover .cta .dot {
+    transform: translateX(4px);
+  }
+  .spot .art {
+    background: linear-gradient(135deg, #e9dcc0, #f3e8d2);
+    display: grid;
+    place-items: center;
+  }
+  .spot .art .bar {
+    animation: wave 1.6s ease-in-out infinite;
+    transform-origin: center;
+  }
+  .spot .art .b2 { animation-delay: .1s; }
+  .spot .art .b3 { animation-delay: .2s; }
+  .spot .art .b4 { animation-delay: .3s; }
+  .spot .art .b5 { animation-delay: .15s; }
+  .spot .art .b6 { animation-delay: .25s; }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(.5); }
+    50%       { transform: scaleY(1); }
+  }
+
+  /* section heading */
+  .sec-h {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 0 26px;
+  }
+  .sec-h .mono-label { white-space: nowrap; }
+  .sec-h .rule {
+    height: 1px;
+    flex: 1;
+    background: color-mix(in oklab, var(--fg) 16%, transparent);
+  }
+  .sec-h .count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    opacity: .45;
+  }
+
+  /* shipping grid */
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 70px;
+  }
+  .card {
+    border: 1px solid color-mix(in oklab, var(--fg) 14%, transparent);
+    border-radius: 18px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--accent, var(--color-ochre));
+    opacity: .85;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -24px rgba(21,35,58,.4);
+    border-color: transparent;
+  }
+  .card .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card .kind {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    opacity: .5;
+  }
+  .card .status {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent, var(--color-ochre));
+  }
+  .card h3 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 24px;
+    margin: 14px 0 8px;
+  }
+  .card:hover h3 {
+    color: var(--accent, var(--color-terracotta));
+  }
+  .card .desc {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--fg-soft);
+    flex: 1;
+  }
+  .card .links {
+    display: flex;
+    gap: 16px;
+    margin-top: 18px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+  }
+  .card .links span {
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 4px;
+  }
+
+  /* card hover-move arrow */
+  .card-arrow {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 15px;
+    opacity: 0;
+    transform: translate(-4px, 4px);
+    transition: opacity .2s, transform .2s;
+    color: var(--accent, var(--color-ochre));
+  }
+  .card:hover .card-arrow {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* side quests */
+  .quests {
+    margin-bottom: 70px;
+  }
+  .quest {
+    display: grid;
+    grid-template-columns: 200px 1fr auto;
+    gap: 20px;
+    align-items: baseline;
+    padding: 16px 0;
+    border-bottom: 1px dashed color-mix(in oklab, var(--fg) 18%, transparent);
+  }
+  .quest .q-name {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 18px;
+  }
+  .quest .q-desc {
+    font-size: 14px;
+    color: var(--fg-soft);
+  }
+  .quest .q-link {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 4px;
+    white-space: nowrap;
+  }
+  .quest:hover .q-name {
+    color: var(--color-terracotta);
+  }
+
+  /* talks */
+  .talks {
+    margin-bottom: 30px;
+  }
+  .talk {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px dashed color-mix(in oklab, var(--fg) 14%, transparent);
+    font-size: 15px;
+  }
+  .talk .t-name { font-weight: 500; }
+  .talk .t-desc { color: var(--fg-soft); font-size: 14px; }
+  .talk a {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 4px;
+    white-space: nowrap;
+  }
+  .talk a:hover {
+    color: var(--color-terracotta);
+  }
+
+  .footer-note {
+    margin-top: 48px;
+    padding-bottom: 48px;
+  }
+  .footer-note code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  /* staggered load-in — mirrors About page .rise approach */
+  .rise {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: rise .7s cubic-bezier(.22, .61, .36, 1) forwards;
+  }
+  @keyframes rise {
+    to { opacity: 1; transform: none; }
+  }
+  .d1        { animation-delay: .05s; }
+  .d2        { animation-delay: .15s; }
+  .d3        { animation-delay: .22s; }
+  .d4        { animation-delay: .29s; }
+  .d5        { animation-delay: .36s; }
+  .d-quests  { animation-delay: .44s; }
+  .d-talks   { animation-delay: .52s; }
+
+  /* responsive */
+  @media (max-width: 860px) {
+    .spot       { grid-template-columns: 1fr; }
+    .spot h2    { font-size: 32px; }
+    .grid3      { grid-template-columns: 1fr; }
+    .quest      { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  /* reduced-motion: kill all auto-animations */
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; }
+    .rise { opacity: 1; transform: none; }
+  }
 </style>
