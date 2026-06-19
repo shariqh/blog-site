@@ -1,11 +1,11 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import Hero from "../components/Hero.astro";
+import PageHeader from "../components/PageHeader.astro";
 ---
 <BaseLayout title="Not found">
-  <Hero title="404 / not found." eyebrow="// dead end" />
+  <PageHeader eyebrow="Dead end" title="404 — not found" />
   <p class="max-w-prose pb-16 text-[var(--fg-soft)]">
     The page you were looking for moved, was deleted, or never existed.
-    Head <a href="/" class="underline decoration-[var(--accent)] underline-offset-4">home</a>.
+    Head <a href="/" class="underline decoration-[var(--accent)] underline-offset-4 hover:text-[var(--accent)]">home</a>.
   </p>
 </BaseLayout>
