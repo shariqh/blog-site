@@ -107,3 +107,28 @@ needed beyond adding the custom domain. The wrangler CLI (`wrangler pages
 deployment tail --project-name=shariq-dev` etc.) is useful for ops; see
 README for the full command list. Don't conflate `wrangler login` (your
 personal OAuth) with `CLOUDFLARE_API_TOKEN` (the CI secret).
+
+## Code review on PRs
+
+Two independent AI reviews can run on a PR:
+
+- **`gpt-5.4` via Copilot CLI** — a GitHub Action (`review` check + a
+  `## 🤖 AI code review` sticky comment). Re-runs automatically on every
+  push. Always watch it (and address findings) before calling a PR ready.
+- **Built-in GitHub Copilot reviewer** — triggered manually:
+
+  ```sh
+  gh pr edit <PR#> --add-reviewer copilot-pull-request-reviewer
+  ```
+
+  Gotchas: (1) the reviewer slug must be exactly
+  `copilot-pull-request-reviewer` — not `Copilot`/`copilot`/`github-copilot`
+  (its comments post under the author name **Copilot**, but the handle
+  differs); a wrong slug errors or silently no-ops. (2) It reviews **once
+  per request** and does NOT auto-re-review on new pushes — to get fresh
+  eyes on later commits, remove then re-add:
+
+  ```sh
+  gh pr edit <PR#> --remove-reviewer copilot-pull-request-reviewer
+  gh pr edit <PR#> --add-reviewer copilot-pull-request-reviewer
+  ```

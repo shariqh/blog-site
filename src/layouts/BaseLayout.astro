@@ -5,18 +5,21 @@ import "@fontsource-variable/jetbrains-mono";
 import "../styles/global.css";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
-import ContactModal from "../components/ContactModal.astro";
 import { SITE } from "../lib/site";
 
 interface Props {
-  title?: string;
-  description?: string;
-  // External canonical URL for cross-posts where this page is a COPY of content
-  // published elsewhere. Omit on original content (defaults to this page's URL).
-  canonical?: string;
+  title?: string
+  description?: string
+  canonical?: string
+  width?: 'prose' | 'wide'
 }
 
-const { title, description = SITE.description, canonical: canonicalOverride } = Astro.props;
+const {
+  title,
+  description = SITE.description,
+  canonical: canonicalOverride,
+  width = 'prose',
+} = Astro.props
 const fullTitle = title ? `${title} — ${SITE.title}` : SITE.title;
 const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
 const canonical = canonicalOverride ?? pageUrl;
@@ -44,24 +47,17 @@ const canonical = canonicalOverride ?? pageUrl;
       async
       src="//gc.zgo.at/count.js"></script>
 
-    <script is:inline>
-      // Apply theme before first paint to avoid FOUC.
-      (function () {
-        const stored = localStorage.getItem("theme") || "system";
-        const dark =
-          stored === "dark" ||
-          (stored === "system" &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.classList.toggle("dark", dark);
-      })();
-    </script>
   </head>
   <body>
     <Header />
-    <main class="mx-auto max-w-3xl px-5">
+    <main
+      class:list={[
+        "mx-auto px-5",
+        width === "wide" ? "max-w-[1100px]" : "max-w-3xl",
+      ]}
+    >
       <slot />
     </main>
     <Footer />
-    <ContactModal />
   </body>
 </html>

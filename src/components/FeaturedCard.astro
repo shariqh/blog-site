@@ -1,0 +1,45 @@
+---
+interface Props {
+  href: string;
+  category: string;
+  title: string;
+  hook: string;
+  cta?: string;
+}
+const { href, category, title, hook, cta = "Read it" } = Astro.props;
+---
+<a class="featured" href={href}>
+  <div class="panel">
+    <p class="cat">{category}</p>
+    <h2>{title}</h2>
+    <p class="hook">{hook}</p>
+    <span class="more"><span class="dot">→</span> {cta}</span>
+  </div>
+  <div class="art">
+    <svg width="230" height="180" viewBox="0 0 230 180" fill="none" stroke="var(--color-terracotta)" stroke-width="2.5">
+      <circle cx="62" cy="62" r="30"></circle>
+      <circle cx="158" cy="116" r="22" fill="var(--color-ochre)" stroke="none"></circle>
+      <path d="M30 138 q42 -52 94 -22 t76 -30" stroke="var(--color-ink)"></path>
+      <rect x="124" y="42" width="52" height="14" rx="7" fill="var(--color-ochre)" stroke="none"></rect>
+      <circle cx="42" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
+      <circle cx="60" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
+      <circle cx="78" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
+    </svg>
+  </div>
+</a>
+
+<style>
+  .featured { display: grid; grid-template-columns: 1.1fr 1fr; border-radius: 24px; overflow: hidden; min-height: 300px; box-shadow: 0 26px 58px -34px color-mix(in oklab, var(--fg) 45%, transparent); }
+  .panel { background: var(--color-ink); color: var(--color-paper); padding: 46px; display: flex; flex-direction: column; justify-content: center; }
+  .cat { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--color-ochre); margin-bottom: 14px; }
+  h2 { font-family: var(--font-display); font-weight: 500; font-size: 34px; line-height: 1.1; letter-spacing: -.01em; }
+  .hook { margin-top: 14px; font-size: 15px; line-height: 1.55; opacity: .72; max-width: 34ch; }
+  .more { margin-top: 26px; display: inline-flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 500; }
+  .more .dot { width: 42px; height: 42px; border-radius: 999px; background: var(--color-ochre); color: var(--color-ink); display: grid; place-items: center; font-size: 18px; transition: transform .15s; }
+  .featured:hover .more .dot { transform: translateX(4px); }
+  .art { background: linear-gradient(135deg, color-mix(in oklab, var(--color-paper) 88%, var(--color-ink)), var(--color-paper)); display: grid; place-items: center; }
+  @media (prefers-reduced-motion: reduce) {
+    .more .dot { transition: none; }
+  }
+  @media (max-width: 760px) { .featured { grid-template-columns: 1fr; } }
+</style>

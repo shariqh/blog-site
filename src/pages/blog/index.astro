@@ -1,0 +1,69 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import FeaturedCard from "../../components/FeaturedCard.astro";
+import FilterPills from "../../components/FilterPills.astro";
+import PostCard from "../../components/PostCard.astro";
+import { pickFeatured } from "../../lib/featured";
+import { resolveBucket, BUCKETS } from "../../lib/buckets";
+
+const all = await getCollection("writing", ({ data }) => !data.draft);
+all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const featured = pickFeatured(all);
+const fb = featured ? resolveBucket(featured.data.tags) : null;
+const rest = featured ? all.filter((p) => p.id !== featured.id) : all;
+
+const bucketList = Object.entries(BUCKETS).map(([key, def]) => ({ key, label: def.label }));
+const slug = (id: string) => `/blog/${id.replace(/\.mdx$/, "")}`;
+---
+<BaseLayout title="The Blog" width="wide">
+  <section class="blogtitle">
+    <p class="eyebrow">Writing</p>
+    <h1>The Blog</h1>
+    <p class="lead">Notes from inside the work — engineering, leading teams, and the AI shift happening in real time.</p>
+  </section>
+
+  <div data-filter-scope>
+    <FilterPills buckets={bucketList} />
+
+    {featured && fb && (
+      <div class="featured-wrap" data-bucket={fb.key}>
+        <FeaturedCard
+          href={slug(featured.id)}
+          category={`${fb.label} · Featured`}
+          title={featured.data.title}
+          hook={featured.data.summary}
+          cta="Read full article"
+        />
+      </div>
+    )}
+
+    <div class="grid3">
+      {rest.map((post) => {
+        const b = resolveBucket(post.data.tags);
+        return (
+          <PostCard
+            href={slug(post.id)}
+            title={post.data.title}
+            date={post.data.date}
+            bucketKey={b.key}
+            bucketLabel={b.label}
+            summary={post.data.summary}
+            coverData={post.data}
+          />
+        );
+      })}
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .blogtitle { padding: 40px 0 28px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .55; margin-bottom: 14px; }
+  .blogtitle h1 { font-family: var(--font-display); font-size: 56px; font-weight: 600; letter-spacing: -.025em; }
+  .blogtitle .lead { margin-top: 14px; font-size: 17px; opacity: .65; max-width: 52ch; line-height: 1.5; }
+  .featured-wrap { margin-bottom: 72px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px 30px; }
+  @media (max-width: 860px) { .grid3 { grid-template-columns: 1fr; } .blogtitle h1 { font-size: 40px; } }
+</style>

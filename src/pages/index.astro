@@ -1,99 +1,128 @@
 ---
 import { getCollection } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import Hero from "../components/Hero.astro";
-import PostCard from "../components/PostCard.astro";
+import PortraitDeck from "../components/PortraitDeck.astro";
+import FeaturedCard from "../components/FeaturedCard.astro";
+import { HOME } from "../lib/home";
+import { active, safeHref } from "../lib/projects";
+import { pickFeatured } from "../lib/featured";
 import { resolveBucket } from "../lib/buckets";
 
 const all = await getCollection("writing", ({ data }) => !data.draft);
-all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
-
-const featured = all[0];
-const featuredBucket = featured ? resolveBucket(featured.data.tags) : null;
-const next = all.slice(1, 4);
-const rest = all.slice(4);
-
-const pad = (n: number) => String(n).padStart(2, "0");
+const featured = pickFeatured(all);
+const fb = featured ? resolveBucket(featured.data.tags) : null;
+const m = HOME.manifesto;
 ---
-<BaseLayout>
-  <Hero
-    eyebrow="Shariq Hirani"
-    title="Notes on engineering, leadership, &amp; AI."
-    subtitle="From inside the work — leading teams, building systems, and the AI shift happening in real time."
-    portrait="/static/images/avatar.jpg"
-    portraitAlt="Shariq Hirani"
-    currently='Building <a href="https://lognote.dev" class="underline decoration-[var(--accent)] underline-offset-2 hover:text-[var(--accent)]">lognote</a> for local transcription and summarization.'
-  />
-
-  <!-- Ornamental divider -->
-  <div class="relative my-6 flex items-center gap-4">
-    <span class="h-px flex-1 bg-[color-mix(in_oklab,var(--fg)_20%,transparent)]"></span>
-    <span class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--fg-soft)]">
-      Recent Writing
-    </span>
-    <span class="h-px flex-1 bg-[color-mix(in_oklab,var(--fg)_20%,transparent)]"></span>
-  </div>
-
-  {featured && featuredBucket && (
-    <section class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <div class="sm:col-span-2">
-        <PostCard
-          href={`/blog/${featured.id.replace(/\.mdx$/, "")}`}
-          title={featured.data.title}
-          date={featured.data.date}
-          bucket={featuredBucket.key}
-          bucketLabel={featuredBucket.label}
-          index={pad(1)}
-          featured
-        />
+<BaseLayout width="wide">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="herotext">
+      <p class="eyebrow">Shariq Hirani</p>
+      <h1>Hi, I'm <span class="i">Shariq.</span></h1>
+      <p class="kicker">{HOME.tagline}</p>
+      <div class="tags">
+        <span class="live">Building {HOME.currently}</span>
+        {HOME.tags.map((t) => <span>{t}</span>)}
       </div>
-      <div class="grid grid-cols-1 gap-3">
-        {next.map((post, i) => {
-          const bucket = resolveBucket(post.data.tags);
-          return (
-            <PostCard
-              href={`/blog/${post.id.replace(/\.mdx$/, "")}`}
-              title={post.data.title}
-              date={post.data.date}
-              bucket={bucket.key}
-              bucketLabel={bucket.label}
-              index={pad(i + 2)}
-            />
-          );
-        })}
-      </div>
-    </section>
+    </div>
+    <PortraitDeck portraits={HOME.portraits} />
+  </section>
+
+  <p class="manifesto">
+    {m.lead}<span class="u">{m.underline}</span>{m.mid}<span class="i">{m.italic}</span>{m.tail}
+  </p>
+
+  <section class="right-now">
+    <h2 class="h">Right now</h2>
+    <ul>
+      <li>
+        <span class="n">01</span>
+        <span class="rn-text">Shipping <a class="rn-link" href="https://lognote.dev" target="_blank" rel="noopener">lognote</a> — local transcription and summarization for meetings.</span>
+      </li>
+      <li>
+        <span class="n">02</span>
+        <span class="rn-text">Senior Solutions Engineer, <span class="rn-org"><svg class="gh" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</span></span>
+      </li>
+    </ul>
+  </section>
+
+  {featured && fb && (
+    <FeaturedCard
+      href={`/blog/${featured.id.replace(/\.mdx$/, "")}`}
+      category={`${fb.label} · Latest`}
+      title={featured.data.title}
+      hook={featured.data.summary}
+    />
   )}
 
-  {rest.length > 0 && (
-    <section class="mt-20">
-      <div class="mb-8 flex items-end justify-between">
-        <h2 class="font-display text-3xl italic">More</h2>
-        <p class="font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">
-          {pad(rest.length)} more posts
-        </p>
-      </div>
-      <ul class="space-y-0">
-        {rest.map((post, i) => {
-          const bucket = resolveBucket(post.data.tags);
-          return (
-            <li class="group">
-              <a
-                href={`/blog/${post.id.replace(/\.mdx$/, "")}`}
-                class="grid grid-cols-[auto_1fr_auto] items-baseline gap-4 border-b border-[color-mix(in_oklab,var(--fg)_15%,transparent)] py-4 transition-colors hover:bg-[color-mix(in_oklab,var(--fg)_3%,transparent)] hover:text-[var(--accent)]"
-              >
-                <span class="font-mono text-[10px] uppercase tracking-widest text-[var(--fg-soft)]">
-                  {pad(i + 5)}
-                </span>
-                <span class="text-base sm:text-lg">{post.data.title}</span>
-                <span class="font-mono text-[10px] uppercase tracking-widest text-[var(--fg-soft)]">
-                  {bucket.label} · {post.data.date.toISOString().slice(0, 10)}
-                </span>
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  )}
+  <section class="built-wrap">
+    <h2 class="h">Lately I've built</h2>
+    <ul class="built">
+      {active.map((p) => (
+        <li>
+          <a class="built-name" href={safeHref(p.site ?? p.repo)} target="_blank" rel="noopener">{p.name}</a>
+          <p class="built-desc">{p.blurb ?? p.description}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
 </BaseLayout>
+
+<style>
+  /* HERO */
+  .hero { display: grid; grid-template-columns: 1fr auto; gap: 76px; align-items: stretch; padding-top: 72px; }
+  .herotext { display: flex; flex-direction: column; min-width: 0; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .5; }
+  .hero h1 { font-family: var(--font-display); font-weight: 500; font-size: 74px; line-height: .98; letter-spacing: -.035em; text-wrap: balance; margin-top: 20px; }
+  h1 .i { font-style: italic; color: var(--color-terracotta); }
+  .kicker { font-size: 22px; line-height: 1.45; margin-top: 26px; max-width: 34ch; text-wrap: balance; }
+
+  /* tag row — pinned to the bottom of the hero text column */
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 40px; }
+  .tags span { font-family: var(--font-mono); font-size: 12px; padding: 7px 14px; border-radius: 999px; background: color-mix(in oklab, var(--fg) 6%, transparent); }
+  .tags span.live { display: inline-flex; align-items: center; gap: 8px; background: var(--color-ochre); color: var(--color-ink); }
+  .tags span.live::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--color-terracotta); box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 60%, transparent); animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 55%, transparent); }
+    70% { box-shadow: 0 0 0 9px color-mix(in oklab, var(--color-terracotta) 0%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 0%, transparent); }
+  }
+
+  /* MANIFESTO */
+  .manifesto { font-family: var(--font-display); font-weight: 400; font-size: 46px; line-height: 1.16; letter-spacing: -.02em; max-width: 26ch; text-wrap: balance; margin: 110px 0; position: relative; }
+  .manifesto .i { font-style: italic; }
+  .manifesto .u { text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 6px; }
+
+  /* RIGHT NOW */
+  .right-now { margin: 0 0 110px; }
+  .right-now .h { font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .5; margin-bottom: 28px; }
+  .right-now ul { list-style: none; display: flex; flex-direction: column; gap: 4px; padding: 0; }
+  .right-now li { font-family: var(--font-display); font-size: 38px; line-height: 1.2; letter-spacing: -.015em; display: flex; align-items: baseline; gap: 16px; }
+  .right-now li .n { font-family: var(--font-mono); font-size: 12px; opacity: .4; width: 28px; flex: none; }
+  .right-now .rn-link { color: var(--color-terracotta); text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
+  .right-now .gh { width: 0.78em; height: 0.78em; vertical-align: -0.14em; }
+  .right-now .rn-org { display: inline-flex; align-items: center; gap: 8px; }
+
+  /* FEATURED spacing (component handles its own inner layout) */
+  :global(.featured) { margin-bottom: 110px; }
+
+  /* BUILT */
+  .built-wrap { margin-bottom: 110px; }
+  .built-wrap .h { font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .5; margin-bottom: 8px; }
+  .built { list-style: none; padding: 0; }
+  .built li { padding: 18px 0; border-bottom: 1px dashed color-mix(in oklab, var(--fg) 22%, transparent); }
+  .built-name { display: inline-block; font-family: var(--font-display); font-style: italic; font-size: 26px; color: inherit; text-decoration: none; }
+  .built-name:hover { color: var(--color-terracotta); }
+  .built-desc { margin-top: 6px; font-size: 15px; opacity: .7; max-width: 60ch; line-height: 1.5; }
+
+  @media (max-width: 880px) {
+    .hero { grid-template-columns: 1fr; }
+    :global([data-deck]) { order: -1; width: 100%; max-width: 300px; align-self: start; margin-bottom: 40px; }
+    :global([data-deck] .deck) { width: 100%; }
+    .tags { margin-top: 28px; padding-top: 0; }
+    .hero h1 { font-size: 60px; }
+    .manifesto { font-size: 34px; }
+    .right-now li { font-size: 28px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>

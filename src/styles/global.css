@@ -15,10 +15,10 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
-/* Light is default; dark inverts. */
+/* Light theme only — dark mode was intentionally removed. */
 @layer base {
   :root {
-    --bg: var(--color-paper);
+    --bg: #ffffff;
     --bg-soft: var(--color-paper-soft);
     --fg: var(--color-ink);
     --fg-soft: var(--color-ink-soft);
@@ -34,25 +34,6 @@
     --bucket-notes-fg: var(--color-ink);
 
     color-scheme: light;
-  }
-
-  :root.dark {
-    --bg: var(--color-ink);
-    --bg-soft: var(--color-ink-soft);
-    --fg: var(--color-paper);
-    --fg-soft: var(--color-paper-soft);
-    --accent: var(--color-ochre);
-    --accent-alt: var(--color-terracotta);
-
-    /* In dark mode, the navy buckets invert to cream so they stand out from the navy bg. */
-    --bucket-leadership-bg: var(--color-paper);
-    --bucket-leadership-fg: var(--color-ink);
-    --bucket-process-bg: var(--color-paper-soft);
-    --bucket-process-fg: var(--color-ink);
-    --bucket-notes-bg: var(--color-ink-soft);
-    --bucket-notes-fg: var(--color-paper);
-
-    color-scheme: dark;
   }
 
   html {
