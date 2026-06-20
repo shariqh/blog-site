@@ -101,6 +101,27 @@ const tools = [
       </div>
     </div>
   </section>
+
+  <script>
+    // Touch: tap a photo to pause the wall + reveal its caption; auto-resumes after a few seconds.
+    if (window.matchMedia("(hover: none)").matches) {
+      document.querySelectorAll<HTMLElement>(".otc .marquee").forEach((m) => {
+        let timer: ReturnType<typeof setTimeout>;
+        m.addEventListener("click", (e) => {
+          const photo = e.target instanceof Element ? e.target.closest(".photo") : null;
+          if (!photo) return;
+          m.classList.add("is-paused");
+          m.querySelectorAll(".photo.is-active").forEach((p) => p.classList.remove("is-active"));
+          photo.classList.add("is-active");
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            m.classList.remove("is-paused");
+            photo.classList.remove("is-active");
+          }, 3500);
+        });
+      });
+    }
+  </script>
 </BaseLayout>
 
 <style>
@@ -288,6 +309,10 @@ const tools = [
     .otc .photo:hover { transform: rotate(0) scale(1.05); }
     .otc .photo:hover .cap { opacity: 1; }
   }
+  /* tap-to-pause (touch) — JS toggles these and auto-resumes after ~3.5s */
+  .otc .marquee.is-paused .track { animation-play-state: paused; }
+  .otc .photo.is-active { transform: rotate(0) scale(1.05); z-index: 2; }
+  .otc .photo.is-active .cap { opacity: 1; }
 
   /* currently + stack */
   .now-grid {
