@@ -86,6 +86,12 @@ const len = portraits.length;
   .carousel .dots { position: absolute; top: 100%; left: 0; right: 0; display: flex; gap: 7px; justify-content: center; margin-top: 18px; }
   .carousel .dots button { width: 7px; height: 7px; border-radius: 999px; border: 0; padding: 0; cursor: pointer; background: color-mix(in oklab, var(--fg) 22%, transparent); transition: all .2s; }
   .carousel .dots button.active { background: var(--color-terracotta); width: 20px; }
+  @media (max-width: 880px) {
+    .carousel .deck img.next  { transform: rotate(6deg)   translate(20px, -10px)  scale(.9); }
+    .carousel .deck img.prev  { transform: rotate(-6deg)  translate(-20px, -10px) scale(.9); }
+    .carousel .deck img.next2 { transform: rotate(11deg)  translate(40px, -20px)  scale(.82); }
+    .carousel .deck img.prev2 { transform: rotate(-11deg) translate(-40px, -20px) scale(.82); }
+  }
   @media (prefers-reduced-motion: reduce) {
     .carousel .deck img { transition: none; }
     .carousel .deck img:not(.front) { opacity: 0; }
