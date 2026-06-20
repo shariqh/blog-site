@@ -324,8 +324,10 @@ import PageHeader from "../components/PageHeader.astro";
       gap: 32px;
     }
     .statement { font-size: 30px; }
-    .otc .strip { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .otc .card { width: 100%; margin: 0 !important; transform: none !important; }
+    .otc .strip { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .otc .card { width: 100%; margin: 0 !important; }
+    .otc .card:nth-child(odd)  { transform: rotate(-2deg) !important; }
+    .otc .card:nth-child(even) { transform: rotate(2deg)  !important; }
     .otc .card .cap { opacity: 1; }
     .otc .hint { display: none; }
   }

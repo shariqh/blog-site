@@ -87,6 +87,8 @@ const len = portraits.length;
   .carousel .dots button { width: 7px; height: 7px; border-radius: 999px; border: 0; padding: 0; cursor: pointer; background: color-mix(in oklab, var(--fg) 22%, transparent); transition: all .2s; }
   .carousel .dots button.active { background: var(--color-terracotta); width: 20px; }
   @media (max-width: 880px) {
+    .carousel { width: 100%; max-width: 240px; margin-left: auto; margin-right: auto; }
+    .carousel .deck { width: 100%; }
     .carousel .deck img.next  { transform: rotate(6deg)   translate(20px, -10px)  scale(.9); }
     .carousel .deck img.prev  { transform: rotate(-6deg)  translate(-20px, -10px) scale(.9); }
     .carousel .deck img.next2 { transform: rotate(11deg)  translate(40px, -20px)  scale(.82); }
