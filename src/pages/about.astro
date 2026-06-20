@@ -1,15 +1,15 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
-import PortraitDeck from "../components/PortraitDeck.astro";
 
-// Same shots as the desktop "off the clock" strip — shown as a carousel on mobile.
+// "Off the clock" photo wall — auto-scrolls horizontally and loops seamlessly.
+// Add as many as you like here; the strip just gets longer.
 const offClock = [
-  { src: "/static/images/home/portrait-4.jpg", alt: "Shariq DJ-ing" },
-  { src: "/static/images/home/portrait-2.jpg", alt: "Shariq off-grid in Nusa Penida" },
-  { src: "/static/images/home/portrait-3.jpg", alt: "Key lime pie baking project" },
-  { src: "/static/images/home/portrait-5.jpg", alt: "Serious burger moment" },
-  { src: "/static/images/home/portrait-1.jpg", alt: "Shariq on stage" },
+  { src: "/static/images/home/portrait-4.jpg", alt: "Shariq DJ-ing", cap: "Behind the decks." },
+  { src: "/static/images/home/portrait-2.jpg", alt: "Shariq off-grid in Nusa Penida", cap: "Off-grid — Nusa Penida." },
+  { src: "/static/images/home/portrait-3.jpg", alt: "Key lime pie baking", cap: "Overcommitting to a key lime pie." },
+  { src: "/static/images/home/portrait-5.jpg", alt: "Shariq at a burger spot", cap: "Serious about a good burger." },
+  { src: "/static/images/home/portrait-1.jpg", alt: "Shariq on stage", cap: "On stage, now and then." },
 ];
 ---
 <BaseLayout title="About" width="wide">
@@ -47,30 +47,22 @@ const offClock = [
   <!-- OFF THE CLOCK -->
   <section class="sec otc">
     <span class="mono-label">Off the clock</span>
-    <div class="strip">
-      <div class="card">
-        <img src="/static/images/home/portrait-4.jpg" alt="Shariq DJ-ing" />
-        <div class="cap">Behind the decks.</div>
-      </div>
-      <div class="card">
-        <img src="/static/images/home/portrait-2.jpg" alt="Shariq off-grid in Nusa Penida" />
-        <div class="cap">Off-grid — Nusa Penida.</div>
-      </div>
-      <div class="card">
-        <img src="/static/images/home/portrait-3.jpg" alt="Key lime pie baking project" />
-        <div class="cap">Overcommitting to a key lime pie.</div>
-      </div>
-      <div class="card">
-        <img src="/static/images/home/portrait-5.jpg" alt="Serious burger moment" />
-        <div class="cap">Serious about a good burger.</div>
-      </div>
-      <div class="card">
-        <img src="/static/images/home/portrait-1.jpg" alt="Shariq on stage" />
-        <div class="cap">On stage, now and then.</div>
-      </div>
+    <div class="marquee">
+      <ul class="track">
+        {offClock.map((p) => (
+          <li class="photo">
+            <img src={p.src} alt={p.alt} loading="lazy" width="300" height="400" />
+            <span class="cap">{p.cap}</span>
+          </li>
+        ))}
+        {offClock.map((p) => (
+          <li class="photo" aria-hidden="true">
+            <img src={p.src} alt="" loading="lazy" width="300" height="400" />
+            <span class="cap">{p.cap}</span>
+          </li>
+        ))}
+      </ul>
     </div>
-    <p class="hint">↑ hover to straighten</p>
-    <div class="otc-deck"><PortraitDeck portraits={offClock} /></div>
   </section>
 
   <!-- CURRENTLY + STACK -->
@@ -216,66 +208,62 @@ const offClock = [
     color: var(--color-terracotta);
   }
 
-  /* off the clock — interactive photo strip */
-  .otc .strip {
-    display: flex;
-    gap: 0;
-    padding: 30px 0 10px;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  .otc .card {
-    width: 200px;
-    aspect-ratio: 3/4;
-    border-radius: 14px;
+  /* off the clock — full-bleed auto-scrolling photo wall */
+  .otc .marquee {
+    margin-top: 30px;
+    width: 100vw;
+    margin-left: 50%;
+    transform: translateX(-50%);
     overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+  .otc .track {
+    display: flex;
+    width: max-content;
+    margin: 0;
+    padding: 28px 0;
+    list-style: none;
+    animation: otc-marquee 60s linear infinite;
+  }
+  .otc .marquee:hover .track { animation-play-state: paused; }
+  @keyframes otc-marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .otc .photo {
     position: relative;
     flex: none;
-    box-shadow: 0 16px 36px -22px rgba(21, 35, 58, .6);
-    transition: transform .35s cubic-bezier(.22, .61, .36, 1), z-index 0s;
-    cursor: default;
+    width: 190px;
+    aspect-ratio: 3 / 4;
+    margin-right: 26px;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 16px 36px -22px color-mix(in oklab, var(--fg) 55%, transparent);
+    transition: transform .35s cubic-bezier(.22, .61, .36, 1);
   }
-  .otc .card:nth-child(1) { transform: rotate(-7deg) translateY(8px);  margin-right: -26px; z-index: 1; }
-  .otc .card:nth-child(2) { transform: rotate(4deg);                   margin-right: -26px; z-index: 2; }
-  .otc .card:nth-child(3) { transform: rotate(-3deg) translateY(6px);  margin-right: -26px; z-index: 3; }
-  .otc .card:nth-child(4) { transform: rotate(6deg) translateY(2px);   margin-right: -26px; z-index: 2; }
-  .otc .card:nth-child(5) { transform: rotate(-5deg) translateY(10px); z-index: 1; }
-  .otc .card:hover {
-    transform: rotate(0) translateY(-12px) scale(1.08);
-    z-index: 10;
-  }
-  .otc .card img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  .otc .card .cap {
+  .otc .photo:nth-child(5n + 1) { transform: rotate(-3deg); }
+  .otc .photo:nth-child(5n + 2) { transform: rotate(2deg); }
+  .otc .photo:nth-child(5n + 3) { transform: rotate(-1.5deg); }
+  .otc .photo:nth-child(5n + 4) { transform: rotate(3deg); }
+  .otc .photo:nth-child(5n + 5) { transform: rotate(-2deg); }
+  .otc .photo:hover { transform: rotate(0) scale(1.05); }
+  .otc .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .otc .photo .cap {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 26px 14px 12px;
+    padding: 26px 12px 10px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 10px;
     letter-spacing: .04em;
     color: #fff;
     background: linear-gradient(transparent, rgba(21, 35, 58, .82));
     opacity: 0;
     transition: opacity .25s;
   }
-  .otc .card:hover .cap {
-    opacity: 1;
-  }
-  .otc .hint {
-    text-align: center;
-    margin-top: 22px;
-    font-size: 13px;
-    color: var(--fg-soft);
-    opacity: .7;
-  }
-  /* mobile-only carousel of the same photos */
-  .otc-deck { display: none; }
+  .otc .photo:hover .cap { opacity: 1; }
 
   /* currently + stack */
   .now-grid {
@@ -337,14 +325,13 @@ const offClock = [
       gap: 32px;
     }
     .statement { font-size: 30px; }
-    .otc .strip { display: none; }
-    .otc .hint { display: none; }
-    .otc-deck { display: block; padding-top: 8px; }
+    .otc .photo { width: 150px; margin-right: 18px; }
   }
 
   /* reduced-motion: kill animations and reset photo card transforms */
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; }
-    .otc .card { transform: none !important; }
+    .otc .marquee { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
+    .otc .photo { transform: none !important; }
   }
 </style>
