@@ -1,6 +1,16 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
+import PortraitDeck from "../components/PortraitDeck.astro";
+
+// Same shots as the desktop "off the clock" strip — shown as a carousel on mobile.
+const offClock = [
+  { src: "/static/images/home/portrait-4.jpg", alt: "Shariq DJ-ing" },
+  { src: "/static/images/home/portrait-2.jpg", alt: "Shariq off-grid in Nusa Penida" },
+  { src: "/static/images/home/portrait-3.jpg", alt: "Key lime pie baking project" },
+  { src: "/static/images/home/portrait-5.jpg", alt: "Serious burger moment" },
+  { src: "/static/images/home/portrait-1.jpg", alt: "Shariq on stage" },
+];
 ---
 <BaseLayout title="About" width="wide">
   <PageHeader eyebrow="Shariq Hirani" title="About" />
@@ -60,6 +70,7 @@ import PageHeader from "../components/PageHeader.astro";
       </div>
     </div>
     <p class="hint">↑ hover to straighten</p>
+    <div class="otc-deck"><PortraitDeck portraits={offClock} /></div>
   </section>
 
   <!-- CURRENTLY + STACK -->
@@ -263,6 +274,8 @@ import PageHeader from "../components/PageHeader.astro";
     color: var(--fg-soft);
     opacity: .7;
   }
+  /* mobile-only carousel of the same photos */
+  .otc-deck { display: none; }
 
   /* currently + stack */
   .now-grid {
@@ -324,12 +337,9 @@ import PageHeader from "../components/PageHeader.astro";
       gap: 32px;
     }
     .statement { font-size: 30px; }
-    .otc .strip { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .otc .card { width: 100%; margin: 0 !important; }
-    .otc .card:nth-child(odd)  { transform: rotate(-2deg) !important; }
-    .otc .card:nth-child(even) { transform: rotate(2deg)  !important; }
-    .otc .card .cap { opacity: 1; }
+    .otc .strip { display: none; }
     .otc .hint { display: none; }
+    .otc-deck { display: block; padding-top: 8px; }
   }
 
   /* reduced-motion: kill animations and reset photo card transforms */
