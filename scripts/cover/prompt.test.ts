@@ -38,4 +38,24 @@ describe('buildCoverPrompt', () => {
     expect(prompt.toLowerCase()).toContain('readable words')
     expect(prompt.toLowerCase()).toContain('no legible prose')
   })
+  it('sanitizes newlines and control chars in title and summary, caps length', () => {
+    const dirtyTitle = 'My Title\nWith\r\nNewlines\x00And\x1fControls'
+    const longSummary = 'x'.repeat(5000)
+    const { prompt, style } = buildCoverPrompt({
+      title: dirtyTitle,
+      summary: longSummary,
+      tags: ['ai'],
+    })
+    // Concept: line must be a single line (no embedded newlines)
+    const conceptLine = prompt.split('\n').find((l) => l.startsWith('Concept:'))
+    expect(conceptLine).toBeDefined()
+    expect(conceptLine).not.toMatch(/\n|\r/)
+    // Title portion is cleaned and shorter than original
+    expect(conceptLine).toContain('My Title')
+    // Summary is capped at 400 chars
+    const afterConcept = conceptLine!.replace(/^Concept:.*?\. /, '')
+    expect(afterConcept.length).toBeLessThanOrEqual(400)
+    // Style still resolved correctly
+    expect(style).toBe('line-art')
+  })
 })

@@ -34,6 +34,23 @@ describe('attachCover', () => {
     expect(path).toBeNull()
   })
 
+  it('returns null and does NOT call stage/setHero when generate returns an unsafe imagePath', async () => {
+    const generate = vi.fn(async () => ({
+      imagePath: '../../evil.png',
+      alt: 'Cover for A',
+      prompt: 'p',
+      style: 'line-art' as const,
+      attempts: 1,
+      usedFallback: false,
+    }))
+    const setHero = vi.fn()
+    const stage = vi.fn()
+    const path = await attachCover(input, { generate, setHero, stage })
+    expect(path).toBeNull()
+    expect(stage).not.toHaveBeenCalled()
+    expect(setHero).not.toHaveBeenCalled()
+  })
+
   it('returns null (non-fatal) and does not leave a staged PNG when setHero throws', async () => {
     const generate = vi.fn(async () => ({
       imagePath: '/static/images/blog/a/cover.png',
