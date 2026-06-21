@@ -7,6 +7,7 @@ export async function generateImage(prompt: string): Promise<Buffer> {
   const url = `${endpoint}/openai/deployments/${deployment}/images/generations?api-version=${API_VERSION}`
   const res = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(120000),
     headers: { 'api-key': key, 'content-type': 'application/json' },
     body: JSON.stringify({
       prompt,

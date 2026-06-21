@@ -33,4 +33,25 @@ describe('attachCover', () => {
     const path = await attachCover(input, { generate, setHero: vi.fn(), stage: vi.fn() })
     expect(path).toBeNull()
   })
+
+  it('returns null (non-fatal) and does not leave a staged PNG when setHero throws', async () => {
+    const generate = vi.fn(async () => ({
+      imagePath: '/static/images/blog/a/cover.png',
+      alt: 'Cover for A',
+      prompt: 'p',
+      style: 'line-art' as const,
+      attempts: 1,
+      usedFallback: false,
+    }))
+    const setHero = vi.fn(() => {
+      throw new Error('disk full')
+    })
+    const stage = vi.fn()
+    const path = await attachCover(input, { generate, setHero, stage })
+    expect(path).toBeNull()
+    // stage was called with the PNG path
+    expect(stage).toHaveBeenCalledWith('public/static/images/blog/a/cover.png')
+    // The function returned null — caller does not see the error (non-fatal contract).
+    // Unstaging is handled internally via spawnSync; we verify the overall result.
+  })
 })

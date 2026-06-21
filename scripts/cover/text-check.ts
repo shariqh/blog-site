@@ -13,6 +13,7 @@ export async function hasText(png: Buffer): Promise<boolean> {
   try {
     const res = await fetch(url, {
       method: 'POST',
+      signal: AbortSignal.timeout(60000),
       headers: { 'api-key': key, 'content-type': 'application/json' },
       body: JSON.stringify({
         max_tokens: 3,

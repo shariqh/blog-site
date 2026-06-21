@@ -3,7 +3,7 @@ import { generateCover } from './generate-cover'
 import { setHeroInFile, toHeroPatch } from './frontmatter'
 
 function gitStage(pngPath: string): void {
-  const r = spawnSync('git', ['add', pngPath], { encoding: 'utf8' })
+  const r = spawnSync('git', ['add', '--', pngPath], { encoding: 'utf8' })
   if (r.status !== 0) throw new Error(`git add ${pngPath} failed: ${r.stderr}`)
 }
 
@@ -27,8 +27,15 @@ export async function attachCover(
       summary: input.summary,
       tags: input.tags,
     })
-    stage(`public${result.imagePath}`)
-    setHero(input.filePath, toHeroPatch(result))
+    const pngPath = `public${result.imagePath}`
+    stage(pngPath)
+    try {
+      setHero(input.filePath, toHeroPatch(result))
+    } catch (heroErr) {
+      // setHero failed after PNG was staged: unstage to keep state consistent.
+      spawnSync('git', ['reset', '-q', 'HEAD', '--', pngPath], { encoding: 'utf8' })
+      throw heroErr
+    }
     return result.imagePath
   } catch (err) {
     console.error(`Cover generation failed (non-fatal): ${(err as Error).message}`)
