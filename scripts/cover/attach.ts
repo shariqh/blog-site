@@ -3,7 +3,8 @@ import { generateCover } from './generate-cover'
 import { setHeroInFile } from './frontmatter'
 
 function gitStage(pngPath: string): void {
-  spawnSync('git', ['add', pngPath], { encoding: 'utf8' })
+  const r = spawnSync('git', ['add', pngPath], { encoding: 'utf8' })
+  if (r.status !== 0) throw new Error(`git add ${pngPath} failed: ${r.stderr}`)
 }
 
 // Non-fatal: a cover failure must never abort a draft. Returns the imagePath or
