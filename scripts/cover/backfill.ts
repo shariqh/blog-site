@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import matter from 'gray-matter'
 import { generateCover, type CoverResult } from './generate-cover'
-import { setHeroInFile, type HeroPatch } from './frontmatter'
+import { setHeroInFile, toHeroPatch, coverInputFromFrontmatter, type HeroPatch } from './frontmatter'
 
 const WRITING_DIR = join('src', 'content', 'writing')
 
@@ -64,16 +64,9 @@ export async function runBackfill(
       console.log(`→ ${slug}: generating …`)
       const result = await deps.generateCover({
         slug,
-        title: String(fm.data.title ?? slug),
-        summary: typeof fm.data.summary === 'string' ? fm.data.summary : undefined,
-        tags: Array.isArray(fm.data.tags) ? (fm.data.tags as string[]) : [],
+        ...coverInputFromFrontmatter(fm.data, slug),
       })
-      deps.setHero(filePath, {
-        image: result.imagePath,
-        alt: result.alt,
-        prompt: result.prompt,
-        style: result.style,
-      })
+      deps.setHero(filePath, toHeroPatch(result))
       made++
       if (result.usedFallback) fellBack++
       console.log(`  ✓ ${result.style}${result.usedFallback ? ' (fallback)' : ''}`)

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import matter from 'gray-matter'
 import { generateCover } from './generate-cover'
-import { setHeroInFile } from './frontmatter'
+import { setHeroInFile, toHeroPatch, coverInputFromFrontmatter } from './frontmatter'
 import type { CoverStyle } from './prompt'
 
 export function parseCliArgs(argv: string[]): { slug: string; style?: CoverStyle; force: boolean } {
@@ -35,17 +35,10 @@ async function main(): Promise<void> {
   console.log(`Generating cover for ${slug} …`)
   const result = await generateCover({
     slug,
-    title: String(fm.data.title ?? slug),
-    summary: typeof fm.data.summary === 'string' ? fm.data.summary : undefined,
-    tags: Array.isArray(fm.data.tags) ? (fm.data.tags as string[]) : [],
+    ...coverInputFromFrontmatter(fm.data, slug),
     style,
   })
-  setHeroInFile(filePath, {
-    image: result.imagePath,
-    alt: result.alt,
-    prompt: result.prompt,
-    style: result.style,
-  })
+  setHeroInFile(filePath, toHeroPatch(result))
   console.log(
     `✓ ${slug}: ${result.style}${result.usedFallback ? ' (branded fallback — text guard tripped 3×)' : ''} → ${result.imagePath}`
   )

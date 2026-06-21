@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { generateCover } from './generate-cover'
-import { setHeroInFile } from './frontmatter'
+import { setHeroInFile, toHeroPatch } from './frontmatter'
 
 function gitStage(pngPath: string): void {
   const r = spawnSync('git', ['add', pngPath], { encoding: 'utf8' })
@@ -27,12 +27,7 @@ export async function attachCover(
       summary: input.summary,
       tags: input.tags,
     })
-    setHero(input.filePath, {
-      image: result.imagePath,
-      alt: result.alt,
-      prompt: result.prompt,
-      style: result.style,
-    })
+    setHero(input.filePath, toHeroPatch(result))
     stage(`public${result.imagePath}`)
     return result.imagePath
   } catch (err) {
