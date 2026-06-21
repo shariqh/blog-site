@@ -57,4 +57,16 @@ describe('generateCover', () => {
     const r = await generateCover({ ...input, style: 'conceptual' }, deps())
     expect(r.style).toBe('conceptual')
   })
+
+  it('propagates a generateImage rejection without swallowing it into the branded fallback', async () => {
+    // A generation error (e.g. azure 429) MUST propagate so callers can count failures.
+    // It must NOT be caught and silently served as the fallback — backfill relies on the throw.
+    const renderFallback = vi.fn(async () => Buffer.from('fallback'))
+    const d = deps({
+      generateImage: vi.fn().mockRejectedValue(new Error('azure 429')),
+      renderFallback,
+    })
+    await expect(generateCover(input, d)).rejects.toThrow(/429/)
+    expect(renderFallback).not.toHaveBeenCalled()
+  })
 })
