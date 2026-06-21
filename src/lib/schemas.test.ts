@@ -27,3 +27,16 @@ describe('writingSchema canonical guard', () => {
     expect(r.success).toBe(true)
   })
 })
+
+describe('writingSchema hero.style', () => {
+  it('accepts a hero.style of line-art or conceptual', () => {
+    const base = { title: 'T', date: '2026-01-01', summary: 's' }
+    expect(
+      writingSchema.safeParse({ ...base, hero: { image: '/static/images/x.png', alt: 'a', style: 'line-art' } })
+        .success
+    ).toBe(true)
+    expect(
+      writingSchema.safeParse({ ...base, hero: { image: '/static/images/x.png', alt: 'a', style: 'bogus' } }).success
+    ).toBe(false)
+  })
+})
