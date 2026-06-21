@@ -34,11 +34,74 @@
     @apply rounded bg-[var(--bg-soft)] px-1.5 py-0.5 font-mono text-[0.9em];
   }
   .prose pre {
-    @apply my-6 overflow-x-auto rounded-lg p-4 text-sm;
+    @apply relative my-6 overflow-x-auto rounded-lg p-4 text-sm;
+    border: 1px solid color-mix(in oklab, var(--color-paper) 16%, transparent);
   }
   .prose pre code { @apply font-mono; }
+  /* One-click copy button (injected by the script below) */
+  .prose pre .copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    color: var(--color-paper);
+    background: color-mix(in oklab, var(--color-paper) 12%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-paper) 24%, transparent);
+    opacity: 0.6;
+    transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .prose pre:hover .copy-btn,
+  .prose pre:focus-within .copy-btn { opacity: 1; }
+  .prose pre .copy-btn:hover,
+  .prose pre .copy-btn.copied {
+    opacity: 1;
+    background: var(--color-ochre);
+    color: var(--color-ink);
+    border-color: var(--color-ochre);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .prose pre .copy-btn { transition: none; }
+  }
   .prose img { @apply my-6 rounded-lg; }
   .prose hr {
     @apply my-12 border-0 border-t border-[color-mix(in_oklab,var(--fg)_15%,transparent)];
   }
 </style>
+
+<script>
+  // Add a one-click "Copy" button to every code block in the prose.
+  for (const pre of document.querySelectorAll(".prose pre")) {
+    if (pre.querySelector(".copy-btn")) continue;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copy-btn";
+    btn.setAttribute("aria-label", "Copy code to clipboard");
+    btn.textContent = "Copy";
+    btn.addEventListener("click", () => {
+      const code = pre.querySelector("code");
+      const text = ((code && code.textContent) || "").replace(/\n$/, "");
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          btn.textContent = "Copied";
+          btn.classList.add("copied");
+          setTimeout(() => {
+            btn.textContent = "Copy";
+            btn.classList.remove("copied");
+          }, 1600);
+        })
+        .catch(() => {
+          btn.textContent = "Failed";
+          setTimeout(() => {
+            btn.textContent = "Copy";
+          }, 1600);
+        });
+    });
+    pre.appendChild(btn);
+  }
+</script>

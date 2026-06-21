@@ -1,12 +1,15 @@
 ---
+import { resolveCover } from "../lib/cover";
 interface Props {
   href: string;
   category: string;
   title: string;
   hook: string;
   cta?: string;
+  coverData?: { hero?: { image?: string; alt?: string }; tags?: string[] };
 }
-const { href, category, title, hook, cta = "Read it" } = Astro.props;
+const { href, category, title, hook, cta = "Read it", coverData } = Astro.props;
+const cover = coverData ? resolveCover(coverData) : null;
 ---
 <a class="featured" href={href}>
   <div class="panel">
@@ -16,15 +19,19 @@ const { href, category, title, hook, cta = "Read it" } = Astro.props;
     <span class="more"><span class="dot">→</span> {cta}</span>
   </div>
   <div class="art">
-    <svg width="230" height="180" viewBox="0 0 230 180" fill="none" stroke="var(--color-terracotta)" stroke-width="2.5">
-      <circle cx="62" cy="62" r="30"></circle>
-      <circle cx="158" cy="116" r="22" fill="var(--color-ochre)" stroke="none"></circle>
-      <path d="M30 138 q42 -52 94 -22 t76 -30" stroke="var(--color-ink)"></path>
-      <rect x="124" y="42" width="52" height="14" rx="7" fill="var(--color-ochre)" stroke="none"></rect>
-      <circle cx="42" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
-      <circle cx="60" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
-      <circle cx="78" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
-    </svg>
+    {cover && cover.kind === "image" ? (
+      <img class="art-img" src={cover.src} alt={cover.alt} loading="lazy" decoding="async" />
+    ) : (
+      <svg width="230" height="180" viewBox="0 0 230 180" fill="none" stroke="var(--color-terracotta)" stroke-width="2.5">
+        <circle cx="62" cy="62" r="30"></circle>
+        <circle cx="158" cy="116" r="22" fill="var(--color-ochre)" stroke="none"></circle>
+        <path d="M30 138 q42 -52 94 -22 t76 -30" stroke="var(--color-ink)"></path>
+        <rect x="124" y="42" width="52" height="14" rx="7" fill="var(--color-ochre)" stroke="none"></rect>
+        <circle cx="42" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
+        <circle cx="60" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
+        <circle cx="78" cy="126" r="4" fill="var(--color-ink)" stroke="none"></circle>
+      </svg>
+    )}
   </div>
 </a>
 
@@ -38,6 +45,7 @@ const { href, category, title, hook, cta = "Read it" } = Astro.props;
   .more .dot { width: 42px; height: 42px; border-radius: 999px; background: var(--color-ochre); color: var(--color-ink); display: grid; place-items: center; font-size: 18px; transition: transform .15s; }
   .featured:hover .more .dot { transform: translateX(4px); }
   .art { background: linear-gradient(135deg, color-mix(in oklab, var(--color-paper) 88%, var(--color-ink)), var(--color-paper)); display: grid; place-items: center; }
+  .art-img { width: 100%; height: 100%; object-fit: cover; display: block; }
   @media (prefers-reduced-motion: reduce) {
     .more .dot { transition: none; }
   }

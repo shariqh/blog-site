@@ -35,6 +35,7 @@ const slug = (id: string) => `/blog/${id.replace(/\.mdx$/, "")}`;
           title={featured.data.title}
           hook={featured.data.summary}
           cta="Read full article"
+          coverData={featured.data}
         />
       </div>
     )}
