@@ -52,6 +52,11 @@ describe('renderOgSafe', () => {
     const png = await renderOgSafe({ ...base, cover: null })
     expect(pngSize(png)).toEqual({ width: 1200, height: 630 })
   })
+
+  // NOTE: "cover:null propagates errors" test skipped — mocking satori internals
+  // would be fragile. The narrowed impl (early-return when !cover) is verified by
+  // code inspection; the corrupt-cover test above confirms the catch only fires
+  // for the cover-present path.
 })
 
 describe('renderBrandedCover', () => {

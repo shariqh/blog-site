@@ -27,6 +27,9 @@ const {
 const fullTitle = title ? `${title} — ${SITE.title}` : SITE.title;
 const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
 const canonical = canonicalOverride ?? pageUrl;
+// Always emit an absolute URL for og:image / twitter:image — relative paths
+// are invalid per the OG spec and break unfurlers. Idempotent for already-absolute values.
+const ogImageUrl = ogImage ? new URL(ogImage, SITE.url).toString() : undefined;
 ---
 <!doctype html>
 <html lang="en">
@@ -42,13 +45,13 @@ const canonical = canonicalOverride ?? pageUrl;
     <meta property="og:description" content={description} />
     <meta property="og:type" content={ogType} />
     <meta property="og:url" content={pageUrl} />
-    {ogImage && (
+    {ogImageUrl && (
       <>
-        <meta property="og:image" content={ogImage} />
+        <meta property="og:image" content={ogImageUrl} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content={ogImage} />
+        <meta name="twitter:image" content={ogImageUrl} />
       </>
     )}
 

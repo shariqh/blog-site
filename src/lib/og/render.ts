@@ -25,10 +25,15 @@ export async function renderOg(data: OgData): Promise<Buffer> {
   return png
 }
 
-// Safe wrapper: if renderOg throws (e.g. corrupt cover bytes), retries with
+// Safe wrapper: if the cover image is corrupt/undecodable, retries with
 // cover: null so a bad image degrades to the branded fallback rather than
-// crashing the static build.
+// crashing the static build. Only catches errors when a cover is present —
+// if cover is already null (or absent), errors propagate so font/template
+// bugs surface rather than being silently masked.
 export async function renderOgSafe(data: OgData): Promise<Buffer> {
+  if (!data.cover) {
+    return renderOg(data)
+  }
   try {
     return await renderOg(data)
   } catch {
