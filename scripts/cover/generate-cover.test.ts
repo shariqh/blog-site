@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { generateCover } from './generate-cover'
 
 function deps(over: Record<string, unknown> = {}) {
@@ -20,7 +23,8 @@ describe('generateCover', () => {
     expect(d.generateImage).toHaveBeenCalledTimes(1)
     expect(d.writeImage).toHaveBeenCalledWith(
       'public/static/images/blog/a-post/cover.png',
-      Buffer.from('gen')
+      Buffer.from('gen'),
+      expect.any(String) // realRoot (symlink-safe write check)
     )
     expect(r).toMatchObject({
       imagePath: '/static/images/blog/a-post/cover.png',
@@ -48,7 +52,8 @@ describe('generateCover', () => {
     expect(d.renderFallback).toHaveBeenCalledTimes(1)
     expect(d.writeImage).toHaveBeenCalledWith(
       'public/static/images/blog/a-post/cover.png',
-      Buffer.from('fallback')
+      Buffer.from('fallback'),
+      expect.any(String) // realRoot (symlink-safe write check)
     )
     expect(r).toMatchObject({ attempts: 3, usedFallback: true })
   })
@@ -68,5 +73,58 @@ describe('generateCover', () => {
     })
     await expect(generateCover(input, d)).rejects.toThrow(/429/)
     expect(renderFallback).not.toHaveBeenCalled()
+  })
+})
+
+describe('generateCover symlink-write safety (real FS)', () => {
+  const temps: string[] = []
+  afterEach(() => {
+    for (const t of temps) {
+      try { rmSync(t, { recursive: true, force: true }) } catch { /* ignore */ }
+    }
+    temps.length = 0
+  })
+
+  it('normal slug writes the PNG under the temp blog dir', async () => {
+    const publicDir = mkdtempSync(join(tmpdir(), 'cover-test-pub-'))
+    temps.push(publicDir)
+    // Use real writeToDisk (no writeImage override) by not passing that dep.
+    const d = {
+      generateImage: vi.fn(async () => Buffer.from('PNGDATA')),
+      hasText: vi.fn(async () => false),
+      renderFallback: vi.fn(async () => Buffer.from('fallback')),
+      // writeImage not overridden — uses the real writeToDisk
+    }
+    const result = await generateCover({ slug: 'normal-slug', title: 'T', tags: ['ai'], publicDir }, d)
+    expect(result.imagePath).toBe('/static/images/blog/normal-slug/cover.png')
+    // File should exist at expected path
+    const { existsSync } = await import('node:fs')
+    expect(existsSync(`${publicDir}/static/images/blog/normal-slug/cover.png`)).toBe(true)
+  })
+
+  it('rejects writing when the slug directory is a symlink pointing outside publicDir', async () => {
+    // Create temp dirs: one for publicDir, one as the "escape" target.
+    const publicDir = mkdtempSync(join(tmpdir(), 'cover-test-pub-'))
+    const escapeDir = mkdtempSync(join(tmpdir(), 'cover-test-escape-'))
+    temps.push(publicDir, escapeDir)
+
+    // Pre-create the blog parent so we can plant the symlink.
+    const blogDir = join(publicDir, 'static', 'images', 'blog')
+    mkdirSync(blogDir, { recursive: true })
+
+    // Create a symlink: blog/evil → escape dir (simulates a committed symlink attack).
+    symlinkSync(escapeDir, join(blogDir, 'evil'))
+
+    const d = {
+      generateImage: vi.fn(async () => Buffer.from('PNGDATA')),
+      hasText: vi.fn(async () => false),
+      renderFallback: vi.fn(async () => Buffer.from('fallback')),
+      // writeImage not overridden — uses the real writeToDisk with symlink check
+    }
+
+    // generateCover with slug 'evil' should throw on the symlink containment check.
+    await expect(
+      generateCover({ slug: 'evil', title: 'T', tags: ['ai'], publicDir }, d)
+    ).rejects.toThrow(/[Ss]ymlink|containment/)
   })
 })

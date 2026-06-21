@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import matter from 'gray-matter'
 import { generateCover } from './generate-cover'
@@ -32,10 +32,24 @@ async function main(): Promise<void> {
   const writingRoot = resolve('src/content/writing')
   const filePath = join(writingRoot, `${slug}.mdx`)
 
-  // Defense-in-depth: ensure the resolved MDX path stays within the writing dir.
+  // Defense-in-depth: lexical containment — resolved MDX path must stay within the writing dir.
   const resolvedFile = resolve(filePath)
   if (!resolvedFile.startsWith(writingRoot + '/') && resolvedFile !== writingRoot) {
     throw new Error(`Path containment violation: "${resolvedFile}" escapes "${writingRoot}"`)
+  }
+
+  // Symlink-safe: reject if the file itself is a symlink, or if its real path
+  // escapes the writing root. lstatSync does NOT follow symlinks (unlike statSync).
+  const stat = lstatSync(filePath) // throws ENOENT if missing — desired (clear error)
+  if (stat.isSymbolicLink()) {
+    throw new Error(`Security: "${filePath}" is a symbolic link — refusing to read/write it`)
+  }
+  const realWritingRoot = realpathSync(writingRoot)
+  const realFile = realpathSync(filePath)
+  if (!realFile.startsWith(realWritingRoot + '/') && realFile !== realWritingRoot) {
+    throw new Error(
+      `Symlink containment violation: "${realFile}" escapes writing root "${realWritingRoot}"`
+    )
   }
 
   const fm = matter(readFileSync(filePath, 'utf8'))
