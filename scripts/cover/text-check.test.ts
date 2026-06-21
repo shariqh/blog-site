@@ -33,4 +33,8 @@ describe('hasText', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'err' }))
     expect(await hasText(Buffer.from('img'))).toBe(true)
   })
+  it('fails safe to true when fetch throws (network error)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
+    expect(await hasText(Buffer.from('img'))).toBe(true)
+  })
 })
