@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import matter from 'gray-matter'
 import { generateCover } from './generate-cover'
 import { setHeroInFile, toHeroPatch, coverInputFromFrontmatter } from './frontmatter'
+import { assertSafeSlug } from './slug'
 import type { CoverStyle } from './prompt'
 
 export function parseCliArgs(argv: string[]): { slug: string; style?: CoverStyle; force: boolean } {
@@ -24,7 +25,19 @@ export function parseCliArgs(argv: string[]): { slug: string; style?: CoverStyle
 
 async function main(): Promise<void> {
   const { slug, style, force } = parseCliArgs(process.argv.slice(2))
-  const filePath = join('src', 'content', 'writing', `${slug}.mdx`)
+
+  // Security: validate slug before using it to build any filesystem path.
+  assertSafeSlug(slug)
+
+  const writingRoot = resolve('src/content/writing')
+  const filePath = join(writingRoot, `${slug}.mdx`)
+
+  // Defense-in-depth: ensure the resolved MDX path stays within the writing dir.
+  const resolvedFile = resolve(filePath)
+  if (!resolvedFile.startsWith(writingRoot + '/') && resolvedFile !== writingRoot) {
+    throw new Error(`Path containment violation: "${resolvedFile}" escapes "${writingRoot}"`)
+  }
+
   const fm = matter(readFileSync(filePath, 'utf8'))
 
   if (fm.data.hero?.image && !force) {

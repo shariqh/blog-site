@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, lstatSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import matter from 'gray-matter'
 import { generateCover, type CoverResult } from './generate-cover'
@@ -10,7 +10,9 @@ export function listPostFiles(dir: string): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry)
-    if (statSync(full).isDirectory()) out.push(...listPostFiles(full))
+    const stat = lstatSync(full)
+    if (stat.isSymbolicLink()) continue  // Skip symlinks — they could escape the tree
+    if (stat.isDirectory()) out.push(...listPostFiles(full))
     else if (entry.endsWith('.mdx')) out.push(full)
   }
   return out

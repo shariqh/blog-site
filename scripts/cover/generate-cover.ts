@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { buildCoverPrompt, type CoverStyle } from './prompt'
 import { generateImage as defaultGenerate } from './azure'
 import { hasText as defaultHasText } from './text-check'
 import { renderFallbackCover } from './fallback'
+import { assertSafeSlug } from './slug'
 
 const MAX_ATTEMPTS = 3
 
@@ -46,10 +47,21 @@ export async function generateCover(
   },
   deps: Partial<CoverDeps> = {}
 ): Promise<CoverResult> {
+  // Security choke point: reject any slug that isn't a safe post slug.
+  assertSafeSlug(input.slug)
+
   const { generateImage, hasText, renderFallback, writeImage } = { ...DEFAULTS, ...deps }
   const publicDir = input.publicDir ?? 'public'
   const imagePath = `/static/images/blog/${input.slug}/cover.png`
   const absPath = `${publicDir}${imagePath}`
+
+  // Defense-in-depth: ensure the resolved path stays inside the allowed tree.
+  const allowedRoot = resolve(publicDir, 'static/images/blog')
+  const resolvedAbs = resolve(absPath)
+  if (!resolvedAbs.startsWith(allowedRoot + '/') && resolvedAbs !== allowedRoot) {
+    throw new Error(`Path containment violation: "${resolvedAbs}" escapes "${allowedRoot}"`)
+  }
+
   const alt = `Cover illustration for "${input.title}".`
 
   const { prompt, style } = buildCoverPrompt({
