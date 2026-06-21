@@ -77,7 +77,7 @@
   // Add a one-click "Copy" button to every code block in the prose.
   // Skip when the Clipboard API is unavailable (insecure contexts / old
   // browsers) so we never inject a button that throws on click.
-  const canCopy = navigator.clipboard && navigator.clipboard.writeText;
+  const canCopy = typeof navigator.clipboard?.writeText === "function";
   if (canCopy) for (const pre of document.querySelectorAll(".prose pre")) {
     if (pre.querySelector(".copy-btn")) continue;
     const btn = document.createElement("button");
