@@ -22,7 +22,9 @@ export default defineConfig({
       rehypeKatex,
     ],
     shikiConfig: {
-      themes: { light: "github-light", dark: "github-dark" },
+      // Single dark theme: the site background is white, so a dark code block
+      // (vs. white-on-white with github-light) gives clear separation on-brand.
+      theme: "github-dark",
       wrap: true,
     },
   },
