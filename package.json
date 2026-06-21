@@ -12,6 +12,7 @@
     "astro": "astro",
     "build": "astro build",
     "dev": "astro dev",
+    "gen:cover": "tsx scripts/cover/cli.ts",
     "migrate:cms": "tsx scripts/agent/migrate-cms.ts",
     "preview": "astro preview",
     "test": "vitest run",
