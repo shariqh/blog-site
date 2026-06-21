@@ -25,6 +25,17 @@ export async function renderOg(data: OgData): Promise<Buffer> {
   return png
 }
 
+// Safe wrapper: if renderOg throws (e.g. corrupt cover bytes), retries with
+// cover: null so a bad image degrades to the branded fallback rather than
+// crashing the static build.
+export async function renderOgSafe(data: OgData): Promise<Buffer> {
+  try {
+    return await renderOg(data)
+  } catch {
+    return await renderOg({ ...data, cover: null })
+  }
+}
+
 // Title-less branded cover at 1536×1024 (3:2).
 // Used as the deterministic fallback when gpt-image-1 keeps leaking text.
 // No prose text is rendered — a title will be overlaid by the OG hybrid later.

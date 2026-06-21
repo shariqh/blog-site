@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 import { getCollection, type CollectionEntry } from 'astro:content'
 import { buildOgData } from '../../lib/og/data'
-import { renderOg } from '../../lib/og/render'
+import { renderOgSafe } from '../../lib/og/render'
 
 export async function getStaticPaths() {
   const posts = await getCollection('writing', ({ data }) => !data.draft)
@@ -13,7 +13,7 @@ export async function getStaticPaths() {
 
 export const GET: APIRoute = async ({ props }) => {
   const { post } = props as { post: CollectionEntry<'writing'> }
-  const png = await renderOg(buildOgData(post))
+  const png = await renderOgSafe(buildOgData(post))
   return new Response(new Uint8Array(png), {
     headers: {
       'Content-Type': 'image/png',

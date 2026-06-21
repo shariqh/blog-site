@@ -57,6 +57,7 @@ export function buildOgData(post: CollectionEntry<'writing'>): OgData {
   const dateLabel = post.data.date.toLocaleString('en-US', {
     month: 'short',
     year: 'numeric',
+    timeZone: 'UTC',
   })
   return {
     title: post.data.title,
