@@ -1,4 +1,9 @@
-import 'dotenv/config'
+import { config as loadEnv } from 'dotenv'
+
+// Load .env.local first (wins over .env) then fall back to .env.
+// Neither call overrides already-set process.env vars (dotenv's default).
+loadEnv({ path: '.env.local' })
+loadEnv()
 
 function trimmed(key: string): string {
   const v = process.env[key]
