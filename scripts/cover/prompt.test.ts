@@ -35,7 +35,7 @@ describe('buildCoverPrompt', () => {
   })
   it('forbids text rendering explicitly', () => {
     const { prompt } = buildCoverPrompt({ title: 'X', tags: [] })
-    expect(prompt.toLowerCase()).toContain('no text')
-    expect(prompt.toLowerCase()).toContain('glyphs')
+    expect(prompt.toLowerCase()).toContain('readable words')
+    expect(prompt.toLowerCase()).toContain('no legible prose')
   })
 })

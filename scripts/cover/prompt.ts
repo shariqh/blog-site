@@ -4,7 +4,7 @@ export type CoverStyle = 'line-art' | 'conceptual'
 
 // Promoted verbatim from the validated spike (design-samples/cover-spike2.mjs),
 // with a strengthened no-text clause appended to BRAND.
-export const BRAND = `Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Absolutely NO text, letters, words, numbers, logos, watermarks, UI screenshots, or realistic human faces. Do not render any glyphs, captions, labels, signage, or typography of any kind anywhere in the image. Wide 3:2 landscape composition with deliberate empty negative space in the LEFT third so a title can be overlaid later.`
+export const BRAND = `Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do NOT render any readable words, captions, labels, headlines, sentences, or paragraphs — the image must contain no legible prose text, because a title will be overlaid afterward. Stylized logos, app or screen UI, code symbols, and abstract mark-making are fine as long as they are not spelled-out words. No photorealistic human faces. Wide 3:2 landscape composition with deliberate empty negative space in the LEFT third so a title can be overlaid later.`
 
 export const A_LINE = `Style: flat abstract shapes combined with loose hand-drawn single-weight line-art (thin, confident strokes), minimal and geometric — a vintage mid-century editorial spot illustration. Flat color fills, subtle paper grain, no gradients, no 3D, no glossy realism.`
 
