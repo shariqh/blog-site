@@ -20,6 +20,124 @@ function mark(): OgNode {
   )
 }
 
+// ---------- Branded cover: title-less, 1536×1024, geometric palette fill ----------
+// Used as the deterministic fallback when gpt-image-1 keeps leaking text.
+// No title, no eyebrow, no mark — the OG hybrid will overlay the title later.
+export function brandedCoverTemplate(): OgNode {
+  return h(
+    'div',
+    {
+      style: {
+        width: 1536,
+        height: 1024,
+        display: 'flex',
+        background: INK,
+        position: 'relative',
+        overflow: 'hidden',
+      },
+    },
+    // Subtle gradient wash over the base
+    h('div', {
+      style: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: 1536,
+        height: 1024,
+        backgroundImage: 'linear-gradient(135deg, #1b2c44, #15233a)',
+      },
+    }),
+    // Ochre accent bar (left edge)
+    h('div', {
+      style: { position: 'absolute', top: 0, left: 0, width: 16, height: 1024, background: OCHRE },
+    }),
+    // Large ochre ring (top-right quadrant)
+    h('div', {
+      style: {
+        position: 'absolute',
+        top: 120,
+        right: 200,
+        width: 340,
+        height: 340,
+        borderRadius: 999,
+        border: `12px solid ${OCHRE}`,
+      },
+    }),
+    // Medium terracotta filled circle (centre-right)
+    h('div', {
+      style: {
+        position: 'absolute',
+        top: 480,
+        right: 320,
+        width: 180,
+        height: 180,
+        borderRadius: 999,
+        background: TERRACOTTA,
+      },
+    }),
+    // Small ochre bar (centre)
+    h('div', {
+      style: {
+        position: 'absolute',
+        top: 400,
+        right: 560,
+        width: 130,
+        height: 32,
+        borderRadius: 16,
+        background: OCHRE,
+      },
+    }),
+    // Small paper dot cluster (lower centre-right)
+    h('div', {
+      style: {
+        position: 'absolute',
+        bottom: 220,
+        right: 390,
+        width: 38,
+        height: 38,
+        borderRadius: 999,
+        background: PAPER,
+      },
+    }),
+    h('div', {
+      style: {
+        position: 'absolute',
+        bottom: 220,
+        right: 460,
+        width: 38,
+        height: 38,
+        borderRadius: 999,
+        background: PAPER,
+      },
+    }),
+    // Thin terracotta ring (lower-right)
+    h('div', {
+      style: {
+        position: 'absolute',
+        bottom: 100,
+        right: 140,
+        width: 200,
+        height: 200,
+        borderRadius: 999,
+        border: `8px solid ${TERRACOTTA}`,
+      },
+    }),
+    // Second smaller ochre ring (upper-left, stays in the negative-space area)
+    h('div', {
+      style: {
+        position: 'absolute',
+        top: 280,
+        left: 120,
+        width: 120,
+        height: 120,
+        borderRadius: 999,
+        border: `6px solid ${OCHRE}`,
+        opacity: 0.35,
+      },
+    })
+  )
+}
+
 // ---------- Hybrid: post HAS a cover ----------
 export function hybridTemplate(d: OgData): OgNode {
   return h(
