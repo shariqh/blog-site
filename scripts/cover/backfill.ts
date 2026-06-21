@@ -1,0 +1,68 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
+import matter from 'gray-matter'
+import { generateCover } from './generate-cover'
+import { setHeroInFile } from './frontmatter'
+
+const WRITING_DIR = join('src', 'content', 'writing')
+
+export function listPostFiles(dir: string): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) out.push(...listPostFiles(full))
+    else if (entry.endsWith('.mdx')) out.push(full)
+  }
+  return out
+}
+
+export function slugFromPath(dir: string, filePath: string): string {
+  return relative(dir, filePath).replace(/\.mdx$/, '').split(sep).join('/')
+}
+
+async function main(): Promise<void> {
+  const force = process.argv.slice(2).includes('--force')
+  const files = listPostFiles(WRITING_DIR).sort()
+  let made = 0
+  let skipped = 0
+  let fellBack = 0
+
+  for (const filePath of files) {
+    const fm = matter(readFileSync(filePath, 'utf8'))
+    if (fm.data.draft) {
+      skipped++
+      continue
+    }
+    const slug = slugFromPath(WRITING_DIR, filePath)
+    if (fm.data.hero?.image && !force) {
+      console.log(`• ${slug}: has hero.image — skipping (use --force).`)
+      skipped++
+      continue
+    }
+    console.log(`→ ${slug}: generating …`)
+    const result = await generateCover({
+      slug,
+      title: String(fm.data.title ?? slug),
+      summary: typeof fm.data.summary === 'string' ? fm.data.summary : undefined,
+      tags: Array.isArray(fm.data.tags) ? (fm.data.tags as string[]) : [],
+    })
+    setHeroInFile(filePath, {
+      image: result.imagePath,
+      alt: result.alt,
+      prompt: result.prompt,
+      style: result.style,
+    })
+    made++
+    if (result.usedFallback) fellBack++
+    console.log(`  ✓ ${result.style}${result.usedFallback ? ' (fallback)' : ''}`)
+  }
+
+  console.log(`\nDone. Generated: ${made}, fell back: ${fellBack}, skipped: ${skipped}.`)
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}
