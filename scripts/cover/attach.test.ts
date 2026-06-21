@@ -4,7 +4,7 @@ import { attachCover } from './attach'
 const input = { filePath: 'src/content/writing/a.mdx', slug: 'a', title: 'A', summary: 's', tags: ['ai'] }
 
 describe('attachCover', () => {
-  it('generates, writes hero, stages the PNG, and returns the image path', async () => {
+  it('generates, writes hero, stages the PNG, and returns the image path (setHero before stage)', async () => {
     const generate = vi.fn(async () => ({
       imagePath: '/static/images/blog/a/cover.png',
       alt: 'Cover for A',
@@ -13,8 +13,9 @@ describe('attachCover', () => {
       attempts: 1,
       usedFallback: false,
     }))
-    const setHero = vi.fn()
-    const stage = vi.fn()
+    const callOrder: string[] = []
+    const setHero = vi.fn(() => { callOrder.push('setHero') })
+    const stage = vi.fn(() => { callOrder.push('stage') })
     const path = await attachCover(input, { generate, setHero, stage })
     expect(path).toBe('/static/images/blog/a/cover.png')
     expect(setHero).toHaveBeenCalledWith('src/content/writing/a.mdx', {
@@ -24,6 +25,8 @@ describe('attachCover', () => {
       style: 'line-art',
     })
     expect(stage).toHaveBeenCalledWith('public/static/images/blog/a/cover.png')
+    // setHero must be called before stage so a frontmatter failure leaves a clean git index.
+    expect(callOrder).toEqual(['setHero', 'stage'])
   })
 
   it('is non-fatal: returns null and does not throw when generation fails', async () => {
@@ -51,7 +54,9 @@ describe('attachCover', () => {
     expect(setHero).not.toHaveBeenCalled()
   })
 
-  it('returns null (non-fatal) and does not leave a staged PNG when setHero throws', async () => {
+  it('returns null (non-fatal) and does NOT stage the PNG when setHero throws', async () => {
+    // New ordering: setHero runs BEFORE stage, so a setHero failure leaves the git
+    // index untouched — no staged PNG to clean up, no git reset required.
     const generate = vi.fn(async () => ({
       imagePath: '/static/images/blog/a/cover.png',
       alt: 'Cover for A',
@@ -66,9 +71,8 @@ describe('attachCover', () => {
     const stage = vi.fn()
     const path = await attachCover(input, { generate, setHero, stage })
     expect(path).toBeNull()
-    // stage was called with the PNG path
-    expect(stage).toHaveBeenCalledWith('public/static/images/blog/a/cover.png')
-    // The function returned null — caller does not see the error (non-fatal contract).
-    // Unstaging is handled internally via spawnSync; we verify the overall result.
+    // stage must NOT have been called — setHero failed before we reached it.
+    expect(stage).not.toHaveBeenCalled()
+    // The function returned null — non-fatal contract preserved.
   })
 })

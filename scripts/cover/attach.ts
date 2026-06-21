@@ -1,7 +1,7 @@
-import { spawnSync } from 'node:child_process'
 import { generateCover } from './generate-cover'
 import { setHeroInFile, toHeroPatch } from './frontmatter'
 import { safeLocalImage } from '../../src/lib/cover'
+import { spawnSync } from 'node:child_process'
 
 function gitStage(pngPath: string): void {
   const r = spawnSync('git', ['add', '--', pngPath], { encoding: 'utf8' })
@@ -10,6 +10,8 @@ function gitStage(pngPath: string): void {
 
 // Non-fatal: a cover failure must never abort a draft. Returns the imagePath or
 // null. The MDX hero edit is applied to filePath (which the caller stages after).
+// Order: generate → validate → setHero → stage. If setHero throws, stage is never
+// called, so no git index manipulation is needed on failure.
 export async function attachCover(
   input: { filePath: string; slug: string; title: string; summary?: string; tags: string[] },
   deps: {
@@ -36,14 +38,10 @@ export async function attachCover(
       return null
     }
     const pngPath = `public${safeImage}`
+    // setHero BEFORE stage: if frontmatter mutation fails, no PNG is staged,
+    // so the git index stays clean without needing a git reset cleanup.
+    setHero(input.filePath, toHeroPatch(result))
     stage(pngPath)
-    try {
-      setHero(input.filePath, toHeroPatch(result))
-    } catch (heroErr) {
-      // setHero failed after PNG was staged: unstage to keep state consistent.
-      spawnSync('git', ['reset', '-q', 'HEAD', '--', pngPath], { encoding: 'utf8' })
-      throw heroErr
-    }
     return safeImage
   } catch (err) {
     console.error(`Cover generation failed (non-fatal): ${(err as Error).message}`)

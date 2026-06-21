@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, it, expect, vi, afterEach } from 'vitest'
@@ -126,5 +126,38 @@ describe('generateCover symlink-write safety (real FS)', () => {
     await expect(
       generateCover({ slug: 'evil', title: 'T', tags: ['ai'], publicDir }, d)
     ).rejects.toThrow(/[Ss]ymlink|containment/)
+  })
+
+  it('rejects writing when cover.png itself is a symlink (O_NOFOLLOW)', async () => {
+    // Create temp dirs: publicDir for the blog, and an "outside" dir with a sentinel file.
+    const publicDir = mkdtempSync(join(tmpdir(), 'cover-test-pub-'))
+    const outsideDir = mkdtempSync(join(tmpdir(), 'cover-test-outside-'))
+    temps.push(publicDir, outsideDir)
+
+    // Create the legitimate slug directory so the dir-containment check passes.
+    const slugDir = join(publicDir, 'static', 'images', 'blog', 'my-post')
+    mkdirSync(slugDir, { recursive: true })
+
+    // Write a sentinel value to the outside file so we can confirm it's untouched.
+    const outsideFile = join(outsideDir, 'secret.txt')
+    writeFileSync(outsideFile, 'UNTOUCHED')
+
+    // Plant a symlink AT the final cover.png path pointing to the outside file.
+    symlinkSync(outsideFile, join(slugDir, 'cover.png'))
+
+    const d = {
+      generateImage: vi.fn(async () => Buffer.from('EVIL')),
+      hasText: vi.fn(async () => false),
+      renderFallback: vi.fn(async () => Buffer.from('fallback')),
+      // writeImage not overridden — uses real writeToDisk with O_NOFOLLOW
+    }
+
+    // The write must throw (ELOOP on POSIX when O_NOFOLLOW encounters a symlink).
+    await expect(
+      generateCover({ slug: 'my-post', title: 'T', tags: ['ai'], publicDir }, d)
+    ).rejects.toThrow()
+
+    // The outside file must be untouched — the symlink was not followed.
+    expect(readFileSync(outsideFile, 'utf8')).toBe('UNTOUCHED')
   })
 })

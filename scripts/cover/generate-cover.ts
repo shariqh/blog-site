@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { mkdirSync, realpathSync, openSync, writeSync, closeSync, constants } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 import { buildCoverPrompt, type CoverStyle } from './prompt'
 import { generateImage as defaultGenerate } from './azure'
@@ -38,7 +38,10 @@ function writeToDisk(absPath: string, data: Buffer, realRoot?: string): void {
       )
     }
   }
-  writeFileSync(absPath, data)
+  // O_NOFOLLOW: if absPath itself is a symlink, openSync throws ELOOP.
+  // This prevents a pre-planted cover.png symlink from redirecting the write.
+  const fd = openSync(absPath, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o644)
+  try { writeSync(fd, data) } finally { closeSync(fd) }
 }
 
 const DEFAULTS: CoverDeps = {
@@ -71,7 +74,7 @@ export async function generateCover(
   // the allowed tree (catches traversal in publicDir itself).
   const allowedRoot = resolve(publicDir, 'static/images/blog')
   const resolvedAbs = resolve(absPath)
-  if (!resolvedAbs.startsWith(allowedRoot + '/') && resolvedAbs !== allowedRoot) {
+  if (!resolvedAbs.startsWith(allowedRoot + sep) && resolvedAbs !== allowedRoot) {
     throw new Error(`Path containment violation: "${resolvedAbs}" escapes "${allowedRoot}"`)
   }
 
