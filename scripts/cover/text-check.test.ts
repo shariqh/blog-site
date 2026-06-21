@@ -37,4 +37,12 @@ describe('hasText', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
     expect(await hasText(Buffer.from('img'))).toBe(true)
   })
+  it('fails safe to true when the model returns an unexpected/unparseable body', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply('I cannot assist with that request.')))
+    expect(await hasText(Buffer.from('img'))).toBe(true)
+  })
+  it('fails safe to true when the model returns an empty string', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply('')))
+    expect(await hasText(Buffer.from('img'))).toBe(true)
+  })
 })

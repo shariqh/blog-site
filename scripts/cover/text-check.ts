@@ -31,7 +31,11 @@ export async function hasText(png: Buffer): Promise<boolean> {
     if (!res.ok) return true
     const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
     const answer = (json.choices?.[0]?.message?.content ?? '').trim().toLowerCase()
-    return answer.startsWith('y')
+    if (answer.startsWith('y')) return true
+    if (answer.startsWith('n')) return false
+    // Unparseable verdict (empty, content-filtered, shape-drift) → fail safe:
+    // treat as "has text" so the orchestrator retries rather than shipping a leak.
+    return true
   } catch {
     return true
   }
