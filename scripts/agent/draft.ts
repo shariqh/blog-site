@@ -10,6 +10,7 @@ import { buildYtSystemPrompt, buildYtUserPrompt, renderYtScriptToBlocks } from '
 import { recentChannelStats } from './lib/youtube'
 import { validateMdxFrontmatter, runVale, formatValeReport } from './lib/validate'
 import { createBranchAndPr } from './lib/pr'
+import { attachCover } from '../cover/attach'
 import type { ContentRow, CommitInfo, YTScriptBlocks, YouTubeStat } from './lib/types'
 
 const READY_FILTER = {
@@ -126,6 +127,16 @@ async function draftBlogRow(
   const slug = slugify(row.title)
   const filePath = join('src', 'content', 'writing', `${slug}.mdx`)
   writeFileSync(filePath, mdx)
+
+  // Generate an on-brand cover (non-fatal). Uses row.hint as the subject hint
+  // since ContentRow has no summary field.
+  await attachCover({
+    filePath,
+    slug,
+    title: row.title,
+    summary: row.hint,
+    tags: row.tags,
+  })
 
   // Vale
   const findings = runVale(filePath)

@@ -39,6 +39,7 @@ export const writingSchema = z.object({
       prompt: z.string().optional(),
       background: z.enum(['ink', 'ink-soft', 'ochre', 'terracotta', 'paper']).optional(),
       titleStyle: z.enum(['italic', 'upper-mono', 'serif-display']).optional(),
+      style: z.enum(['line-art', 'conceptual']).optional(),
     })
     .optional(),
   draft: z.boolean().default(false),

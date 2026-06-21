@@ -17,6 +17,8 @@ npm run dev    # http://localhost:4321
 - `npm test` — run unit tests (Vitest)
 - `npm run test:smoke` — Playwright smoke test (requires `npm run build` first)
 - `npm run astro check` — type-check `.astro` files
+- `npm run gen:cover <slug> [--style line-art|conceptual] [--force]` — generate a post's AI cover (Azure `gpt-image-1`)
+- `npm run gen:cover:all [--force]` — backfill AI covers across all posts
 
 ## Authoring posts
 
@@ -26,6 +28,12 @@ time (see `src/content.config.ts`). Tags map to display buckets in
 
 You can write a post by hand (create the MDX, commit, push, open a PR), or
 let the drafting agent write one for you — see [Content workflow](#content-workflow).
+
+Each post gets an on-brand **cover image** — AI-generated via Azure `gpt-image-1`
+and written to `hero.image` — plus a build-time **Open Graph image** (1200×630,
+one per post under `dist/og/`) so shared links preview cleanly. The drafting
+agent covers new posts automatically; `npm run gen:cover` / `gen:cover:all`
+do it by hand.
 
 ## Deploy (Cloudflare Pages via GitHub Actions)
 

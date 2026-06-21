@@ -30,3 +30,9 @@ npm-debug.log*
 
 # Agent local env
 .env.local
+
+# local spike creds (Azure key) — never commit
+.cover-spike.env
+
+# stray subagent report dir (reports normally live in .git/worktrees/*/sdd)
+/sdd/

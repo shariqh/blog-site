@@ -9,6 +9,7 @@ import Youtube from "../../components/mdx/Youtube.astro";
 import Image from "../../components/mdx/Image.astro";
 import { resolveBucket } from "../../lib/buckets";
 import CoverImage from "../../components/CoverImage.astro";
+import { SITE } from "../../lib/site";
 
 export async function getStaticPaths() {
   const posts = await getCollection("writing", ({ data }) => !data.draft);
@@ -25,11 +26,15 @@ const bucket = resolveBucket(post.data.tags);
 const readingMinutes = remarkPluginFrontmatter?.readingTime
   ? Math.ceil(remarkPluginFrontmatter.readingTime / 60)
   : undefined;
+const slug = post.id.replace(/\.mdx$/, "");
+const ogImage = new URL(`/og/${slug}.png`, SITE.url).toString();
 ---
 <BaseLayout
   title={post.data.title}
   description={post.data.summary}
   canonical={post.data.canonical}
+  ogImage={ogImage}
+  ogType="article"
 >
   <article class="pb-16">
     {post.data.hero?.image && (

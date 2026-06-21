@@ -9,7 +9,7 @@ type Cover =
 // backslashes, and percent-encoding (which could smuggle encoded traversal),
 // then validate the BROWSER-NORMALIZED pathname against a strict prefix + raster
 // extension, and return that normalized path (never the raw input) as the src.
-function safeLocalImage(src: string): string | null {
+export function safeLocalImage(src: string): string | null {
   if (!src.startsWith('/') || src.startsWith('//')) return null
   if (/[%\\?#]/.test(src)) return null
   let pathname: string
