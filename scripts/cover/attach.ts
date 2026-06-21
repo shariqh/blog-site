@@ -27,8 +27,8 @@ export async function attachCover(
       summary: input.summary,
       tags: input.tags,
     })
-    setHero(input.filePath, toHeroPatch(result))
     stage(`public${result.imagePath}`)
+    setHero(input.filePath, toHeroPatch(result))
     return result.imagePath
   } catch (err) {
     console.error(`Cover generation failed (non-fatal): ${(err as Error).message}`)
