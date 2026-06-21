@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
 export type OgFont = {
   name: string
@@ -8,7 +8,9 @@ export type OgFont = {
   style: 'normal'
 }
 
-const DIR = fileURLToPath(new URL('../../assets/og/fonts/', import.meta.url))
+// process.cwd() is the project root in both vitest and Astro build contexts,
+// so this path resolves correctly regardless of where the compiled chunk lives.
+const DIR = join(process.cwd(), 'src/assets/og/fonts/')
 
 function read(file: string): Buffer {
   return readFileSync(`${DIR}${file}`)
