@@ -12,7 +12,7 @@ function mark(): OgNode {
   return h(
     'div',
     { style: { display: 'flex', alignItems: 'center', fontFamily: 'JetBrains Mono', fontSize: 24, color: WHITE } },
-    h('div', { style: { color: OCHRE, marginRight: 10 } }, '◆'),
+    h('div', { style: { display: 'flex', color: OCHRE, marginRight: 10 } }, '◆'),
     h('div', { style: { display: 'flex' } }, 'shariq.dev')
   )
 }
