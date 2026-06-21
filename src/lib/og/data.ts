@@ -41,7 +41,9 @@ export function loadCoverDataUri(image: string | undefined): string | null {
 
 export function buildOgData(post: CollectionEntry<'writing'>): OgData {
   const bucket = resolveBucket(post.data.tags)
-  const minutes = Math.max(1, Math.ceil(readingTime(post.body).minutes))
+  // post.body ?? '' — file-based MDX always has a body, but cover generation
+  // reuses buildOgData and may pass a synthetic entry; degrade instead of throw.
+  const minutes = Math.max(1, Math.ceil(readingTime(post.body ?? '').minutes))
   const dateLabel = post.data.date.toLocaleString('en-US', {
     month: 'short',
     year: 'numeric',
