@@ -2,7 +2,7 @@ import { getVisionConfig } from './config'
 
 const API_VERSION = '2024-10-21'
 const QUESTION =
-  'Does this image contain any readable text, letters, words, or numbers? Answer with only "yes" or "no".'
+  'Does this image contain READABLE WORDS, captions, labels, headlines, or full sentences — actual spelled-out prose text a person could read (for example a word written on an object, a sign, or a caption)? Answer NO for logos and brand marks, code symbols like </> or {}, abstract or illegible squiggles meant to suggest code, single decorative letters, and numbers that are part of an icon or logo. Answer YES only if there is legible word-text that would visually compete with a title. Reply with only "yes" or "no".'
 
 // Provider-agnostic in spirit: the agent MAY swap this for its in-process Claude
 // vision. The default uses an Azure gpt-4o-mini chat-completions vision call.
