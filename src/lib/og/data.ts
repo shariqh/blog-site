@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import readingTime from 'reading-time'
 import type { CollectionEntry } from 'astro:content'
 import { resolveBucket } from '../buckets'
@@ -21,6 +21,8 @@ const MIME: Record<string, string> = {
   avif: 'image/avif',
 }
 
+const MAX_COVER_BYTES = 5 * 1024 * 1024 // 5 MB
+
 // Validate via the shared guard, then read the file from /public and inline it
 // as a data URI (Satori has no filesystem access). Any failure → null → caller
 // falls back to the branded template. Never reads an unvalidated path.
@@ -32,7 +34,15 @@ export function loadCoverDataUri(image: string | undefined): string | null {
   const mime = MIME[ext]
   if (!mime) return null
   try {
-    const bytes = readFileSync(`${process.cwd()}/public${safe}`)
+    const absPath = `${process.cwd()}/public${safe}`
+    // Symlink containment: real path must stay inside public/static/images/
+    const allowedBase = realpathSync(`${process.cwd()}/public/static/images`)
+    const realAbs = realpathSync(absPath)
+    if (!realAbs.startsWith(allowedBase + '/') && realAbs !== allowedBase) return null
+    // Size cap: don't inline oversized assets
+    const stat = statSync(realAbs)
+    if (stat.size > MAX_COVER_BYTES) return null
+    const bytes = readFileSync(realAbs)
     return `data:${mime};base64,${bytes.toString('base64')}`
   } catch {
     return null

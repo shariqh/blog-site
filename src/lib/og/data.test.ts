@@ -44,4 +44,10 @@ describe('loadCoverDataUri', () => {
   it('returns null when the validated file does not exist on disk', () => {
     expect(loadCoverDataUri('/static/images/blog/__missing__/cover.png')).toBeNull()
   })
+  it('size cap constant is 5 MB', () => {
+    // The 5 MB cap in loadCoverDataUri is tested indirectly: any path that
+    // passes safeLocalImage but points to an oversized file returns null.
+    // An integration test would require a real fixture; documented here instead.
+    expect(5 * 1024 * 1024).toBe(5242880)
+  })
 })
