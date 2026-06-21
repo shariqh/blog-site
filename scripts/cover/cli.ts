@@ -46,10 +46,12 @@ async function main(): Promise<void> {
   }
 
   console.log(`Generating cover for ${slug} …`)
+  const coverInput = coverInputFromFrontmatter(fm.data, slug)
   const result = await generateCover({
     slug,
-    ...coverInputFromFrontmatter(fm.data, slug),
-    style,
+    ...coverInput,
+    // Precedence: CLI flag > frontmatter hero.style > bucket default (in generateCover)
+    style: style ?? coverInput.style,
   })
   setHeroInFile(filePath, toHeroPatch(result))
   console.log(

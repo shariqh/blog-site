@@ -23,11 +23,14 @@ export function toHeroPatch(result: CoverResult): HeroPatch {
 export function coverInputFromFrontmatter(
   data: Record<string, unknown>,
   slug: string
-): { title: string; summary?: string; tags: string[] } {
+): { title: string; summary?: string; tags: string[]; style?: 'line-art' | 'conceptual' } {
+  const heroStyle = (data.hero as Record<string, unknown> | undefined)?.style
   return {
     title: String(data.title ?? slug),
     summary: typeof data.summary === 'string' ? data.summary : undefined,
     tags: Array.isArray(data.tags) ? data.tags.filter((t): t is string => typeof t === 'string') : [],
+    style:
+      heroStyle === 'line-art' || heroStyle === 'conceptual' ? heroStyle : undefined,
   }
 }
 

@@ -73,7 +73,7 @@ for (const slug of SLUGS) {
 
 test('blog post exposes OG image meta and the PNG is built', async ({ page }) => {
   const slug = 'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
-  await page.goto(`/blog/${slug}/`)
+  await page.goto(`/blog/${slug}`)
 
   const ogImage = page.locator('meta[property="og:image"]')
   await expect(ogImage).toHaveAttribute('content', new RegExp(`/og/${slug}\\.png$`))

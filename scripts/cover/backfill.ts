@@ -30,6 +30,7 @@ export type BackfillDeps = {
     title: string
     summary?: string
     tags: string[]
+    style?: 'line-art' | 'conceptual'
   }) => Promise<CoverResult>
   setHero: (filePath: string, hero: HeroPatch) => void
 }
@@ -64,9 +65,12 @@ export async function runBackfill(
     }
     try {
       console.log(`→ ${slug}: generating …`)
+      const coverInput = coverInputFromFrontmatter(fm.data, slug)
       const result = await deps.generateCover({
         slug,
-        ...coverInputFromFrontmatter(fm.data, slug),
+        ...coverInput,
+        // Honor frontmatter hero.style when present; bucket default applies when undefined.
+        style: coverInput.style,
       })
       deps.setHero(filePath, toHeroPatch(result))
       made++

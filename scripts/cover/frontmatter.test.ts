@@ -95,4 +95,16 @@ describe('coverInputFromFrontmatter', () => {
   it('filters out non-string elements from tags array', () => {
     expect(coverInputFromFrontmatter({ tags: ['ai', 42, null, 'engineering'] }, 's').tags).toEqual(['ai', 'engineering'])
   })
+
+  it('returns hero.style when it is a valid cover style', () => {
+    expect(coverInputFromFrontmatter({ hero: { style: 'line-art' }, tags: [] }, 's').style).toBe('line-art')
+    expect(coverInputFromFrontmatter({ hero: { style: 'conceptual' }, tags: [] }, 's').style).toBe('conceptual')
+  })
+
+  it('returns undefined for style when hero.style is absent or invalid', () => {
+    expect(coverInputFromFrontmatter({ tags: [] }, 's').style).toBeUndefined()
+    expect(coverInputFromFrontmatter({ hero: {} }, 's').style).toBeUndefined()
+    expect(coverInputFromFrontmatter({ hero: { style: 'unknown' }, tags: [] }, 's').style).toBeUndefined()
+    expect(coverInputFromFrontmatter({ hero: { style: 42 }, tags: [] }, 's').style).toBeUndefined()
+  })
 })
