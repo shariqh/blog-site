@@ -7,12 +7,15 @@ const TERRACOTTA = '#b04a3a'
 const PAPER = '#f3e8d2'
 const WHITE = '#ffffff'
 
-// The mark: "◆ shariq.dev" with an ochre diamond.
+// The mark: "◆ shariq.dev" — the diamond is a rotated square div (a font glyph
+// would be a missing-glyph box, since the vendored fonts lack U+25C6).
 function mark(): OgNode {
   return h(
     'div',
     { style: { display: 'flex', alignItems: 'center', fontFamily: 'JetBrains Mono', fontSize: 24, color: WHITE } },
-    h('div', { style: { display: 'flex', color: OCHRE, marginRight: 10 } }, '◆'),
+    h('div', {
+      style: { display: 'flex', width: 13, height: 13, marginRight: 13, background: OCHRE, transform: 'rotate(45deg)' },
+    }),
     h('div', { style: { display: 'flex' } }, 'shariq.dev')
   )
 }
