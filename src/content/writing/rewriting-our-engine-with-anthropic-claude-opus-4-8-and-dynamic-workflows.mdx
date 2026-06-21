@@ -1,9 +1,47 @@
 ---
-title: "Rewriting Our Engine with Anthropic's Claude Opus 4.8 and Dynamic Workflows"
+title: Rewriting Our Engine with Anthropic's Claude Opus 4.8 and Dynamic Workflows
 date: '2026-06-08'
-tags: ['ai', 'engineering', 'claude']
-summary: "I rewrote lognote's engine from Python to Swift one module at a time — built with Anthropic's Claude Opus 4.8 through Claude Code and dynamic multi-agent workflows, with the old Python pipeline as a byte-for-byte reference and a different frontier model reviewing every PR."
+tags:
+  - ai
+  - engineering
+  - claude
+summary: >-
+  I rewrote lognote's engine from Python to Swift one module at a time — built
+  with Anthropic's Claude Opus 4.8 through Claude Code and dynamic multi-agent
+  workflows, with the old Python pipeline as a byte-for-byte reference and a
+  different frontier model reviewing every PR.
 draft: false
+hero:
+  image: >-
+    /static/images/blog/rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows/cover.png
+  alt: >-
+    Cover illustration for "Rewriting Our Engine with Anthropic's Claude Opus
+    4.8 and Dynamic Workflows".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Concept: Rewriting Our Engine with Anthropic's Claude Opus 4.8 and Dynamic
+    Workflows. I rewrote lognote's engine from Python to Swift one module at a
+    time — built with Anthropic's Claude Opus 4.8 through Claude Code and
+    dynamic multi-agent workflows, with the old Python pipeline as a
+    byte-for-byte reference and a different frontier model reviewing every PR.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, captions, labels, headlines, sentences, or
+    paragraphs — the image must contain no legible prose text, because a title
+    will be overlaid afterward. Stylized logos, app or screen UI, code symbols,
+    and abstract mark-making are fine as long as they are not spelled-out words.
+    No photorealistic human faces. Wide 3:2 landscape composition with
+    deliberate empty negative space in the LEFT third so a title can be overlaid
+    later.
+  style: line-art
 ---
 
 [lognote](https://lognote.dev/?utm_source=shariq.dev&utm_medium=blog&utm_campaign=engine-rewrite) records both sides of a meeting on your Mac, transcribes it on-device, and writes the notes into your own vault. For most of its life the part that did the work, the transcription and summarization engine, was Python. It leaned on MLX-Whisper, a couple of large vendor SDKs, and a 1.2GB virtual environment to do its job.
