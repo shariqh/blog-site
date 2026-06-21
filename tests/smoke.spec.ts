@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 function walkMdx(dir: string, prefix = ''): string[] {
@@ -70,3 +70,15 @@ for (const slug of SLUGS) {
     await expect(page.locator('h1').first()).toBeVisible()
   })
 }
+
+test('blog post exposes OG image meta and the PNG is built', async ({ page }) => {
+  const slug = 'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
+  await page.goto(`/blog/${slug}/`)
+
+  const ogImage = page.locator('meta[property="og:image"]')
+  await expect(ogImage).toHaveAttribute('content', new RegExp(`/og/${slug}\\.png$`))
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute('content', '1200')
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image')
+
+  expect(existsSync(`dist/og/${slug}.png`)).toBe(true)
+})
