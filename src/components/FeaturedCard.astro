@@ -22,7 +22,7 @@ const cover = coverData ? resolveCover(coverData) : null;
     {cover && cover.kind === "image" ? (
       <img class="art-img" src={cover.src} alt={cover.alt} loading="lazy" decoding="async" />
     ) : (
-      <svg width="230" height="180" viewBox="0 0 230 180" fill="none" stroke="var(--color-terracotta)" stroke-width="2.5">
+      <svg width="230" height="180" viewBox="0 0 230 180" fill="none" stroke="var(--color-terracotta)" stroke-width="2.5" aria-hidden="true">
         <circle cx="62" cy="62" r="30"></circle>
         <circle cx="158" cy="116" r="22" fill="var(--color-ochre)" stroke="none"></circle>
         <path d="M30 138 q42 -52 94 -22 t76 -30" stroke="var(--color-ink)"></path>
