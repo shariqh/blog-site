@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync, openSync, writeSync, closeSync, constants } from 'node:fs'
+import { mkdirSync, realpathSync, openSync, writeFileSync, closeSync, constants } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 import { buildCoverPrompt, type CoverStyle } from './prompt'
 import { generateImage as defaultGenerate } from './azure'
@@ -41,7 +41,9 @@ function writeToDisk(absPath: string, data: Buffer, realRoot?: string): void {
   // O_NOFOLLOW: if absPath itself is a symlink, openSync throws ELOOP.
   // This prevents a pre-planted cover.png symlink from redirecting the write.
   const fd = openSync(absPath, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o644)
-  try { writeSync(fd, data) } finally { closeSync(fd) }
+  // writeFileSync(fd, ...) writes the whole buffer (loops internally), unlike a
+  // single writeSync which may short-write and silently truncate a large PNG.
+  try { writeFileSync(fd, data) } finally { closeSync(fd) }
 }
 
 const DEFAULTS: CoverDeps = {
