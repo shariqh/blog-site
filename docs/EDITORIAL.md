@@ -99,7 +99,7 @@ Every post in `src/content/writing/*.mdx` has frontmatter validated by Zod at bu
 
 Optional:
 
-- `hero` — image + alt + optional generation prompt. The drafting agent (Plan B) fills this. v1 posts can ship heroless.
+- `hero` — the cover image (`image` + `alt`, plus the generation `prompt` and an optional `style`). Covers are **AI-generated** (Azure `gpt-image-1`): the drafting agent fills `hero.image` automatically, and `hero.style` (`line-art` | `conceptual`) overrides the look. Curate the result before publishing — regenerate or pin a different image if it misses.
 - `canonical` — if the post is syndicated elsewhere (e.g., a Coreworx blog crosspost), point to the canonical URL.
 - `draft` — set to `true` to keep a WIP out of production. The build excludes drafts from listings and from `/feed.xml`.
 
@@ -114,6 +114,7 @@ Before a post lands on master (`draft: false`), run through:
 - [ ] **AI-tell sweep:** Vale clean on warnings + suggestions for the post file. (Errors block merge.)
 - [ ] **Length matches bucket** (see Length section above).
 - [ ] **Frontmatter complete:** title / date / summary / tags. Hero optional. Canonical if syndicated.
+- [ ] **Cover image** is on-brand and topic-relevant — AI covers are curated, not auto-trusted.
 - [ ] **Read it aloud** or have someone else read it. If you stumble, the sentence is wrong.
 - [ ] **Vercel/Cloudflare preview reviewed.** Spot-check on mobile.
 
