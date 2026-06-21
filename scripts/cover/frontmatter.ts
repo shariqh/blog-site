@@ -27,7 +27,7 @@ export function coverInputFromFrontmatter(
   return {
     title: String(data.title ?? slug),
     summary: typeof data.summary === 'string' ? data.summary : undefined,
-    tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
+    tags: Array.isArray(data.tags) ? data.tags.filter((t): t is string => typeof t === 'string') : [],
   }
 }
 

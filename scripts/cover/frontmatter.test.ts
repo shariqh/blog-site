@@ -92,4 +92,7 @@ describe('coverInputFromFrontmatter', () => {
     expect(coverInputFromFrontmatter({ tags: 'not-array' }, 's').tags).toEqual([])
     expect(coverInputFromFrontmatter({}, 's').tags).toEqual([])
   })
+  it('filters out non-string elements from tags array', () => {
+    expect(coverInputFromFrontmatter({ tags: ['ai', 42, null, 'engineering'] }, 's').tags).toEqual(['ai', 'engineering'])
+  })
 })
