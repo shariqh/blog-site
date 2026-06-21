@@ -26,6 +26,7 @@ async function main(): Promise<void> {
   let made = 0
   let skipped = 0
   let fellBack = 0
+  let failed = 0
 
   for (const filePath of files) {
     const fm = matter(readFileSync(filePath, 'utf8'))
@@ -39,25 +40,31 @@ async function main(): Promise<void> {
       skipped++
       continue
     }
-    console.log(`→ ${slug}: generating …`)
-    const result = await generateCover({
-      slug,
-      title: String(fm.data.title ?? slug),
-      summary: typeof fm.data.summary === 'string' ? fm.data.summary : undefined,
-      tags: Array.isArray(fm.data.tags) ? (fm.data.tags as string[]) : [],
-    })
-    setHeroInFile(filePath, {
-      image: result.imagePath,
-      alt: result.alt,
-      prompt: result.prompt,
-      style: result.style,
-    })
-    made++
-    if (result.usedFallback) fellBack++
-    console.log(`  ✓ ${result.style}${result.usedFallback ? ' (fallback)' : ''}`)
+    try {
+      console.log(`→ ${slug}: generating …`)
+      const result = await generateCover({
+        slug,
+        title: String(fm.data.title ?? slug),
+        summary: typeof fm.data.summary === 'string' ? fm.data.summary : undefined,
+        tags: Array.isArray(fm.data.tags) ? (fm.data.tags as string[]) : [],
+      })
+      setHeroInFile(filePath, {
+        image: result.imagePath,
+        alt: result.alt,
+        prompt: result.prompt,
+        style: result.style,
+      })
+      made++
+      if (result.usedFallback) fellBack++
+      console.log(`  ✓ ${result.style}${result.usedFallback ? ' (fallback)' : ''}`)
+    } catch (err) {
+      console.error(`  ✗ ${slug}: ${err instanceof Error ? err.message : String(err)}`)
+      failed++
+    }
   }
 
-  console.log(`\nDone. Generated: ${made}, fell back: ${fellBack}, skipped: ${skipped}.`)
+  console.log(`\nDone. Generated: ${made}, fell back: ${fellBack}, skipped: ${skipped}, failed: ${failed}.`)
+  if (failed > 0) process.exit(1)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
