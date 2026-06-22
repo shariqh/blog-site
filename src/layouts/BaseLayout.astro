@@ -14,6 +14,7 @@ interface Props {
   width?: 'prose' | 'wide'
   ogImage?: string
   ogType?: 'website' | 'article'
+  jsonLd?: object | object[]
 }
 
 const {
@@ -23,6 +24,7 @@ const {
   width = 'prose',
   ogImage,
   ogType = 'website',
+  jsonLd,
 } = Astro.props;
 const fullTitle = title ? `${title} — ${SITE.title}` : SITE.title;
 const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
@@ -56,6 +58,10 @@ const ogImageUrl = ogImage ? new URL(ogImage, SITE.url).toString() : undefined;
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:image" content={ogImageUrl} />
       </>
+    )}
+
+    {jsonLd && (
+      <script type="application/ld+json" set:html={JSON.stringify(Array.isArray(jsonLd) ? jsonLd : [jsonLd])} />
     )}
 
     <!-- GoatCounter — privacy-friendly analytics (no cookies, no PII).
