@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
+import { SITE } from "../lib/site";
 
 // "Off the clock" photo wall — auto-scrolls horizontally and loops seamlessly.
 // Add as many as you like here; the strip just gets longer.
@@ -82,7 +83,7 @@ const tools = [
   </section>
 
   <!-- CURRENTLY + STACK -->
-  <section class="sec" style="border-bottom:none">
+  <section class="sec">
     <div class="now-grid">
       <div class="now">
         <h3>Currently building</h3>
@@ -98,6 +99,34 @@ const tools = [
             </span>
           ))}
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORK WITH ME -->
+  <section class="sec work-cta" style="border-bottom:none;">
+    <span class="mono-label">Work with me</span>
+    <div class="cta-inner">
+      <h2 class="cta-heading">
+        Got a hard engineering problem,<br />
+        or a team that needs to ship faster?
+      </h2>
+      <p class="cta-body">
+        I'm a Senior Solutions Engineer at GitHub with 10+ years across distributed systems,
+        platform architecture, and technical leadership. I work with teams on the AI shift —
+        building agentic tooling that actually holds up in production, not just in demos.
+        If you're looking for a technical collaborator, advisor, or just want to talk through
+        a hard problem, I'm open to the conversation.
+      </p>
+      <div class="cta-actions">
+        <a href={`mailto:${SITE.email}`} class="cta-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          {SITE.email}
+        </a>
+        <a href={SITE.social.twitter} target="_blank" rel="noopener noreferrer" class="cta-secondary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.26 5.632zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          @ShariqHirani on X
+        </a>
       </div>
     </div>
   </section>
@@ -392,5 +421,52 @@ const tools = [
     * { animation: none !important; }
     .otc .marquee { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
     .otc .photo { transform: none !important; }
+  }
+
+  /* work with me CTA */
+  .work-cta { padding: 72px 0; }
+  .cta-inner { max-width: 56ch; }
+  .cta-heading {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 32px;
+    line-height: 1.15;
+    letter-spacing: -.02em;
+    margin-bottom: 18px;
+  }
+  .cta-body {
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--fg-soft);
+    margin-bottom: 28px;
+  }
+  .cta-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .cta-primary,
+  .cta-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    text-decoration: none;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .cta-primary {
+    background: var(--color-ink);
+    color: var(--color-paper);
+    border: 1px solid var(--color-ink);
+  }
+  .cta-primary:hover { background: var(--color-ochre); border-color: var(--color-ochre); color: var(--color-ink); }
+  .cta-secondary {
+    background: none;
+    color: inherit;
+    border: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+  }
+  .cta-secondary:hover { border-color: var(--color-ochre); color: var(--color-ochre); }
+  @media (prefers-reduced-motion: reduce) {
+    .cta-primary,
+    .cta-secondary { transition: none; }
   }
 </style>
