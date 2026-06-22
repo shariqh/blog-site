@@ -1,14 +1,20 @@
 {
-  "name": "",
-  "short_name": "",
+  "name": "Shariq Hirani",
+  "short_name": "Shariq",
   "icons": [
     {
-      "src": "/android-chrome-96x96.png",
+      "src": "/static/favicons/android-chrome-96x96.png",
       "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/favicons/favicon-32x32.png",
+      "sizes": "32x32",
       "type": "image/png"
     }
   ],
-  "theme_color": "#000000",
-  "background_color": "#000000",
-  "display": "standalone"
+  "theme_color": "#d49a3a",
+  "background_color": "#f3e8d2",
+  "display": "standalone",
+  "start_url": "/"
 }

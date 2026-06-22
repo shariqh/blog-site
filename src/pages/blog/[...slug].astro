@@ -10,6 +10,8 @@ import Image from "../../components/mdx/Image.astro";
 import { resolveBucket } from "../../lib/buckets";
 import CoverImage from "../../components/CoverImage.astro";
 import { SITE } from "../../lib/site";
+import ShareFooter from "../../components/ShareFooter.astro";
+import ReadNext from "../../components/ReadNext.astro";
 
 export async function getStaticPaths() {
   const posts = await getCollection("writing", ({ data }) => !data.draft);
@@ -28,6 +30,38 @@ const readingMinutes = remarkPluginFrontmatter?.readingTime
   : undefined;
 const slug = post.id.replace(/\.mdx$/, "");
 const ogImage = new URL(`/og/${slug}.png`, SITE.url).toString();
+const postUrl = new URL(`/blog/${slug}`, SITE.url).toString();
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": post.data.title,
+    "description": post.data.summary,
+    "datePublished": post.data.date.toISOString(),
+    "author": {
+      "@type": "Person",
+      "name": "Shariq Hirani",
+      "url": SITE.url,
+    },
+    "image": ogImage,
+    "mainEntityOfPage": postUrl,
+    "keywords": post.data.tags.join(", "),
+    "publisher": {
+      "@type": "Person",
+      "name": "Shariq Hirani",
+      "url": SITE.url,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": SITE.url },
+      { "@type": "ListItem", "position": 2, "name": "Blog", "item": new URL("/blog", SITE.url).toString() },
+      { "@type": "ListItem", "position": 3, "name": post.data.title, "item": postUrl },
+    ],
+  },
+];
 ---
 <BaseLayout
   title={post.data.title}
@@ -35,8 +69,9 @@ const ogImage = new URL(`/og/${slug}.png`, SITE.url).toString();
   canonical={post.data.canonical}
   ogImage={ogImage}
   ogType="article"
+  jsonLd={jsonLd}
 >
-  <article class="pb-16">
+  <article class="relative pb-2">
     {post.data.hero?.image && (
       <div class="post-cover">
         <CoverImage data={post.data} priority />
@@ -65,7 +100,20 @@ const ogImage = new URL(`/og/${slug}.png`, SITE.url).toString();
         </a>
       </p>
     )}
+
+    <ShareFooter
+      url={post.data.canonical ?? new URL(`/blog/${slug}`, SITE.url).toString()}
+      title={post.data.title}
+      xHandle="ShariqHirani"
+      feedUrl="/feed.xml"
+    />
   </article>
+  <ReadNext
+    currentSlug={slug}
+    currentBucket={bucket.key}
+    currentTags={post.data.tags}
+    currentDate={post.data.date}
+  />
 </BaseLayout>
 
 <style>

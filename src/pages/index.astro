@@ -7,13 +7,35 @@ import { HOME } from "../lib/home";
 import { active, safeHref } from "../lib/projects";
 import { pickFeatured } from "../lib/featured";
 import { resolveBucket } from "../lib/buckets";
+import { SITE } from "../lib/site";
 
 const all = await getCollection("writing", ({ data }) => !data.draft);
 const featured = pickFeatured(all);
 const fb = featured ? resolveBucket(featured.data.tags) : null;
 const m = HOME.manifesto;
+const homeLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "url": SITE.url,
+    "name": SITE.title,
+    "description": SITE.description,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": SITE.author,
+    "url": SITE.url,
+    "sameAs": [
+      SITE.social.twitter,
+      SITE.social.github,
+      SITE.social.linkedin,
+      SITE.social.youtube,
+    ],
+  },
+];
 ---
-<BaseLayout width="wide">
+<BaseLayout width="wide" jsonLd={homeLd}>
   <!-- HERO -->
   <section class="hero">
     <div class="herotext">

@@ -10,25 +10,70 @@ const { buckets } = Astro.props;
 </div>
 
 <script>
-  document.querySelectorAll<HTMLElement>("[data-filters]").forEach((bar) => {
-    const pills = [...bar.querySelectorAll<HTMLButtonElement>(".pill")];
+  // Apply `key` to one filter bar: toggle pills, show/hide cards, update the
+  // empty state, and optionally push history. Re-queries the bar's DOM each
+  // call so it works whether invoked from init, a click, or popstate.
+  function applyFilter(bar: HTMLElement, key: string, pushState: boolean) {
     const scope = bar.closest("[data-filter-scope]");
     if (!scope) return;
+    const pills = [...bar.querySelectorAll<HTMLButtonElement>(".pill")];
     const cards = [...scope.querySelectorAll<HTMLElement>("[data-bucket]")];
-    bar.addEventListener("click", (e) => {
-      const pill = (e.target as HTMLElement).closest<HTMLButtonElement>(".pill");
-      if (!pill) return;
-      const key = pill.dataset.filter!;
-      pills.forEach((p) => {
-        const on = p === pill
-        p.classList.toggle("active", on)
-        p.setAttribute("aria-pressed", String(on))
-      });
-      cards.forEach((c) => {
-        c.style.display = key === "all" || c.dataset.bucket === key ? "" : "none";
+    const emptyMsg = scope.querySelector<HTMLElement>("[data-filter-empty]");
+    const validKeys = pills.map((p) => p.dataset.filter!);
+    const target = validKeys.includes(key) ? key : "all";
+
+    pills.forEach((p) => {
+      const on = p.dataset.filter === target;
+      p.classList.toggle("active", on);
+      p.setAttribute("aria-pressed", String(on));
+    });
+
+    let anyVisible = false;
+    cards.forEach((c) => {
+      const show = target === "all" || c.dataset.bucket === target;
+      c.dataset.hidden = show ? "" : "true";
+      if (show) anyVisible = true;
+    });
+
+    if (emptyMsg) {
+      emptyMsg.hidden = anyVisible;
+      if (!anyVisible) {
+        const pill = pills.find((p) => p.dataset.filter === target);
+        emptyMsg.textContent = `No posts in ${pill?.textContent?.trim() ?? target} yet.`;
+      }
+    }
+
+    if (pushState) {
+      const url = new URL(window.location.href);
+      if (target === "all") url.searchParams.delete("tag");
+      else url.searchParams.set("tag", target);
+      window.history.pushState({ filter: target }, "", url.toString());
+    }
+  }
+
+  const tagFromUrl = () => new URLSearchParams(window.location.search).get("tag") ?? "all";
+  const eachBar = (fn: (bar: HTMLElement) => void) =>
+    document.querySelectorAll<HTMLElement>("[data-filters]").forEach(fn);
+
+  // Per page-load: apply the URL's filter and bind the click handler. The
+  // listener lives on `bar`, which is swapped out on view-transition
+  // navigation, so it never accumulates across pages.
+  function initFilterPills() {
+    eachBar((bar) => {
+      applyFilter(bar, tagFromUrl(), false);
+      bar.addEventListener("click", (e) => {
+        const pill = (e.target as HTMLElement).closest<HTMLButtonElement>(".pill");
+        if (pill) applyFilter(bar, pill.dataset.filter!, true);
       });
     });
-  });
+  }
+
+  // Runs once on load. (Site-wide view transitions are deferred; when they
+  // land, this moves to an astro:page-load listener.)
+  initFilterPills();
+
+  // Back/forward: re-sync every bar from the URL. Bound once at module scope.
+  window.addEventListener("popstate", () => eachBar((bar) => applyFilter(bar, tagFromUrl(), false)));
 </script>
 
 <style>
@@ -39,4 +84,5 @@ const { buckets } = Astro.props;
   }
   .pill.active { background: var(--color-terracotta); border-color: var(--color-terracotta); color: var(--color-paper); opacity: 1; }
   .pill:not(.active):hover { border-color: var(--fg); opacity: 1; }
+  [data-bucket][data-hidden="true"] { display: none; }
 </style>
