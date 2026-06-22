@@ -62,7 +62,13 @@ const ogImageUrl = ogImage ? new URL(ogImage, SITE.url).toString() : undefined;
     )}
 
     {jsonLd && (
-      <script type="application/ld+json" set:html={JSON.stringify(Array.isArray(jsonLd) ? jsonLd : [jsonLd])} />
+      <script
+        type="application/ld+json"
+        set:html={JSON.stringify(Array.isArray(jsonLd) ? jsonLd : [jsonLd])
+          .replace(/</g, "\\u003c")
+          .replace(/>/g, "\\u003e")
+          .replace(/&/g, "\\u0026")}
+      />
     )}
 
     <ClientRouter />

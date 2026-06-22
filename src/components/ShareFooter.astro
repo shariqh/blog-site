@@ -83,8 +83,9 @@ const xFollowUrl = `https://x.com/${xHandle}`;
     }
   }
 
-  // Init on first load AND on view-transition navigation
-  initShare();
+  // `astro:page-load` fires on initial load + every view-transition nav, so
+  // binding here alone avoids double-binding the buttons' click handlers on
+  // first load (initShare() is not idempotent).
   document.addEventListener("astro:page-load", initShare);
 </script>
 
