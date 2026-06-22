@@ -249,11 +249,23 @@ Add `jsonLd?: object | object[]` to the Props interface. Add destructuring `cons
 
 ```html
 {jsonLd && (
-      <script type="application/ld+json" set:html={JSON.stringify(Array.isArray(jsonLd) ? jsonLd : [jsonLd])} />
+      <script
+        type="application/ld+json"
+        set:html={JSON.stringify(Array.isArray(jsonLd) ? jsonLd : [jsonLd])
+          .replace(/</g, "\\u003c")
+          .replace(/>/g, "\\u003e")
+          .replace(/&/g, "\\u0026")}
+      />
     )}
 ```
 
-Note: Astro's `set:html` directive passes raw HTML without escaping — correct for JSON-LD.
+Escape `<`, `>`, `&` to their `\uXXXX` forms before `set:html`. `JSON.stringify`
+does not escape these, so without this a post title/summary/tag containing
+`</script>` would break out of the script tag (stored XSS). The JSON parser
+decodes the escapes back, so the structured data is unchanged.
+
+(Astro's `set:html` passes raw HTML through unescaped — which is exactly why the
+`\uXXXX` escaping above is required, not optional, here.)
 
 - [ ] **Step 2: Emit BlogPosting + BreadcrumbList on post page**
 
@@ -541,8 +553,10 @@ const xFollowUrl = `https://x.com/${xHandle}`;
     }
   }
 
-  // Init on first load AND on view-transition navigation
-  initShare();
+  // `astro:page-load` fires on the initial load AND after every view-transition
+  // navigation, so binding here alone covers both. Do NOT also call initShare()
+  // directly — it is not idempotent, so a direct call would double-bind the
+  // buttons' click handlers on first load.
   document.addEventListener("astro:page-load", initShare);
 </script>
 
@@ -943,18 +957,21 @@ Read `src/components/FilterPills.astro`. Replace the entire `<script>` block wit
         applyFilter(pill.dataset.filter!, true);
       });
 
-      // Handle browser back/forward
-      window.addEventListener("popstate", (e) => {
-        const key = (e.state as { filter?: string } | null)?.filter
-          ?? new URLSearchParams(window.location.search).get("tag")
-          ?? "all";
-        applyFilter(validKeys.includes(key) ? key : "all", false);
-      });
     });
   }
 
-  // Init on first load + view-transition navigation
-  initFilterPills();
+  // Back/forward. As-built (FilterPills.astro): hoist this to MODULE scope so it
+  // binds once — `window` survives view-transition navigation, so binding it
+  // inside initFilterPills() would leak a popstate listener on every navigation.
+  // On fire, re-sync each [data-filters] bar from the URL's ?tag=.
+  window.addEventListener("popstate", () => {
+    document.querySelectorAll<HTMLElement>("[data-filters]").forEach((bar) =>
+      applyFilter(bar, new URLSearchParams(window.location.search).get("tag") ?? "all", false)
+    );
+  });
+
+  // astro:page-load fires on initial load + every navigation, so this alone
+  // covers both; a direct initFilterPills() call too would double-bind on load.
   document.addEventListener("astro:page-load", initFilterPills);
 </script>
 ```
@@ -1122,7 +1139,8 @@ Replace the current script block with:
     }
   }
 
-  initCopyButtons();
+  // astro:page-load fires on initial load + every navigation; initCopyButtons
+  // is idempotent, but a direct call too would still run it twice on first load.
   document.addEventListener("astro:page-load", initCopyButtons);
 </script>
 ```
