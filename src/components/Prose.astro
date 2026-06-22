@@ -77,34 +77,40 @@
   // Add a one-click "Copy" button to every code block in the prose.
   // Skip when the Clipboard API is unavailable (insecure contexts / old
   // browsers) so we never inject a button that throws on click.
-  const canCopy = typeof navigator.clipboard?.writeText === "function";
-  if (canCopy) for (const pre of document.querySelectorAll(".prose pre")) {
-    if (pre.querySelector(".copy-btn")) continue;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "copy-btn";
-    btn.setAttribute("aria-label", "Copy code to clipboard");
-    btn.textContent = "Copy";
-    btn.addEventListener("click", () => {
-      const code = pre.querySelector("code");
-      const text = ((code && code.textContent) || "").replace(/\n$/, "");
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          btn.textContent = "Copied";
-          btn.classList.add("copied");
-          setTimeout(() => {
-            btn.textContent = "Copy";
-            btn.classList.remove("copied");
-          }, 1600);
-        })
-        .catch(() => {
-          btn.textContent = "Failed";
-          setTimeout(() => {
-            btn.textContent = "Copy";
-          }, 1600);
-        });
-    });
-    pre.appendChild(btn);
+  function initCopyButtons() {
+    const canCopy = typeof navigator.clipboard?.writeText === "function";
+    if (!canCopy) return;
+    for (const pre of document.querySelectorAll(".prose pre")) {
+      if (pre.querySelector(".copy-btn")) continue;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "copy-btn";
+      btn.setAttribute("aria-label", "Copy code to clipboard");
+      btn.textContent = "Copy";
+      btn.addEventListener("click", () => {
+        const code = pre.querySelector("code");
+        const text = ((code && code.textContent) || "").replace(/\n$/, "");
+        navigator.clipboard
+          .writeText(text)
+          .then(() => {
+            btn.textContent = "Copied";
+            btn.classList.add("copied");
+            setTimeout(() => {
+              btn.textContent = "Copy";
+              btn.classList.remove("copied");
+            }, 1600);
+          })
+          .catch(() => {
+            btn.textContent = "Failed";
+            setTimeout(() => {
+              btn.textContent = "Copy";
+            }, 1600);
+          });
+      });
+      pre.appendChild(btn);
+    }
   }
+
+  initCopyButtons();
+  document.addEventListener("astro:page-load", initCopyButtons);
 </script>

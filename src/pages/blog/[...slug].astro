@@ -73,7 +73,7 @@ const jsonLd = [
 >
   <article class="pb-16">
     {post.data.hero?.image && (
-      <div class="post-cover">
+      <div class="post-cover" transition:name={`cover-${slug}`}>
         <CoverImage data={post.data} priority />
       </div>
     )}
