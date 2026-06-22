@@ -11,6 +11,7 @@ import { resolveBucket } from "../../lib/buckets";
 import CoverImage from "../../components/CoverImage.astro";
 import { SITE } from "../../lib/site";
 import ShareFooter from "../../components/ShareFooter.astro";
+import ReadNext from "../../components/ReadNext.astro";
 
 export async function getStaticPaths() {
   const posts = await getCollection("writing", ({ data }) => !data.draft);
@@ -107,6 +108,12 @@ const jsonLd = [
       </p>
     )}
   </article>
+  <ReadNext
+    currentSlug={slug}
+    currentBucket={bucket.key}
+    currentTags={post.data.tags}
+    currentDate={post.data.date}
+  />
 </BaseLayout>
 
 <style>
