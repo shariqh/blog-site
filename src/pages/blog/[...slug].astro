@@ -71,7 +71,7 @@ const jsonLd = [
   ogType="article"
   jsonLd={jsonLd}
 >
-  <article class="pb-16">
+  <article class="relative pb-2">
     {post.data.hero?.image && (
       <div class="post-cover">
         <CoverImage data={post.data} priority />
@@ -92,13 +92,6 @@ const jsonLd = [
       <Content components={{ Callout, Youtube, Image }} />
     </Prose>
 
-    <ShareFooter
-      url={post.data.canonical ?? new URL(`/blog/${slug}`, SITE.url).toString()}
-      title={post.data.title}
-      xHandle="ShariqHirani"
-      feedUrl="/feed.xml"
-    />
-
     {post.data.canonical && (
       <p class="mt-12 font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">
         Originally published at{" "}
@@ -107,6 +100,13 @@ const jsonLd = [
         </a>
       </p>
     )}
+
+    <ShareFooter
+      url={post.data.canonical ?? new URL(`/blog/${slug}`, SITE.url).toString()}
+      title={post.data.title}
+      xHandle="ShariqHirani"
+      feedUrl="/feed.xml"
+    />
   </article>
   <ReadNext
     currentSlug={slug}
