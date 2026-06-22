@@ -10,25 +10,72 @@ const { buckets } = Astro.props;
 </div>
 
 <script>
-  document.querySelectorAll<HTMLElement>("[data-filters]").forEach((bar) => {
-    const pills = [...bar.querySelectorAll<HTMLButtonElement>(".pill")];
-    const scope = bar.closest("[data-filter-scope]");
-    if (!scope) return;
-    const cards = [...scope.querySelectorAll<HTMLElement>("[data-bucket]")];
-    bar.addEventListener("click", (e) => {
-      const pill = (e.target as HTMLElement).closest<HTMLButtonElement>(".pill");
-      if (!pill) return;
-      const key = pill.dataset.filter!;
-      pills.forEach((p) => {
-        const on = p === pill
-        p.classList.toggle("active", on)
-        p.setAttribute("aria-pressed", String(on))
+  function initFilterPills() {
+    document.querySelectorAll<HTMLElement>("[data-filters]").forEach((bar) => {
+      const pills = [...bar.querySelectorAll<HTMLButtonElement>(".pill")];
+      const scope = bar.closest("[data-filter-scope]");
+      if (!scope) return;
+      const cards = [...scope.querySelectorAll<HTMLElement>("[data-bucket]")];
+      const emptyMsg = scope.querySelector<HTMLElement>("[data-filter-empty]");
+
+      function applyFilter(key: string, pushState = false) {
+        pills.forEach((p) => {
+          const on = p.dataset.filter === key;
+          p.classList.toggle("active", on);
+          p.setAttribute("aria-pressed", String(on));
+        });
+
+        let anyVisible = false;
+        cards.forEach((c) => {
+          const show = key === "all" || c.dataset.bucket === key;
+          c.dataset.hidden = show ? "" : "true";
+          if (show) anyVisible = true;
+        });
+
+        if (emptyMsg) {
+          emptyMsg.hidden = anyVisible;
+          if (!anyVisible) {
+            const pill = pills.find((p) => p.dataset.filter === key);
+            emptyMsg.textContent = `No posts in ${pill?.textContent?.trim() ?? key} yet.`;
+          }
+        }
+
+        if (pushState) {
+          const url = new URL(window.location.href);
+          if (key === "all") {
+            url.searchParams.delete("tag");
+          } else {
+            url.searchParams.set("tag", key);
+          }
+          window.history.pushState({ filter: key }, "", url.toString());
+        }
+      }
+
+      // Read initial state from URL
+      const initialTag = new URLSearchParams(window.location.search).get("tag") ?? "all";
+      const validKeys = pills.map((p) => p.dataset.filter!);
+      const startKey = validKeys.includes(initialTag) ? initialTag : "all";
+      applyFilter(startKey, false);
+
+      bar.addEventListener("click", (e) => {
+        const pill = (e.target as HTMLElement).closest<HTMLButtonElement>(".pill");
+        if (!pill) return;
+        applyFilter(pill.dataset.filter!, true);
       });
-      cards.forEach((c) => {
-        c.style.display = key === "all" || c.dataset.bucket === key ? "" : "none";
+
+      // Handle browser back/forward
+      window.addEventListener("popstate", (e) => {
+        const key = (e.state as { filter?: string } | null)?.filter
+          ?? new URLSearchParams(window.location.search).get("tag")
+          ?? "all";
+        applyFilter(validKeys.includes(key) ? key : "all", false);
       });
     });
-  });
+  }
+
+  // Init on first load + view-transition navigation
+  initFilterPills();
+  document.addEventListener("astro:page-load", initFilterPills);
 </script>
 
 <style>
@@ -39,4 +86,5 @@ const { buckets } = Astro.props;
   }
   .pill.active { background: var(--color-terracotta); border-color: var(--color-terracotta); color: var(--color-paper); opacity: 1; }
   .pill:not(.active):hover { border-color: var(--fg); opacity: 1; }
+  [data-bucket][data-hidden="true"] { display: none; }
 </style>
