@@ -41,6 +41,9 @@ const ogImageUrl = ogImage ? new URL(ogImage, SITE.url).toString() : undefined;
     <link rel="canonical" href={canonical} />
     <link rel="alternate" type="application/rss+xml" title={SITE.title} href="/feed.xml" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/static/favicons/site.webmanifest" />
+    <meta name="theme-color" content="#d49a3a" />
+    <link rel="apple-touch-icon" href="/static/favicons/apple-touch-icon.png" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content={ogType} />
