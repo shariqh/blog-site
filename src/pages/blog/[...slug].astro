@@ -10,6 +10,7 @@ import Image from "../../components/mdx/Image.astro";
 import { resolveBucket } from "../../lib/buckets";
 import CoverImage from "../../components/CoverImage.astro";
 import { SITE } from "../../lib/site";
+import ShareFooter from "../../components/ShareFooter.astro";
 
 export async function getStaticPaths() {
   const posts = await getCollection("writing", ({ data }) => !data.draft);
@@ -89,6 +90,13 @@ const jsonLd = [
     <Prose>
       <Content components={{ Callout, Youtube, Image }} />
     </Prose>
+
+    <ShareFooter
+      url={new URL(`/blog/${slug}`, SITE.url).toString()}
+      title={post.data.title}
+      xHandle="ShariqHirani"
+      feedUrl="/feed.xml"
+    />
 
     {post.data.canonical && (
       <p class="mt-12 font-mono text-xs uppercase tracking-widest text-[var(--fg-soft)]">
