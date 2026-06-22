@@ -52,7 +52,6 @@ const slug = (id: string) => `/blog/${id.replace(/\.mdx$/, "")}`;
             bucketLabel={b.label}
             summary={post.data.summary}
             coverData={post.data}
-            transitionName={`cover-${post.id.replace(/\.mdx$/, "")}`}
           />
         );
       })}

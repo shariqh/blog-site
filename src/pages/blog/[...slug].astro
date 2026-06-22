@@ -73,7 +73,7 @@ const jsonLd = [
 >
   <article class="pb-16">
     {post.data.hero?.image && (
-      <div class="post-cover" transition:name={`cover-${slug}`}>
+      <div class="post-cover">
         <CoverImage data={post.data} priority />
       </div>
     )}
@@ -93,7 +93,7 @@ const jsonLd = [
     </Prose>
 
     <ShareFooter
-      url={new URL(`/blog/${slug}`, SITE.url).toString()}
+      url={post.data.canonical ?? new URL(`/blog/${slug}`, SITE.url).toString()}
       title={post.data.title}
       xHandle="ShariqHirani"
       feedUrl="/feed.xml"

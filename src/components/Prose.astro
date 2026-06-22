@@ -111,8 +111,7 @@
     }
   }
 
-  // `astro:page-load` fires on the initial load *and* after every
-  // view-transition navigation, so this alone covers first paint + nav;
-  // calling initCopyButtons() directly too would run it twice on first load.
-  document.addEventListener("astro:page-load", initCopyButtons);
+  // Runs once on load. (Site-wide view transitions are deferred — when they
+  // land, this moves to an astro:page-load listener so it re-runs per nav.)
+  initCopyButtons();
 </script>

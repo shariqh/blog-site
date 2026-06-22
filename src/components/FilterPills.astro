@@ -68,13 +68,11 @@ const { buckets } = Astro.props;
     });
   }
 
-  // `astro:page-load` fires on initial load + every navigation, so this alone
-  // covers both (a direct init() call too would double-bind on first load).
-  document.addEventListener("astro:page-load", initFilterPills);
+  // Runs once on load. (Site-wide view transitions are deferred; when they
+  // land, this moves to an astro:page-load listener.)
+  initFilterPills();
 
-  // Back/forward: re-sync every bar from the URL. Bound once at module scope —
-  // `window` survives view-transition navigation, so binding it inside
-  // initFilterPills() would leak a popstate listener on every navigation.
+  // Back/forward: re-sync every bar from the URL. Bound once at module scope.
   window.addEventListener("popstate", () => eachBar((bar) => applyFilter(bar, tagFromUrl(), false)));
 </script>
 

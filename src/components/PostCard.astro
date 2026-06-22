@@ -11,12 +11,11 @@ interface Props {
   bucketLabel: string;
   summary?: string;
   coverData: { hero?: { image?: string; alt?: string }; tags?: string[] };
-  transitionName?: string;
 }
-const { href, title, date, bucketKey, bucketLabel, summary, coverData, transitionName } = Astro.props;
+const { href, title, date, bucketKey, bucketLabel, summary, coverData } = Astro.props;
 ---
 <a class="card" href={href} data-bucket={bucketKey}>
-  <div class="imgwrap" transition:name={transitionName}><CoverImage data={coverData} /></div>
+  <div class="imgwrap"><CoverImage data={coverData} /></div>
   <div class="body">
     <div class="meta">
       <span class:list={["cat", `cat-${bucketKey}`]}>{bucketLabel}</span>
