@@ -1,0 +1,208 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import { SITE } from "../lib/site";
+
+const nowLd = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "url": new URL("/now", SITE.url).toString(),
+  "name": "Now — Shariq Hirani",
+  "description": "What Shariq Hirani is focused on right now.",
+};
+
+const tools = [
+  { name: "Docker", icon: "docker" },
+  { name: "Notion", icon: "notion" },
+  { name: "1Password", icon: "1password" },
+  { name: "GitHub", icon: "github" },
+  { name: "GitHub Copilot", icon: "githubcopilot" },
+  { name: "Claude", icon: "claude" },
+  { name: "iTerm2", icon: "iterm2" },
+  { name: "Soloterm", icon: null },
+  { name: "Obsidian", icon: "obsidian" },
+  { name: "Spotify", icon: "spotify" },
+  { name: "Apple Music", icon: "applemusic" },
+  { name: "Sublime Text", icon: "sublimetext" },
+];
+---
+<BaseLayout title="Now" description="What Shariq Hirani is working on right now." jsonLd={nowLd}>
+  <PageHeader eyebrow="Updated regularly" title="Now" />
+
+  <section class="now-section">
+    <span class="mono-label">Building</span>
+    <div class="building">
+      <h2 class="project-name">
+        <a href="https://lognote.dev" target="_blank" rel="noopener">lognote</a>
+      </h2>
+      <p class="project-desc">
+        A local-first Mac app that records your meetings, transcribes them on-device with MLX-Whisper,
+        and drops a clean Markdown summary into your notes. Private by default — nothing leaves your machine.
+      </p>
+    </div>
+  </section>
+
+  <section class="now-section">
+    <span class="mono-label">Day job</span>
+    <div class="dayjob">
+      <p class="role">Senior Solutions Engineer</p>
+      <p class="org">
+        <svg class="gh-ic" viewBox="0 0 16 16" aria-hidden="true">
+          <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        GitHub
+      </p>
+    </div>
+  </section>
+
+  <section class="now-section">
+    <span class="mono-label">Writing about</span>
+    <ul class="writing-list">
+      <li>Engineering teams — how they actually run vs. how they're written about</li>
+      <li>The AI shift in software: what holds up under sustained use, not just demos</li>
+      <li>The move from senior engineer to lead, and the asymmetric jump back</li>
+    </ul>
+  </section>
+
+  <section class="now-section" style="border-bottom: none;">
+    <span class="mono-label">Tools I reach for</span>
+    <div class="stack">
+      {tools.map((t) => (
+        <span class="tool">
+          {t.icon && <i class="tool-ic" style={`--ic: url(/static/icons/${t.icon}.svg)`} aria-hidden="true" />}
+          {t.name}
+        </span>
+      ))}
+    </div>
+  </section>
+
+  <p class="updated">Last updated June 2026 — <a href="/about">more about me</a></p>
+</BaseLayout>
+
+<style>
+  .mono-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    opacity: .55;
+    display: block;
+    margin-bottom: 18px;
+  }
+
+  .now-section {
+    padding: 48px 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
+  }
+
+  .building .project-name {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 40px;
+    letter-spacing: -.02em;
+    margin-bottom: 14px;
+  }
+
+  .building .project-name a {
+    color: var(--color-terracotta);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 5px;
+  }
+
+  .project-desc {
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--fg-soft);
+    max-width: 52ch;
+  }
+
+  .dayjob {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .role {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 500;
+    letter-spacing: -.015em;
+  }
+
+  .org {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    color: var(--fg-soft);
+  }
+
+  .gh-ic {
+    width: 0.9em;
+    height: 0.9em;
+    vertical-align: -0.1em;
+  }
+
+  .writing-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .writing-list li {
+    font-family: var(--font-display);
+    font-size: 22px;
+    line-height: 1.4;
+    letter-spacing: -.01em;
+    padding: 14px 0;
+    border-bottom: 1px dashed color-mix(in oklab, var(--fg) 16%, transparent);
+  }
+
+  .writing-list li:last-child { border-bottom: none; }
+
+  .stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent);
+  }
+
+  .tool-ic {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    background: var(--fg);
+    -webkit-mask: var(--ic) center / contain no-repeat;
+    mask: var(--ic) center / contain no-repeat;
+  }
+
+  .updated {
+    margin-top: 40px;
+    margin-bottom: 40px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    opacity: .45;
+    letter-spacing: .06em;
+  }
+
+  .updated a {
+    color: var(--color-terracotta);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 3px;
+  }
+</style>
