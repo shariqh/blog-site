@@ -1,5 +1,5 @@
 ---
-title: The night I shipped lognote knowing it was rough
+title: Day one of a fast-moving beta
 date: '2026-06-24'
 tags:
   - leadership
@@ -8,24 +8,24 @@ tags:
   - beta
   - lognote
 summary: >-
-  I sent the lognote private beta to the waitlist last night. The recording core
-  held all day; the scaffolding around it fought me. A website 404, a 64GB
-  import freeze, and CI running out of minutes. Why I shipped it rough anyway,
-  and what day one taught me.
+  I sent the lognote private beta to the waitlist last night. The core recorded,
+  transcribed, and summarized all day without a stumble. The scaffolding around
+  it caught fire in order: a 404'd launch post, a 64GB import freeze, CI out of
+  minutes. Why early beats finished.
 hero:
   image: /static/images/blog/the-night-i-shipped-lognote/cover.png
-  alt: Cover illustration for "The night I shipped lognote knowing it was rough".
+  alt: Cover illustration for "Day one of a fast-moving beta".
   prompt: >-
     Style: rich conceptual editorial illustration, like a Wired or New Yorker
     feature spread, with one clear central metaphor. Painterly flat shading,
     depth, texture, sophisticated. Constrained to the palette.
 
 
-    Concept: The night I shipped lognote knowing it was rough. I sent the
-    lognote private beta to the waitlist last night. The recording core held all
-    day; the scaffolding around it fought me. A website 404, a 64GB import
-    freeze, and CI running out of minutes. Why I shipped it rough anyway, and
-    what day one taught me.
+    Concept: Day one of a fast-moving beta. I sent the lognote private beta to
+    the waitlist last night. The core recorded, transcribed, and summarized all
+    day without a stumble. The scaffolding around it caught fire in order: a
+    404'd launch post, a 64GB import freeze, CI out of minutes. Why early beats
+    finished.
 
 
     Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
@@ -41,11 +41,11 @@ hero:
   style: conceptual
 ---
 
-I have a README line I almost deleted three times: "Early but usable. A fast-moving beta, not a finished product." I kept it. Last night, around 6:45pm PT, I sent the private-beta announcement to the waitlist and let people start cloning the repo.
+lognote's README has a line I stand behind: "Early but usable. A fast-moving beta, not a finished product." Last night I shipped on exactly those terms. Around 6:45pm PT I sent the private-beta announcement to the waitlist and let people start cloning the repo.
 
 lognote is the thing I have wanted to exist for two years. It records a meeting from your mic and your system audio through a CoreAudio process tap, transcribes it on-device with WhisperKit on the Neural Engine, summarizes it with a local model by default, and drops a clean note (TL;DR, action items, decisions, open questions) into Obsidian. No DMG. No App Store. The repo is still private. Just `git clone` and `./setup.sh`, sent to people who raised a hand. This was an invite, not a parade.
 
-I expected to feel proud. Mostly I felt exposed. I had braced for the product to break. I had not braced for the plumbing.
+I thought day one would test the product. Instead it tested everything around the product. The recording engine I had spent months on barely came up. The plumbing did.
 
 ## Thirteen minutes
 
@@ -53,24 +53,24 @@ The announcement went live. Thirteen minutes later I was pushing a hotfix. Not t
 
 The launch post built clean and uploaded clean, and then it 404'd on lognote.dev. Every time. The site had been quietly deploying to a Cloudflare preview alias the entire time, never to production, because `wrangler-action` never expanded the deploy-branch variable. So every green checkmark I had trusted for weeks told the truth about a URL nobody could load. The one page I most wanted people to see went live at an address only I could reach.
 
-It worked. It just had not moved. I fixed the variable, redeployed, watched the real domain resolve, and laughed the laugh of someone who just learned their victory lap had been run in an empty stadium.
+I fixed the variable, redeployed, watched the real domain resolve, and laughed the laugh of someone who just learned their victory lap had been run in an empty stadium.
 
 ## The 64-gigabyte afternoon
 
 A tester imported a 45-minute Teams transcript and froze their Mac. Hard. The kind of freeze where the fans spin up and you start apologizing to the laptop.
 
-Here is what happened, in order, because the order is the whole joke. The Import button had no in-flight guard. A stale onboarding modal still promised "Azure summarize takes ~5s," so a first run that took longer simply looked frozen. Looking frozen invites clicking. So they clicked again, and again. Each click spawned another engine process, each one loaded its own 8GB model in parallel, and macOS rolled the whole pile up under Obsidian, which proudly reported around 64GB in use. The machine did exactly what it was told. It was told something ridiculous. I built the trap, then mislabeled it as safe.
+Here is what happened, in order, because the order is the whole joke. The Import button had no in-flight guard. A stale onboarding modal still promised "Azure summarize takes ~5s," so a first run that took longer simply looked frozen. Looking frozen invites clicking. So they clicked again, and again. Each click spawned another engine process, each one loaded its own 8GB model in parallel, and macOS rolled the whole pile up under Obsidian, which proudly reported around 64GB in use. The machine did exactly what it was told. It was told something ridiculous, and by dinner I had un-told it.
 
-Five hours of focused work later it was gone. A cross-process model-load lock so two engines can never race for the same memory. A RAM gate that picks the largest model that actually fits the machine in front of it, not the largest model I wish everyone had. An in-flight guard that greys the button the instant you press it, so impatience does nothing instead of everything. The OOM was a stack of small honest gaps lined up end to end, the most satisfying kind of bug to close: every fix is obviously correct once you see the row.
+The fix is the part I am proud of. A cross-process model-load lock so two engines can never race for the same memory. A RAM gate that picks the largest model that actually fits the machine in front of it. An in-flight guard that greys the button the instant you press it, so impatience does nothing instead of everything. Five hours, three small gaps closed, the kind of bug where every fix is obviously correct the moment you see the row.
 
-The detail I keep holding onto: the recording and transcription path, the heart of the product, never flinched. Not once, all day. The mic and system-audio tap held. WhisperKit kept doing its job on device. The worst failure came from Import, the newest thing I bolted on last. The core held while the edges caught fire, and that told me the foundation is sound.
+And the detail that mattered most to me: the recording and transcription path, the heart of the product, never flinched. Not once, all day. The mic and system-audio tap held. WhisperKit kept doing its job on device. The worst problem of the day came from Import, the newest thing I had bolted on, not the core. The foundation I had worried about most was the one part I never had to touch.
 
-There were smaller fires too. Notifications had been silently broken for every alpha tester, because onboarding never requested permission, so every "notes ready" banner had been firing into the void. For testers running obsidian-git, a `git clean` quietly deleted the plugin files while my walkthrough still showed a cheerful green "installed" checkmark. And mid-afternoon, the private repo's GitHub Actions ran out of free minutes and plan-blocked CI at the exact hour I needed it most, fixes queued and nowhere to run them. Merging is publishing, and for a few tense hours I could not merge anything. I moved CI to a self-hosted runner, topped up credits, and got the pipeline breathing again inside the hour. Launch day is precisely when you burn through whatever runway your tooling quietly assumed you had.
+There were smaller fires, the kind a fast-moving beta throws off. Notifications had been quietly broken for every alpha tester, because onboarding never requested permission, so every "notes ready" banner had been firing into the void. For testers running obsidian-git, a `git clean` swept the plugin files out from under a cheerful green "installed" check. And mid-afternoon the private repo's GitHub Actions ran out of free minutes and stalled CI at the exact hour I needed it. Merging is publishing, and for a little while I could not merge. I moved CI to a self-hosted runner, topped up credits, and had the pipeline breathing again inside the hour.
 
-## Why ship it rough
+## Why early, on purpose
 
-I could have waited. Guarded that Import button first, written the permission prompt, caught the preview-alias bug in a staging pass nobody would have applauded. Polished-and-waiting is a comfortable place to live. It is also a place where nothing ever moves.
+I could have waited. Guarded that Import button first, written the permission prompt, caught the preview-alias bug in a staging pass nobody would have applauded. Polished-and-waiting is a comfortable place to live. It is also a place where nothing moves.
 
-Here is the take I keep committing to: honest-and-shipping beats polished-and-waiting. Not because rough is good, but because rough in front of real people is the only thing that turns into not-rough. The 64GB freeze is now a model-load lock and a RAM gate that protect every tester who comes after, and that fix does not exist if I keep the repo to myself another month. The bug had to meet a real machine before I could kill it.
+Here is the take I keep committing to: honest-and-shipping beats polished-and-waiting. A beta in real hands is the only thing that becomes a product. The 64GB freeze is now a model-load lock and a RAM gate that protect every tester who comes after, and that fix does not exist if I keep the repo to myself another month. The bug had to meet a real machine before I could kill it.
 
-Day one is over. The core records, transcribes, and summarizes, and it did all day without a stumble. The edges are getting sturdier by the hour. Next I am writing the onboarding permission flow and the import guards into the setup itself, so the next person's day one is calmer than mine. I will write that post after it actually runs.
+Day one is over, and the part that counts came through clean. The core recorded, transcribed, and summarized, all day, without a stumble. The edges are getting sturdier by the hour. Next I am folding the permission flow and the import guards into setup itself, so the next person's day one is calmer than mine. I will write that post after it actually runs.
