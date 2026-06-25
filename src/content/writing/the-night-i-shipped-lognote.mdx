@@ -1,0 +1,71 @@
+---
+title: Day one of a fast-moving beta
+date: '2026-06-24'
+tags:
+  - leadership
+  - shipping
+  - launch
+  - beta
+  - lognote
+summary: >-
+  I sent the lognote private beta to the waitlist last night. The core recorded,
+  transcribed, and summarized all day without a stumble. The scaffolding around
+  it caught on fire: a 404'd launch post, a 64GB memory freeze, CI out of
+  minutes. It was still worth it.
+hero:
+  image: /static/images/blog/the-night-i-shipped-lognote/cover.png
+  alt: Cover illustration for "Day one of a fast-moving beta".
+  prompt: >-
+    Style: rich conceptual editorial illustration, like a Wired or New Yorker
+    feature spread, with one clear central metaphor. Painterly flat shading,
+    depth, texture, sophisticated. Constrained to the palette.
+
+
+    Concept: Day one of a fast-moving beta. I sent the lognote private beta to
+    the waitlist last night. The core recorded, transcribed, and summarized all
+    day without a stumble. The scaffolding around it caught on fire: a 404'd
+    launch post, a 64GB memory freeze, CI out of minutes. It was still worth it.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, captions, labels, headlines, sentences, or
+    paragraphs — the image must contain no legible prose text, because a title
+    will be overlaid afterward. Stylized logos, app or screen UI, code symbols,
+    and abstract mark-making are fine as long as they are not spelled-out words.
+    No photorealistic human faces. Wide 3:2 landscape composition with
+    deliberate empty negative space in the LEFT third so a title can be overlaid
+    later.
+  style: conceptual
+---
+
+When reading about other founders' success stories, you are always told "Be early, be agile, be open to feedback." Last night I shipped on exactly those terms. Around 11:00pm PT I sent the private-beta announcement to the waitlist and let people start downloading the app.
+
+lognote is the tool I have wanted to exist for two years. It records a meeting from your mic and your system audio through a CoreAudio process tap, transcribes it on-device with WhisperKit on the Neural Engine, summarizes it with a local model, and drops a clean note into Obsidian.
+
+I thought day one would test the product but instead it tested everything around the product. The recording engine I had spent months on barely came up. The plumbing did.
+
+## Thirteen minutes
+
+Thirteen minutes after the announcement went live, I was pushing a hotfix to the website.
+
+The private beta launch blog post built clean and uploaded clean, and then it 404'd on lognote.dev. The site had been quietly deploying to a Cloudflare preview alias the entire time, never to production, because of a CI bug. The one page I most wanted people to see went live at an address only I could reach.
+
+I fixed the CI, redeployed, and laughed as I just realized my victory lap had been run in an empty stadium.
+
+## The compounding 64-gigabyte memory leak (I thought)
+
+A private beta user imported a 45-minute Teams transcript and froze their Mac. It was the kind of freeze where the fans spin up and you start apologizing to the laptop.
+
+The external import had no in-flight guard and a stale onboarding modal promised a summary within a few seconds so a first run that took longer simply looked frozen. Looking frozen invites clicking. So they clicked again, and again. Each click spawned another engine process, each one loaded its own 8GB model in parallel, and macOS rolled the whole pile up under Obsidian, which proudly reported around 64GB in use. The machine did exactly what it was told.
+
+The fix is the part I am proud of: a cross-process model-load lock so two engines can never race for the same memory. We added a RAM gate that picks the largest model that actually fits the machine in front of it and added an in-flight guard that greys the button when you press it. Five hours in I had three small gaps closed. And the detail that mattered most to me: the recording and transcription path, the heart of the product, never failed. The mic and system-audio tap held while WhisperKit kept doing its job on device. The worst problem of the day came from Import, the first non-core feature.
+
+There were smaller fires as well like notifications had been quietly broken because onboarding never requested permission so every "notes ready" banner had been firing into the void. For testers running obsidian-git, a `git clean` swept the plugin files out from under a green "installed" check, and mid-afternoon the private repo's GitHub Actions ran out of free minutes and stalled CI at the exact moment I needed to push these bug fixes. I moved CI to a self-hosted runner, topped up credits, and had the pipeline breathing again after an hour.
+
+## Early on purpose
+
+I could have waited and tried to guard that Import button first, written the permission prompt, caught the preview-alias bug in a staging pass, etc. Polished-and-waiting is a comfortable place to live. It is also a place where nothing moves and something I've been at fault for a few too many times. A beta in real hands is the only thing that becomes a product. The 64GB freeze is now a model-load lock and a RAM gate that protect every tester who comes after, and that fix does not exist if I keep the repo to myself another month. The bug had to meet a real machine before I could squash it.
+
+Now that day one is over, the core recorded, transcribed, and summarized all day without a stumble. The edges will keep getting sturdier. Thanks to everyone who has helped so far.
