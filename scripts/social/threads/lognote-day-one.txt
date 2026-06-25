@@ -1,0 +1,33 @@
+A tester froze their Mac at 64GB of RAM on day one of lognote. Under "Obsidian." Eight gigs of models, loaded several times over, off one missing guard on a brand-new import button.
+
+That was one bug, and day one had a whole queue.
+---
+13 minutes after the launch post went live, I was already pushing a hotfix.
+
+The whole site had been deploying to a Cloudflare preview alias, so the post 404'd on the real domain. My big moment shipped to a URL only I could load.
+---
+Back to the frozen Mac. The import had no in-flight guard, and a stale modal promised "~5s," so a slow first run looked dead and the tester re-clicked until several 8GB models were loading in parallel.
+
+Fixed in ~5 hours: load lock + RAM gate + guard.
+---
+Then I found notifications had been silently broken for every early tester, because onboarding never asked for permission.
+
+Every "notes ready" banner had been firing into the void for weeks, and nobody told me because nobody saw anything.
+---
+obsidian-git's "git clean" quietly deleted plugin files for some testers, while the UI kept showing a cheerful green "installed" check.
+
+The most confident lie in software is a checkmark over an empty folder.
+---
+Then CI ran out of free GitHub Actions minutes mid-day, exactly when I needed it, so I moved CI to a self-hosted runner on an Intel NUC at home and topped up credits.
+
+Then the NUC's fan died. Self-hosting means you're the datacenter now, HVAC included.
+---
+So launch week also meant physically swapping a fan in the literal box running my CI.
+
+Through all of it, the core, recording and on-device transcription, never broke once. The heart of the product was the one thing I didn't have to touch.
+---
+Day one was a fire drill, and the product underneath it held steady.
+
+Be early, be agile, be open to feedback. It was worth every hour of it.
+
+Thanks to everyone testing lognote with me so far. The full account, fan and all: https://shariq.dev/blog/the-night-i-shipped-lognote/

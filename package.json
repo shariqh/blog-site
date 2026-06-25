@@ -15,6 +15,7 @@
     "gen:cover": "tsx scripts/cover/cli.ts",
     "gen:cover:all": "tsx scripts/cover/backfill.ts",
     "migrate:cms": "tsx scripts/agent/migrate-cms.ts",
+    "post:thread": "tsx scripts/social/post-thread.ts",
     "preview": "astro preview",
     "test": "vitest run",
     "test:smoke": "playwright test",
@@ -49,6 +50,7 @@
     "prettier-plugin-astro": "^0.14.1",
     "satori": "^0.26.0",
     "tsx": "^4.22.4",
+    "twitter-api-v2": "^1.29.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   }
