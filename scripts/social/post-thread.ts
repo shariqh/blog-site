@@ -18,9 +18,25 @@ import { TwitterApi } from 'twitter-api-v2'
 
 const ENV_KEYS = ['X_API_KEY', 'X_API_SECRET', 'X_ACCESS_TOKEN', 'X_ACCESS_SECRET'] as const
 
-// X counts every URL as 23 chars (the t.co wrap), regardless of the real length.
+// X wraps every URL to 23 chars (t.co). Match URLs but don't swallow trailing
+// punctuation, which X counts as real characters, so the estimate stays
+// conservative instead of undercounting a borderline tweet.
 function tweetLength(text: string): number {
-  return text.replace(/https?:\/\/\S+/g, 'x'.repeat(23)).length
+  return text.replace(/https?:\/\/\S+/g, (match) => {
+    const url = match.replace(/[).,!?:;'"\]]+$/, '')
+    return 'x'.repeat(23) + match.slice(url.length)
+  }).length
+}
+
+// Strip control/escape chars (keeping newlines) so a thread file can't rewrite
+// the terminal during preview. The original text is still what gets posted.
+function sanitize(text: string): string {
+  return Array.from(text)
+    .filter((c) => {
+      const code = c.codePointAt(0) ?? 0
+      return c === '\n' || (code >= 0x20 && code !== 0x7f)
+    })
+    .join('')
 }
 
 function parseThread(path: string): string[] {
@@ -69,7 +85,7 @@ async function main() {
     const len = tweetLength(t)
     const over = len > 280
     if (over) overLimit = true
-    console.log(`\n--- [${i + 1}/${tweets.length}] ${len}/280${over ? '  !! OVER LIMIT' : ''} ---\n${t}`)
+    console.log(`\n--- [${i + 1}/${tweets.length}] ${len}/280${over ? '  !! OVER LIMIT' : ''} ---\n${sanitize(t)}`)
   })
 
   if (overLimit && !force) {
