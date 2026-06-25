@@ -10,8 +10,8 @@ tags:
 summary: >-
   I sent the lognote private beta to the waitlist last night. The core recorded,
   transcribed, and summarized all day without a stumble. The scaffolding around
-  it caught fire in order: a 404'd launch post, a 64GB import freeze, CI out of
-  minutes. Why early beats finished.
+  it caught on fire: a 404'd launch post, a 64GB memory freeze, CI out of
+  minutes. It was still worth it.
 hero:
   image: /static/images/blog/the-night-i-shipped-lognote/cover.png
   alt: Cover illustration for "Day one of a fast-moving beta".
@@ -23,9 +23,8 @@ hero:
 
     Concept: Day one of a fast-moving beta. I sent the lognote private beta to
     the waitlist last night. The core recorded, transcribed, and summarized all
-    day without a stumble. The scaffolding around it caught fire in order: a
-    404'd launch post, a 64GB import freeze, CI out of minutes. Why early beats
-    finished.
+    day without a stumble. The scaffolding around it caught on fire: a 404'd
+    launch post, a 64GB memory freeze, CI out of minutes. It was still worth it.
 
 
     Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
@@ -41,36 +40,32 @@ hero:
   style: conceptual
 ---
 
-lognote's README has a line I stand behind: "Early but usable. A fast-moving beta, not a finished product." Last night I shipped on exactly those terms. Around 6:45pm PT I sent the private-beta announcement to the waitlist and let people start cloning the repo.
+When reading about other founders' success stories, you are always told "Be early, be agile, be open to feedback." Last night I shipped on exactly those terms. Around 11:00pm PT I sent the private-beta announcement to the waitlist and let people start downloading the app.
 
-lognote is the thing I have wanted to exist for two years. It records a meeting from your mic and your system audio through a CoreAudio process tap, transcribes it on-device with WhisperKit on the Neural Engine, summarizes it with a local model by default, and drops a clean note (TL;DR, action items, decisions, open questions) into Obsidian. No DMG. No App Store. The repo is still private. Just `git clone` and `./setup.sh`, sent to people who raised a hand. This was an invite, not a parade.
+lognote is the tool I have wanted to exist for two years. It records a meeting from your mic and your system audio through a CoreAudio process tap, transcribes it on-device with WhisperKit on the Neural Engine, summarizes it with a local model, and drops a clean note into Obsidian.
 
-I thought day one would test the product. Instead it tested everything around the product. The recording engine I had spent months on barely came up. The plumbing did.
+I thought day one would test the product but instead it tested everything around the product. The recording engine I had spent months on barely came up. The plumbing did.
 
 ## Thirteen minutes
 
-The announcement went live. Thirteen minutes later I was pushing a hotfix. Not to the app. To the website.
+Thirteen minutes after the announcement went live, I was pushing a hotfix to the website.
 
-The launch post built clean and uploaded clean, and then it 404'd on lognote.dev. Every time. The site had been quietly deploying to a Cloudflare preview alias the entire time, never to production, because `wrangler-action` never expanded the deploy-branch variable. So every green checkmark I had trusted for weeks told the truth about a URL nobody could load. The one page I most wanted people to see went live at an address only I could reach.
+The private beta launch blog post built clean and uploaded clean, and then it 404'd on lognote.dev. The site had been quietly deploying to a Cloudflare preview alias the entire time, never to production, because of a CI bug. The one page I most wanted people to see went live at an address only I could reach.
 
-I fixed the variable, redeployed, watched the real domain resolve, and laughed the laugh of someone who just learned their victory lap had been run in an empty stadium.
+I fixed the CI, redeployed, and laughed as I just realized my victory lap had been run in an empty stadium.
 
-## The 64-gigabyte afternoon
+## The compounding 64-gigabyte memory leak (I thought)
 
-A tester imported a 45-minute Teams transcript and froze their Mac. Hard. The kind of freeze where the fans spin up and you start apologizing to the laptop.
+A private beta user imported a 45-minute Teams transcript and froze their Mac. It was the kind of freeze where the fans spin up and you start apologizing to the laptop.
 
-Here is what happened, in order, because the order is the whole joke. The Import button had no in-flight guard. A stale onboarding modal still promised "Azure summarize takes ~5s," so a first run that took longer simply looked frozen. Looking frozen invites clicking. So they clicked again, and again. Each click spawned another engine process, each one loaded its own 8GB model in parallel, and macOS rolled the whole pile up under Obsidian, which proudly reported around 64GB in use. The machine did exactly what it was told. It was told something ridiculous, and by dinner I had un-told it.
+The external import had no in-flight guard and a stale onboarding modal promised a summary within a few seconds so a first run that took longer simply looked frozen. Looking frozen invites clicking. So they clicked again, and again. Each click spawned another engine process, each one loaded its own 8GB model in parallel, and macOS rolled the whole pile up under Obsidian, which proudly reported around 64GB in use. The machine did exactly what it was told.
 
-The fix is the part I am proud of. A cross-process model-load lock so two engines can never race for the same memory. A RAM gate that picks the largest model that actually fits the machine in front of it. An in-flight guard that greys the button the instant you press it, so impatience does nothing instead of everything. Five hours, three small gaps closed, the kind of bug where every fix is obviously correct the moment you see the row.
+The fix is the part I am proud of with a cross-process model-load lock so two engines can never race for the same memory. We added a RAM gate that picks the largest model that actually fits the machine in front of it and added in-flight guard that greys the button when you press it. Five hours in I had three small gaps closed. And the detail that mattered most to me: the recording and transcription path, the heart of the product, never failed. The mic and system-audio tap held while WhisperKit kept doing its job on device. The worst problem of the day came from Import, the first non-core feature.
 
-And the detail that mattered most to me: the recording and transcription path, the heart of the product, never flinched. Not once, all day. The mic and system-audio tap held. WhisperKit kept doing its job on device. The worst problem of the day came from Import, the newest thing I had bolted on, not the core. The foundation I had worried about most was the one part I never had to touch.
+There were smaller fires as well like notifications had been quietly broken because onboarding never requested permission so every "notes ready" banner had been firing into the void. For testers running obsidian-git, a `git clean` swept the plugin files out from under a green "installed" check, and mid-afternoon the private repo's GitHub Actions ran out of free minutes and stalled CI at the exact moment I needed to push these bug fixes. I moved CI to a self-hosted runner, topped up credits, and had the pipeline breathing again after an hour.
 
-There were smaller fires, the kind a fast-moving beta throws off. Notifications had been quietly broken for every alpha tester, because onboarding never requested permission, so every "notes ready" banner had been firing into the void. For testers running obsidian-git, a `git clean` swept the plugin files out from under a cheerful green "installed" check. And mid-afternoon the private repo's GitHub Actions ran out of free minutes and stalled CI at the exact hour I needed it. Merging is publishing, and for a little while I could not merge. I moved CI to a self-hosted runner, topped up credits, and had the pipeline breathing again inside the hour.
+## Early on purpose
 
-## Why early, on purpose
+I could have waited and tried to guard that Import button first, written the permission prompt, caught the preview-alias bug in a staging pass, etc. Polished-and-waiting is a comfortable place to live. It is also a place where nothing moves and something I've been at fault for a few too many times. A beta in real hands is the only thing that becomes a product. The 64GB freeze is now a model-load lock and a RAM gate that protect every tester who comes after, and that fix does not exist if I keep the repo to myself another month. The bug had to meet a real machine before I could squash it.
 
-I could have waited. Guarded that Import button first, written the permission prompt, caught the preview-alias bug in a staging pass nobody would have applauded. Polished-and-waiting is a comfortable place to live. It is also a place where nothing moves.
-
-Here is the take I keep committing to: honest-and-shipping beats polished-and-waiting. A beta in real hands is the only thing that becomes a product. The 64GB freeze is now a model-load lock and a RAM gate that protect every tester who comes after, and that fix does not exist if I keep the repo to myself another month. The bug had to meet a real machine before I could kill it.
-
-Day one is over, and the part that counts came through clean. The core recorded, transcribed, and summarized, all day, without a stumble. The edges are getting sturdier by the hour. Next I am folding the permission flow and the import guards into setup itself, so the next person's day one is calmer than mine. I will write that post after it actually runs.
+Now that day one is over, the core recorded, transcribed, and summarized all day without a stumble. The edges will keep getting sturdier. Thanks to everyone who has helped so far.
