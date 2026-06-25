@@ -33,8 +33,10 @@ function tweetLength(text: string): number {
 function sanitize(text: string): string {
   return Array.from(text)
     .filter((c) => {
+      if (c === '\n') return true
       const code = c.codePointAt(0) ?? 0
-      return c === '\n' || (code >= 0x20 && code !== 0x7f)
+      // drop C0 (< 0x20), DEL (0x7f), and C1 (0x80-0x9f) control characters
+      return code >= 0x20 && code !== 0x7f && (code < 0x80 || code > 0x9f)
     })
     .join('')
 }
