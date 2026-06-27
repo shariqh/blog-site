@@ -84,5 +84,11 @@ const { buckets } = Astro.props;
   }
   .pill.active { background: var(--color-terracotta); border-color: var(--color-terracotta); color: var(--color-paper); opacity: 1; }
   .pill:not(.active):hover { border-color: var(--fg); opacity: 1; }
-  [data-bucket][data-hidden="true"] { display: none; }
+  /* The cards live in the parent page / PostCard, not in this component, so this
+     rule must be global (un-scoped) to match them. It also needs the
+     [data-filter-scope] ancestor: PostCard's `.card { display: block }` becomes
+     `.card[data-astro-cid-…]` (specificity 0,2,0) under Astro scoping, which ties
+     a bare `[data-bucket][data-hidden]` and wins on source order. The ancestor
+     lifts this to 0,3,0 so the hide always wins. */
+  :global([data-filter-scope] [data-bucket][data-hidden="true"]) { display: none; }
 </style>
