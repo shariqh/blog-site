@@ -17,3 +17,5 @@ jobs:
       - run: npm run astro check
       - run: npm test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:smoke # Playwright e2e against the built site (preview server)
