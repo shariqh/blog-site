@@ -75,9 +75,9 @@ migrating expense-tracker.
                        ┌─────────────────────────────────────────────┐
    blog-site (TS)      │  image-gateway  (ubi-prod, Docker, Node/TS)  │
    scripts/cover/      │  behind cloudflared tunnel                   │
-   ─ generateImage ───►│  POST /v1/images:generate    ──┐            │
-   ─ hasText       ───►│  POST /v1/vision:check-text   ──┤            │      ┌──────────────┐
-                       │  POST /v1/images:edit (reserved)─┼──Azure────┼─────►│ Azure OpenAI │
+   ─ generateImage ───►│  POST /v1/images/generate    ──┐            │
+   ─ hasText       ───►│  POST /v1/vision/check-text   ──┤            │      ┌──────────────┐
+                       │  POST /v1/images/edit (reserved)─┼──Azure────┼─────►│ Azure OpenAI │
    bby-game (py)       │  GET  /healthz                  ─┘  key      │      │ gpt-image-1  │
    gen.py (follow-on)─►│  Bearer-token auth · req logging │  (only    │      │ gpt-4o-mini  │
                        │  Azure key lives here only       │   here)   │      └──────────────┘
@@ -108,7 +108,7 @@ credential, and adds auth + structured logging. It contains no blog-cover policy
 
 All endpoints require `Authorization: Bearer <IMAGE_GATEWAY_TOKEN>`; missing/invalid → `401`.
 
-**`POST /v1/images:generate`**
+**`POST /v1/images/generate`**
 - Request `Content-Type: application/json`:
   ```jsonc
   {
@@ -124,13 +124,13 @@ All endpoints require `Authorization: Bearer <IMAGE_GATEWAY_TOKEN>`; missing/inv
 - Failure: non-2xx, `application/json` `{ "error": { "message": "...", "upstreamStatus": 0 } }`.
 - Internally: POST `{endpoint}/openai/deployments/{IMAGE_DEPLOYMENT}/images/generations?api-version=2025-04-01-preview`, decode `data[0].b64_json` → bytes.
 
-**`POST /v1/vision:check-text`**
+**`POST /v1/vision/check-text`**
 - Request: `Content-Type: image/png`, body = raw PNG bytes.
 - Success: `200`, `application/json` `{ "hasText": true | false }`.
 - Failure: non-2xx (the **client** owns the fail-safe policy — see §6).
 - Internally: POST `{endpoint}/openai/deployments/{VISION_DEPLOYMENT}/chat/completions?api-version=2024-10-21`, the same yes/no "does this image contain legible readable words?" prompt blog-site uses today.
 
-**`POST /v1/images:edit`** — *contract-reserved, implemented with bby-game (§8).*
+**`POST /v1/images/edit`** — *contract-reserved, implemented with bby-game (§8).*
 - Request: `multipart/form-data` fields `prompt`, `size`, `quality`, `n`; file `image` (reference).
 - Success: `200`, `image/png`.
 - Internally: multipart POST to `…/images/edits`.
@@ -171,11 +171,11 @@ frontmatter patching are untouched (the injectable-deps seam already isolates th
 1. **`scripts/cover/config.ts`** — replace `getImageConfig`/`getVisionConfig`/`requireCreds`
    (Azure endpoint/key/deployments) with `getGatewayConfig()` reading `IMAGE_GATEWAY_URL`
    + `IMAGE_GATEWAY_TOKEN`.
-2. **`scripts/cover/azure.ts`** — `generateImage(prompt)` POSTs `…/v1/images:generate`
+2. **`scripts/cover/azure.ts`** — `generateImage(prompt)` POSTs `…/v1/images/generate`
    (`size: "1536x1024"`, `quality: "high"`, `output_format: "png"`), returns the PNG buffer.
    **Raise** the client timeout to ~200s (the current 120s is below the gateway's
    worst-case generate time of ~180s plus proxy overhead).
-3. **`scripts/cover/text-check.ts`** — `hasText(png)` POSTs the PNG to `…/v1/vision:check-text`,
+3. **`scripts/cover/text-check.ts`** — `hasText(png)` POSTs the PNG to `…/v1/vision/check-text`,
    returns `body.hasText`. Preserve the **fail-safe**: any non-2xx / network error / parse
    failure → `true` (forces a retry, then the local fallback) — identical to today.
 4. **`.env.local.example`** + **`CLAUDE.md`** ("AI cover generation" section) — swap the
@@ -216,7 +216,7 @@ gateway is not on the site's critical build path.
 
 ## 8. Follow-on work (out of scope here)
 
-- **bby-game migration:** implement `POST /v1/images:edit`; point `gen.py` at the gateway
+- **bby-game migration:** implement `POST /v1/images/edit`; point `gen.py` at the gateway
   (its `generate` calls work day one — `size`/`background: transparent` are already
   supported; only reference-mode needs `edit`); remove its Azure key.
 - **lognote wiring:** add a `hero` field to its blog schema, a per-page OG prop + cover
