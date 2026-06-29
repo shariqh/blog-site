@@ -228,7 +228,7 @@ Expected: repo created under your account, initial commit pushed, `origin` set.
 
 ### Task 2: File the deferred backlog as GitHub issues on the new repo
 
-Everything not built today (spec §8 follow-ons + §9 risks + the reserved `edit` endpoint) becomes a tracked issue so it isn't lost. Run after Task 1 (the repo must exist).
+Everything not built today (spec §8 follow-ons + §9 risks) becomes a tracked issue so it isn't lost. Run after Task 1 (the repo must exist). Note: the `edit` endpoint is **in scope** (Task 6), so it is NOT filed as an issue.
 
 **Files:** none (uses `gh` against the `image-gateway` repo).
 
@@ -246,13 +246,9 @@ done
 
 ```bash
 cd /Users/shariqhirani/Development/image-gateway
-gh issue create --title "Implement POST /v1/images/edit (reference-image mode)" \
-  --label enhancement --label gateway --label follow-up \
-  --body "Multipart edit endpoint (reference image for character consistency) used by bby-game. Internally POSTs to Azure .../images/edits. Contract reserved in the v1 spec; implement alongside the bby-game migration (#bby)."
-
 gh issue create --title "Migrate bby-game onto the gateway" \
   --label enhancement --label consumer --label follow-up \
-  --body "Point bby-game's gen.py at the gateway and remove its Azure key. Its generate calls (incl. size + background:transparent) already work; only reference-mode needs the edit endpoint."
+  --body "Point bby-game's gen.py at the gateway (both generate AND edit paths — the gateway's /v1/images/edit endpoint is implemented in v1) and remove its Azure key. Step-by-step lives in bby-game/MIGRATE-TO-GATEWAY.md."
 
 gh issue create --title "Wire lognote as a cover consumer" \
   --label enhancement --label consumer --label follow-up \
@@ -296,7 +292,7 @@ gh issue create --title "Verify cloudflared passes 60-180s responses without cut
 ```bash
 gh issue list --repo "$(gh repo view --json nameWithOwner -q .nameWithOwner)" --limit 20
 ```
-Expected: 11 open issues listed. (No commit — issues are remote.)
+Expected: 10 open issues listed. (No commit — issues are remote.)
 
 ---
 
@@ -377,7 +373,8 @@ git add -A && git commit -m "feat: bearer-token auth middleware"
 **Interfaces:**
 - Produces: `class UpstreamError extends Error { constructor(op: string, status: number, detail: string) }` with `.status: number`.
 - Produces: `interface GenerateParams { prompt: string; size?: string; quality?: string; outputFormat?: string; background?: string }`.
-- Produces: `interface AzureClient { generate(p: GenerateParams): Promise<Buffer>; checkText(png: Buffer): Promise<boolean> }`.
+- Produces: `interface EditParams { prompt: string; image: Buffer; filename?: string; size?: string; quality?: string }`.
+- Produces: `interface AzureClient { generate(p: GenerateParams): Promise<Buffer>; checkText(png: Buffer): Promise<boolean>; edit?(p: EditParams): Promise<Buffer> }` — `edit` is optional here and implemented in Task 6, so generate/check-text fakes in other tests need no change.
 - Produces: `createAzureClient(cfg: GatewayConfig, fetchImpl?: typeof fetch): AzureClient`.
 - Produces route `POST /v1/images/generate` → `image/png` on success; `{ error: { message, upstreamStatus? } }` with status 400/500/502 on failure.
 
@@ -440,7 +437,12 @@ export class UpstreamError extends Error {
 }
 
 export interface GenerateParams { prompt: string; size?: string; quality?: string; outputFormat?: string; background?: string }
-export interface AzureClient { generate(p: GenerateParams): Promise<Buffer>; checkText(png: Buffer): Promise<boolean> }
+export interface EditParams { prompt: string; image: Buffer; filename?: string; size?: string; quality?: string }
+export interface AzureClient {
+  generate(p: GenerateParams): Promise<Buffer>;
+  checkText(png: Buffer): Promise<boolean>;
+  edit?(p: EditParams): Promise<Buffer>; // implemented in Task 6
+}
 
 async function safeText(res: Response): Promise<string> { try { return await res.text(); } catch { return ''; } }
 
@@ -684,50 +686,143 @@ git add -A && git commit -m "feat: vision/check-text endpoint over Azure gpt-4o-
 
 ---
 
-### Task 6: `POST /v1/images/edit` reserved → 501
+### Task 6: `POST /v1/images/edit` (Azure edit client + route)
+
+In scope so bby-game can migrate end-to-end (its character-consistency uses reference/edit mode).
 
 **Files:**
-- Modify: `/Users/shariqhirani/Development/image-gateway/src/app.ts` (add the route)
+- Modify: `/Users/shariqhirani/Development/image-gateway/src/azure.ts` (implement `edit` on `createAzureClient`)
+- Modify: `/Users/shariqhirani/Development/image-gateway/src/app.ts` (add the multipart route)
+- Test: `/Users/shariqhirani/Development/image-gateway/test/azure-edit.test.ts`
 - Test: `/Users/shariqhirani/Development/image-gateway/test/edit-route.test.ts`
 
 **Interfaces:**
-- Produces route `POST /v1/images/edit` → `501 { error: { message } }` (auth still enforced). Documents the surface until the bby-game migration implements it (issue from Task 2).
+- Produces: `AzureClient.edit(p: EditParams): Promise<Buffer>` — multipart POST to `.../images/edits?api-version=2025-04-01-preview`; returns PNG bytes; throws `UpstreamError` on non-2xx / no image.
+- Produces route `POST /v1/images/edit` (multipart/form-data: `prompt`, file `image`, optional `size`/`quality`) → `image/png`; `400` on missing prompt/image; `502` on `UpstreamError`.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing Azure-edit test**
+
+`test/azure-edit.test.ts`:
+```ts
+import { describe, it, expect, vi } from 'vitest';
+import { createAzureClient } from '../src/azure.js';
+
+const cfg = { azureEndpoint: 'https://x.openai.azure.com', azureKey: 'k',
+  imageDeployment: 'gpt-image-1', visionDeployment: 'gpt-4o-mini', gatewayToken: 't', port: 8080 };
+
+describe('AzureClient.edit', () => {
+  it('POSTs multipart to images/edits and decodes b64 to a Buffer', async () => {
+    const png = Buffer.from('EDITED');
+    const fetchImpl = vi.fn(async (url: any, init: any) => {
+      expect(String(url)).toBe('https://x.openai.azure.com/openai/deployments/gpt-image-1/images/edits?api-version=2025-04-01-preview');
+      expect(init.headers['api-key']).toBe('k');
+      expect(init.body).toBeInstanceOf(FormData);
+      const fd = init.body as FormData;
+      expect(fd.get('prompt')).toBe('make it pop');
+      expect(fd.get('image')).toBeInstanceOf(Blob);
+      return new Response(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] }), { status: 200 });
+    });
+    const out = await createAzureClient(cfg, fetchImpl as any).edit!({ prompt: 'make it pop', image: Buffer.from('REF'), filename: 'ref.png', size: '1024x1024' });
+    expect(out.equals(png)).toBe(true);
+  });
+  it('throws UpstreamError on non-2xx', async () => {
+    const fetchImpl = vi.fn(async () => new Response('bad', { status: 400 }));
+    await expect(createAzureClient(cfg, fetchImpl as any).edit!({ prompt: 'p', image: Buffer.from('x') })).rejects.toMatchObject({ status: 400 });
+  });
+});
+```
+
+- [ ] **Step 2: Run it — expect FAIL** (`edit` not on the client).
+
+- [ ] **Step 3: Implement `edit` in `createAzureClient` (src/azure.ts)** — add this method to the returned object
+
+```ts
+    async edit(p) {
+      const url = `${cfg.azureEndpoint}/openai/deployments/${cfg.imageDeployment}/images/edits?api-version=${IMAGE_API_VERSION}`;
+      const form = new FormData();
+      form.append('prompt', p.prompt);
+      form.append('n', '1');
+      if (p.size) form.append('size', p.size);
+      if (p.quality) form.append('quality', p.quality);
+      form.append('image', new Blob([p.image], { type: 'image/png' }), p.filename ?? 'image.png');
+      const res = await fetchImpl(url, { method: 'POST', headers: { 'api-key': cfg.azureKey }, body: form });
+      if (!res.ok) throw new UpstreamError('edit', res.status, await safeText(res));
+      const json = (await res.json()) as { data?: { b64_json?: string }[] };
+      const b64 = json.data?.[0]?.b64_json;
+      if (!b64) throw new UpstreamError('edit', 502, 'no image in response');
+      return Buffer.from(b64, 'base64');
+    },
+```
+> Do NOT set `content-type` on the edit request — `fetch` derives the multipart boundary from the `FormData` body automatically.
+
+- [ ] **Step 4: Run the Azure-edit test — expect PASS.**
+
+- [ ] **Step 5: Write the failing edit-route test**
 
 `test/edit-route.test.ts`:
 ```ts
 import { describe, it, expect } from 'vitest';
 import { buildApp } from '../src/app.js';
 import type { AzureClient } from '../src/azure.js';
-const azure: AzureClient = { async generate() { return Buffer.from(''); }, async checkText() { return false; } };
+
+const edited = Buffer.from('EDITEDPNG');
+const azure: AzureClient = { async generate() { return Buffer.from(''); }, async checkText() { return false; }, async edit() { return edited; } };
+
+function form(withImage = true) {
+  const fd = new FormData();
+  fd.append('prompt', 'make it pop');
+  if (withImage) fd.append('image', new Blob([Buffer.from('REF')], { type: 'image/png' }), 'ref.png');
+  return fd;
+}
 
 describe('POST /v1/images/edit', () => {
   it('401 without auth', async () => {
-    const res = await buildApp({ azure, token: 't' }).request('/v1/images/edit', { method: 'POST' });
+    const res = await buildApp({ azure, token: 't' }).request('/v1/images/edit', { method: 'POST', body: form() });
     expect(res.status).toBe(401);
   });
-  it('501 not implemented with auth', async () => {
-    const res = await buildApp({ azure, token: 't' }).request('/v1/images/edit', { method: 'POST', headers: { authorization: 'Bearer t' } });
-    expect(res.status).toBe(501);
+  it('400 when the image file is missing', async () => {
+    const res = await buildApp({ azure, token: 't' }).request('/v1/images/edit', { method: 'POST', headers: { authorization: 'Bearer t' }, body: form(false) });
+    expect(res.status).toBe(400);
+  });
+  it('returns image/png on success', async () => {
+    const res = await buildApp({ azure, token: 't' }).request('/v1/images/edit', { method: 'POST', headers: { authorization: 'Bearer t' }, body: form() });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('image/png');
+    expect(Buffer.from(await res.arrayBuffer()).equals(edited)).toBe(true);
   });
 });
 ```
 
-- [ ] **Step 2: Run it — expect FAIL.**
+- [ ] **Step 6: Run it — expect FAIL** (route still absent / 501).
 
-- [ ] **Step 3: Add the route to `src/app.ts`**
+- [ ] **Step 7: Add the route to `src/app.ts`** (replace any prior `/images/edit` line; place before `app.route('/v1', v1)`)
 
 ```ts
-  v1.post('/images/edit', (c) => c.json({ error: { message: 'edit not implemented in v1 — see image-gateway issues' } }, 501));
+  v1.post('/images/edit', async (c) => {
+    const fd = await c.req.formData();
+    const prompt = fd.get('prompt');
+    const image = fd.get('image');
+    if (typeof prompt !== 'string' || !prompt) return c.json({ error: { message: 'prompt is required' } }, 400);
+    if (!(image instanceof File)) return c.json({ error: { message: 'image file is required' } }, 400);
+    if (!deps.azure.edit) return c.json({ error: { message: 'edit not available' } }, 501);
+    const size = typeof fd.get('size') === 'string' ? (fd.get('size') as string) : undefined;
+    const quality = typeof fd.get('quality') === 'string' ? (fd.get('quality') as string) : undefined;
+    try {
+      const out = await deps.azure.edit({ prompt, image: Buffer.from(await image.arrayBuffer()), filename: image.name, size, quality });
+      return c.body(out, 200, { 'content-type': 'image/png' });
+    } catch (e) {
+      if (e instanceof UpstreamError) return c.json({ error: { message: e.message, upstreamStatus: e.status } }, 502);
+      return c.json({ error: { message: (e as Error).message } }, 500);
+    }
+  });
 ```
 
-- [ ] **Step 4: Run tests — expect PASS.**
+- [ ] **Step 8: Run all tests — expect PASS.**
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add -A && git commit -m "feat: reserve images/edit endpoint (501 until bby-game migration)"
+git add -A && git commit -m "feat: images/edit endpoint (multipart reference-image mode)"
 ```
 
 ---
@@ -851,7 +946,7 @@ Holds the only Azure key. See blog-site spec 2026-06-29-image-gateway-extraction
 ## Endpoints
 - `POST /v1/images/generate`  JSON `{prompt,size?,quality?,output_format?,background?}` -> image/png
 - `POST /v1/vision/check-text` body image/png -> `{hasText}`
-- `POST /v1/images/edit`       reserved (501)
+- `POST /v1/images/edit`       multipart {prompt,image,size?,quality?} -> image/png
 - `GET  /healthz`
 
 All `/v1/*` require `Authorization: Bearer $IMAGE_GATEWAY_TOKEN`.
@@ -1318,8 +1413,9 @@ Watch the `review` check and the `## 🤖 AI code review` sticky comment; addres
 - blog-site cutover (§5) → Tasks 11–14; reprove (§7) → Task 15. ✓
 - Secret rotation (§4.3/§6) → Task 10 + Task 14 scrub. ✓
 - Failure behavior unchanged (§6) → Task 13 fail-safe tests + Task 12 throw-on-error. ✓
-- Follow-ons + risks (§8/§9) → Task 2 GitHub issues (11 issues incl. edit, bby-game, lognote, L2 package, fonts, per-consumer tokens, rate limit, server-side guard, expense-tracker, n>1, tunnel-timeout). ✓
+- Follow-ons + risks (§8/§9) → Task 2 GitHub issues (10 issues: bby-game, lognote, L2 package, fonts, per-consumer tokens, rate limit, server-side guard, expense-tracker, n>1, tunnel-timeout). The `edit` endpoint is NOT an issue — it's built in Task 6 so bby-game can migrate e2e. ✓
 - User request (file backlog as issues once repo exists) → Task 2 (after repo creation in Task 1). ✓
+- `edit` endpoint (multipart reference mode, bby-game's e2e dependency) → Task 6 (real implementation + tests). ✓
 
 **Placeholder scan:** No TBD/TODO. `<existing-slug>`, `<PR#>`, `<resource>`, `<tunnel-name>`, `<old-key-prefix>` are genuine user-supplied values, not unfinished plan content. ✓
 

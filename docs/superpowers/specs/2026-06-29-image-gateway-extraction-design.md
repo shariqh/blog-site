@@ -55,9 +55,9 @@ the gateway instead of Azure directly, and produces covers identically to today.
 **In scope (this deliverable):**
 
 1. A new standalone **`image-gateway`** service (own repo), deployed to **ubi-prod** in
-   Docker behind the existing cloudflared tunnel, exposing `generate`, `vision:check-text`,
-   and `healthz` (the `edit` endpoint is contract-reserved but implemented with bby-game —
-   see §8).
+   Docker behind the existing cloudflared tunnel, exposing `generate`, `vision/check-text`,
+   `images/edit`, and `healthz`. (`edit` is built now so bby-game can later migrate
+   end-to-end; bby-game's own cutover remains a follow-on.)
 2. **blog-site cutover:** replace the two Azure-calling functions with gateway calls;
    move config from Azure vars to gateway URL + token; update env example + docs.
 3. **Azure key rotation:** rotate the sprawled key; the new key lives only in the gateway;
@@ -65,8 +65,9 @@ the gateway instead of Azure directly, and produces covers identically to today.
 4. **Reprove:** demonstrate blog-site still generates a real cover via the gateway, unit
    tests pass, and the build (incl. OG images) is unaffected.
 
-**Non-goals (tracked as follow-ons, §8):** lognote wiring; bby-game migration + the `edit`
-endpoint; factoring L2 into a shared package; per-consumer tokens; rate limiting;
+**Non-goals (tracked as follow-ons, §8):** lognote wiring; bby-game migration (the gateway's
+`edit` endpoint is built here, but pointing `gen.py` at it is the follow-on); factoring L2
+into a shared package; per-consumer tokens; rate limiting;
 migrating expense-tracker.
 
 ## 3. Architecture
@@ -77,7 +78,7 @@ migrating expense-tracker.
    scripts/cover/      │  behind cloudflared tunnel                   │
    ─ generateImage ───►│  POST /v1/images/generate    ──┐            │
    ─ hasText       ───►│  POST /v1/vision/check-text   ──┤            │      ┌──────────────┐
-                       │  POST /v1/images/edit (reserved)─┼──Azure────┼─────►│ Azure OpenAI │
+                       │  POST /v1/images/edit (multipart)─┼──Azure───┼─────►│ Azure OpenAI │
    bby-game (py)       │  GET  /healthz                  ─┘  key      │      │ gpt-image-1  │
    gen.py (follow-on)─►│  Bearer-token auth · req logging │  (only    │      │ gpt-4o-mini  │
                        │  Azure key lives here only       │   here)   │      └──────────────┘
@@ -130,7 +131,7 @@ All endpoints require `Authorization: Bearer <IMAGE_GATEWAY_TOKEN>`; missing/inv
 - Failure: non-2xx (the **client** owns the fail-safe policy — see §6).
 - Internally: POST `{endpoint}/openai/deployments/{VISION_DEPLOYMENT}/chat/completions?api-version=2024-10-21`, the same yes/no "does this image contain legible readable words?" prompt blog-site uses today.
 
-**`POST /v1/images/edit`** — *contract-reserved, implemented with bby-game (§8).*
+**`POST /v1/images/edit`** — *implemented in v1 (so bby-game can migrate e2e).*
 - Request: `multipart/form-data` fields `prompt`, `size`, `quality`, `n`; file `image` (reference).
 - Success: `200`, `image/png`.
 - Internally: multipart POST to `…/images/edits`.
@@ -216,9 +217,9 @@ gateway is not on the site's critical build path.
 
 ## 8. Follow-on work (out of scope here)
 
-- **bby-game migration:** implement `POST /v1/images/edit`; point `gen.py` at the gateway
-  (its `generate` calls work day one — `size`/`background: transparent` are already
-  supported; only reference-mode needs `edit`); remove its Azure key.
+- **bby-game migration:** point `gen.py` at the gateway — both `generate` and `edit`
+  (reference) paths, since the `edit` endpoint ships in v1 — and remove its Azure key.
+  Step-by-step in `bby-game/MIGRATE-TO-GATEWAY.md`.
 - **lognote wiring:** add a `hero` field to its blog schema, a per-page OG prop + cover
   display; this is the natural trigger to **factor L2 into a shared, config-driven package**
   (palette, fonts-as-TTF-buffers, taxonomy→style map, content/output paths). lognote needs
