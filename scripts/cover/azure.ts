@@ -1,28 +1,21 @@
-import { getImageConfig } from './config'
+import { getGatewayConfig } from './config.js';
 
-const API_VERSION = '2025-04-01-preview'
+const GENERATE_TIMEOUT_MS = 200_000; // > gpt-image-1 worst case (~180s) + proxy overhead
 
 export async function generateImage(prompt: string): Promise<Buffer> {
-  const { endpoint, key, deployment } = getImageConfig()
-  const url = `${endpoint}/openai/deployments/${deployment}/images/generations?api-version=${API_VERSION}`
-  const res = await fetch(url, {
-    method: 'POST',
-    signal: AbortSignal.timeout(120000),
-    headers: { 'api-key': key, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      prompt,
-      n: 1,
-      size: '1536x1024',
-      quality: 'high',
-      output_format: 'png',
-    }),
-  })
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(`gpt-image-1 request failed: ${res.status} ${detail.slice(0, 300)}`)
+  const { url, token } = getGatewayConfig();
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), GENERATE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${url}/v1/images/generate`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-client': 'blog-site' },
+      body: JSON.stringify({ prompt, size: '1536x1024', quality: 'high', output_format: 'png' }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`gateway generate failed: ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  } finally {
+    clearTimeout(t);
   }
-  const json = (await res.json()) as { data?: Array<{ b64_json?: string }> }
-  const b64 = json.data?.[0]?.b64_json
-  if (!b64) throw new Error('gpt-image-1 returned no image')
-  return Buffer.from(b64, 'base64')
 }
