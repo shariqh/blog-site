@@ -20,4 +20,22 @@ describe('hasText', () => {
     expect(await hasText(Buffer.from('p'))).toBe(true);
     spy.mockRestore();
   });
+  it('fails safe to true on non-JSON body', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('not json', { status: 200 }));
+    const { hasText } = await import('./text-check.js');
+    expect(await hasText(Buffer.from('p'))).toBe(true);
+    spy.mockRestore();
+  });
+  it('fails safe to true when hasText field is missing', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ foo: 1 }), { status: 200 }));
+    const { hasText } = await import('./text-check.js');
+    expect(await hasText(Buffer.from('p'))).toBe(true);
+    spy.mockRestore();
+  });
+  it('fails safe to true when hasText field is non-boolean', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ hasText: 'yes' }), { status: 200 }));
+    const { hasText } = await import('./text-check.js');
+    expect(await hasText(Buffer.from('p'))).toBe(true);
+    spy.mockRestore();
+  });
 });
