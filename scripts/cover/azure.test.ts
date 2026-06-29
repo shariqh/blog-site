@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 beforeEach(() => {
   process.env.IMAGE_GATEWAY_URL = 'https://gw.test';
   process.env.IMAGE_GATEWAY_TOKEN = 'tok';
@@ -7,7 +9,7 @@ beforeEach(() => {
 
 describe('generateImage', () => {
   it('POSTs the gateway generate endpoint and returns PNG bytes', async () => {
-    const png = Buffer.from('PNGBYTES');
+    const png = Buffer.concat([PNG_MAGIC, Buffer.from('the rest of the image bytes')]);
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(png, { status: 200, headers: { 'content-type': 'image/png' } }),
     );
@@ -24,6 +26,14 @@ describe('generateImage', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('err', { status: 502 }));
     const { generateImage } = await import('./azure.js');
     await expect(generateImage('p')).rejects.toThrow();
+    fetchSpy.mockRestore();
+  });
+  it('throws when a 2xx body is not a PNG (misrouted HTML/JSON)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<html>not an image</html>', { status: 200, headers: { 'content-type': 'text/html' } }),
+    );
+    const { generateImage } = await import('./azure.js');
+    await expect(generateImage('p')).rejects.toThrow(/not a valid PNG/);
     fetchSpy.mockRestore();
   });
 });

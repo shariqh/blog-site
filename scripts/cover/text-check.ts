@@ -3,8 +3,11 @@ import { getGatewayConfig } from './config.js';
 const CHECK_TIMEOUT_MS = 60_000;
 
 export async function hasText(png: Buffer): Promise<boolean> {
+  // Read config OUTSIDE the fail-safe catch: a missing IMAGE_GATEWAY_URL/TOKEN is a
+  // deployment error that must surface, not be silently masked as "has text" (which would
+  // turn every cover into a branded fallback with no error).
+  const { url, token } = getGatewayConfig();
   try {
-    const { url, token } = getGatewayConfig();
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), CHECK_TIMEOUT_MS);
     try {
@@ -20,6 +23,6 @@ export async function hasText(png: Buffer): Promise<boolean> {
       clearTimeout(t);
     }
   } catch {
-    return true; // any error (network/abort/parse) fails safe to "has text"
+    return true; // network/abort/parse failures fail safe to "has text"
   }
 }

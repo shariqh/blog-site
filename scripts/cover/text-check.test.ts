@@ -38,4 +38,9 @@ describe('hasText', () => {
     expect(await hasText(Buffer.from('p'))).toBe(true);
     spy.mockRestore();
   });
+  it('surfaces a config error (does NOT mask it as true) when the gateway token is missing', async () => {
+    delete process.env.IMAGE_GATEWAY_TOKEN;
+    const { hasText } = await import('./text-check.js');
+    await expect(hasText(Buffer.from('p'))).rejects.toThrow(/IMAGE_GATEWAY_TOKEN/);
+  });
 });
