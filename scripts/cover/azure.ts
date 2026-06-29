@@ -1,6 +1,7 @@
 import { getGatewayConfig } from './config.js';
 
 const GENERATE_TIMEOUT_MS = 200_000; // > gpt-image-1 worst case (~180s) + proxy overhead
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // gpt-image-1 PNGs are ~1.5MB; cap absurd responses
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 export async function generateImage(prompt: string): Promise<Buffer> {
@@ -15,9 +16,17 @@ export async function generateImage(prompt: string): Promise<Buffer> {
       signal: ctrl.signal,
     });
     if (!res.ok) throw new Error(`gateway generate failed: ${res.status}`);
+    // Reject an oversized response up front (Content-Length) before buffering it.
+    const declared = Number(res.headers.get('content-length') ?? 0);
+    if (declared > MAX_IMAGE_BYTES) {
+      throw new Error(`gateway generate: response too large (${declared} bytes)`);
+    }
     // The result is written verbatim as a public cover.png — never trust a 2xx blindly.
-    // Validate the actual PNG signature so a misrouted/error body can't be published as an image.
+    // Validate size + the actual PNG signature so a misrouted/error/huge body can't be published.
     const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > MAX_IMAGE_BYTES) {
+      throw new Error(`gateway generate: response too large (${buf.length} bytes)`);
+    }
     if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_MAGIC)) {
       throw new Error(`gateway generate: response is not a valid PNG (${buf.length} bytes)`);
     }
