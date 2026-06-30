@@ -22,8 +22,10 @@ export async function generateImage(prompt: string): Promise<Buffer> {
       throw new Error(`gateway generate: response too large (${declared} bytes)`);
     }
     // The result is written verbatim as a public cover.png — never trust a 2xx blindly.
-    // Stream the body and abort mid-stream if accumulated bytes exceed the cap, so a gateway
-    // that omits/lies about Content-Length cannot OOM the process.
+    // Stream the body and reject mid-stream as soon as accumulated bytes exceed the cap.
+    // Each individual chunk is also checked before being accepted so a single oversized
+    // chunk is caught at chunk-granularity rather than only after full accumulation.
+    // This bounds peak allocation to MAX_IMAGE_BYTES + one chunk (typically ≤ a few KB).
     if (!res.body) throw new Error('gateway generate: response body is null');
     const reader = res.body.getReader();
     const chunks: Uint8Array[] = [];
@@ -32,11 +34,12 @@ export async function generateImage(prompt: string): Promise<Buffer> {
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        total += value.length;
-        if (total > MAX_IMAGE_BYTES) {
+        // Check before pushing so the chunk is never retained if it tips us over.
+        if (total + value.length > MAX_IMAGE_BYTES) {
           await reader.cancel();
           throw new Error(`gateway generate: response too large (>${MAX_IMAGE_BYTES} bytes)`);
         }
+        total += value.length;
         chunks.push(value);
       }
     } finally {
