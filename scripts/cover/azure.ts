@@ -22,11 +22,28 @@ export async function generateImage(prompt: string): Promise<Buffer> {
       throw new Error(`gateway generate: response too large (${declared} bytes)`);
     }
     // The result is written verbatim as a public cover.png — never trust a 2xx blindly.
-    // Validate size + the actual PNG signature so a misrouted/error/huge body can't be published.
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length > MAX_IMAGE_BYTES) {
-      throw new Error(`gateway generate: response too large (${buf.length} bytes)`);
+    // Stream the body and abort mid-stream if accumulated bytes exceed the cap, so a gateway
+    // that omits/lies about Content-Length cannot OOM the process.
+    if (!res.body) throw new Error('gateway generate: response body is null');
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.length;
+        if (total > MAX_IMAGE_BYTES) {
+          await reader.cancel();
+          throw new Error(`gateway generate: response too large (>${MAX_IMAGE_BYTES} bytes)`);
+        }
+        chunks.push(value);
+      }
+    } finally {
+      // Ensure the reader is always released, even if read() itself throws (e.g. AbortError).
+      reader.releaseLock();
     }
+    const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
     if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_MAGIC)) {
       throw new Error(`gateway generate: response is not a valid PNG (${buf.length} bytes)`);
     }

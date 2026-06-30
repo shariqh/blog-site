@@ -36,4 +36,22 @@ describe('generateImage', () => {
     await expect(generateImage('p')).rejects.toThrow(/not a valid PNG/);
     fetchSpy.mockRestore();
   });
+  it('throws when streamed body exceeds MAX_IMAGE_BYTES (26 MB across chunks)', async () => {
+    // Build a ReadableStream that pushes >25MB of data in chunks.
+    const chunk = new Uint8Array(10 * 1024 * 1024); // 10 MB per chunk
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(chunk);
+        controller.enqueue(chunk);
+        controller.enqueue(chunk); // 30 MB total — exceeds 25 MB cap
+        controller.close();
+      },
+    });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream, { status: 200 }),
+    );
+    const { generateImage } = await import('./azure.js');
+    await expect(generateImage('p')).rejects.toThrow(/too large/);
+    fetchSpy.mockRestore();
+  });
 });
