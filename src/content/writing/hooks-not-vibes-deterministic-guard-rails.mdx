@@ -10,7 +10,7 @@ tags:
 summary: >-
   The rules you give a coding agent live as prose in a config file and rely on
   it remembering them every turn. That breaks when the context summarizes. I
-  moved six of lognote's rules into Claude Code hooks, and learned where
+  moved seven of lognote's rules into Claude Code hooks, and learned where
   determinism actually stops.
 hero:
   image: /static/images/blog/hooks-not-vibes-deterministic-guard-rails/cover.png
@@ -18,16 +18,15 @@ hero:
     Cover illustration for "Hooks, not vibes: deterministic guard-rails for an
     AI coding agent".
   prompt: >-
-    Style: flat abstract shapes combined with loose hand-drawn single-weight
-    line-art (thin, confident strokes), minimal and geometric — a vintage
-    mid-century editorial spot illustration. Flat color fills, subtle paper
-    grain, no gradients, no 3D, no glossy realism.
+    Style: rich conceptual editorial illustration, like a Wired or New Yorker
+    feature spread, with one clear central metaphor. Painterly flat shading,
+    depth, texture, sophisticated. Constrained to the palette.
 
 
     Concept: Hooks, not vibes: deterministic guard-rails for an AI coding agent.
     The rules you give a coding agent live as prose in a config file and rely on
     it remembering them every turn. That breaks when the context summarizes. I
-    moved six of lognote's rules into Claude Code hooks, and learned where
+    moved seven of lognote's rules into Claude Code hooks, and learned where
     determinism actually stops.
 
 
@@ -41,7 +40,7 @@ hero:
     No photorealistic human faces. Wide 3:2 landscape composition with
     deliberate empty negative space in the LEFT third so a title can be overlaid
     later.
-  style: line-art
+  style: conceptual
 ---
 
 Every coding agent I run has a list of rules. Never commit straight to `main`. Work in a worktree, not the shared checkout. Sync the docs after you finish a feature. Get a review before you merge. For most people, including me until last week, those rules live as prose in a `CLAUDE.md` or a memory file, and they work by the agent reading them and choosing to obey.
@@ -60,9 +59,9 @@ A `PreToolUse` hook can deny a `git commit` on `main` before it ever runs. That 
 
 So determinism is available for gates. For work, you make the trigger deterministic and accept the ceiling. I think it is worth naming that plainly, because the easy version of this story oversells hooks as automation, and they are not.
 
-## The six hooks
+## The seven hooks
 
-I built six for [lognote](https://lognote.dev/?utm_source=shariq.dev&utm_medium=blog&utm_campaign=hooks), split along a line that turned out to matter.
+I built seven for [lognote](https://lognote.dev/?utm_source=shariq.dev&utm_medium=blog&utm_campaign=hooks), split along a line that turned out to matter.
 
 Four are committed and repo-wide, living in `.claude/settings.json` and tracked `.claude/hooks/*.sh`. They are invariants every clone should enforce:
 
@@ -71,7 +70,7 @@ Four are committed and repo-wide, living in `.claude/settings.json` and tracked 
 - Remind the agent to sync docs after it edits feature code.
 - Run shellcheck on any `.sh` file it touches.
 
-The other two are personal, in a gitignored `settings.local.json` plus `*.local.sh`. They encode my working style, not the repo's invariants: auto-dispatch a background review agent the moment a PR is created, and gate `gh pr merge` behind a checklist. There is also a nudge that warns me when I am editing the shared `main` checkout instead of a worktree.
+The other three are personal, in a gitignored `settings.local.json` plus `*.local.sh`. They encode my working style, not the repo's invariants: auto-dispatch a background review agent the moment a PR is created, gate `gh pr merge` behind a checklist, and warn me when I am editing the shared `main` checkout instead of a worktree.
 
 The split is the design. Repo invariants ship to everyone who clones; my idiosyncrasies stay on my machine and never fire for a contributor who works differently.
 
@@ -79,13 +78,13 @@ The split is the design. Repo invariants ship to everyone who clones; my idiosyn
 
 The first thing the new auto-dispatch reviewer hook did, the very first time it fired, was review the guard hooks I had just finished writing. An independent model read them and reported that they were trivially bypassable.
 
-It was right. I had been grepping the whole shell command string for the thing I wanted to block, instead of parsing out the specific command segment. So `git commit ; cd .` sailed through, because my pattern was anchored in a way the extra clause broke. An override token I had buried in a commit message was being read as approval. The tooling I built to catch bugs immediately caught the bugs in the tooling. It took six rounds of adversarial review-and-harden before the suite was solid enough to merge.
+It was right. I had been grepping the whole shell command string for the thing I wanted to block, instead of parsing out the specific command segment. So `git commit ; cd .` sailed through, because my pattern was anchored in a way the extra clause broke. An override token I had buried in a commit message was being read as approval. The tooling I built to catch bugs immediately caught the bugs in the tooling. It took five rounds of adversarial review-and-harden before the suite was solid enough to merge.
 
 That loop, an independent model attacking my work the instant it exists, is the actual payoff. The hook did not fix anything itself. It just guaranteed the review happened, on every PR, no matter what state the context was in.
 
 ## Determinism has a floor in a bash hook
 
-Round six did not make the hooks airtight, and chasing that was a mistake I had to stop making. You cannot fully parse a shell from inside a bash hook. There is always a more exotic invocation: `git --no-pager -C . commit`, or `yarn dlx wrangler ...` routing around the binary name you matched on. Every pattern I tightened, I could think of one more way around it.
+Round five did not make the hooks airtight, and chasing that was a mistake I had to stop making. You cannot fully parse a shell from inside a bash hook. There is always a more exotic invocation: a launcher like `yarn dlx wrangler ...` or `npx --yes wrangler ...` that routes around the binary name you matched on. Every pattern I tightened, I could think of one more way around it.
 
 At some point you stop chasing the asymptote and draw a threat-model line instead. Mine: these are guard-rails against accidental mistakes, not an adversary who already controls the shell. If something can already run arbitrary commands as me, a grep in a bash hook is not what is standing between it and the damage. I wrote that line into a comment at the top of the hook itself, so the next person (often a future me, or a future agent) reads the boundary in the same place they read the code. Being honest about where the determinism stops is part of the design, not an apology for it.
 
