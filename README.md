@@ -2,6 +2,99 @@
 
 Personal blog at [shariq.dev](https://www.shariq.dev). Astro 6 + Tailwind 4 + MDX. Hosted on Cloudflare Pages.
 
+## Architecture & flows
+
+A few moving parts beyond "build a static site": a Notion-driven drafting agent,
+AI cover generation through a shared image service, build-time OG images, and
+Cloudflare Pages CI. Here's how they fit.
+
+### System overview
+
+```
+   you  ────────────┐           Notion CMS (control panel)
+   the draft agent ─┤           ideas → triage → Ready
+                    ▼                    │
+   ┌──────────────────── content ───────┼─────────────────────┐
+   │  src/content/writing/*.mdx          ▼                     │
+   │  Zod-validated frontmatter · tags → 5 buckets             │
+   │  each post: hero cover (AI) + a build-time OG image       │
+   └───────────────────────────┬─────────────────────────────-┘
+                               │ git push / PR
+                               ▼
+   ┌──────────── Astro build (GitHub Actions) ───────────────┐
+   │  render pages  +  OG PNGs (Satori/resvg, LOCAL, one per  │
+   │  post → dist/og/<slug>.png)                              │
+   └───────────────────────────┬─────────────────────────────┘
+                               ▼
+   ┌──────────── Cloudflare Pages ──────────────┐  analytics: GoatCounter
+   │  main → production (shariq.dev)             │  engagement: email / X (footer)
+   │  PR   → preview URL (commented on the PR)   │  no comments
+   └─────────────────────────────────────────────┘
+
+   AI covers call the external image-gateway (img-gateway.shariq.dev) at
+   draft/CLI time — see "Cover + OG generation". The site BUILD never calls it.
+```
+
+### Post lifecycle (idea → live)
+
+```
+  Notion: Idea ──► Proposed ──► Ready
+                                  │  agent-draft (daily 02:00 UTC)
+                                  ▼
+     write MDX  ─►  AI cover (→ image-gateway)  ─►  open PR
+     (by hand,      patch hero.image                 │
+      or agent)                                       ▼
+                                     PR checks: CI (vitest) · Vale ·
+                                     gpt-5.4 AI review · Pages preview
+                                                      │ review + merge
+                                                      ▼
+                                push to main ─► build (+ OG) ─► Cloudflare
+                                                                Pages = LIVE
+```
+
+### AI drafting agent (Plan B) — GitHub Actions cron
+
+Nothing publishes automatically; the agent only proposes and drafts. Full details
+under [Content workflow](#content-workflow).
+
+```
+        Notion CMS DB  (Stage: Idea/Proposed/Ready/Drafted/Published)
+              ▲                ▲                         ▲
+   discover   │      draft     │            promote      │
+   (Sun 03:00)│   (daily 02:00)│          (daily 04:00)  │
+   ┌──────────┴─┐  ┌───────────┴─────┐  ┌───────────────-┴──┐
+   │ scan ideas,│  │ Ready rows →    │  │ published YT with  │
+   │ my commits,│  │ MDX + AI cover  │  │ cross-post=blog →  │
+   │ dev trends │  │ → open a PR     │  │ new blog row       │
+   │ → Proposed │  │ (cover failure  │  │ (Stage=Proposed)   │
+   │            │  │  is non-fatal)  │  │                    │
+   └────────────┘  └─────────────────┘  └────────────────────┘
+```
+
+### Cover + OG generation
+
+Two separate image paths — one generative (remote, via the gateway), one
+deterministic (local, at build):
+
+```
+  AI COVER  (generative — at draft/CLI time, NOT during the build)
+    gen:cover / agent → build prompt (palette + bucket→style spine)
+      ├─ POST img-gateway.shariq.dev /v1/images/generate ─┐ retry ≤3
+      ├─ POST                        /v1/vision/check-text┘ "readable text?"
+      │     gateway holds the Azure key → gpt-image-1 + gpt-4o-mini
+      ├─ 3 strikes → render branded fallback LOCALLY (Satori)
+      └─ write public/static/images/blog/<slug>/cover.png + patch hero
+
+  OG IMAGE  (deterministic — LOCAL, at build, no network)
+    astro build → src/pages/og/[...slug].png.ts → Satori + resvg
+      ├─ hybrid     (cover + scrim + title)   when hero.image exists
+      └─ fallback   (ink panel + motif + title) otherwise
+      → dist/og/<slug>.png   (emitted as og:image / twitter:card)
+```
+
+The image-gateway is a separate service (`shariqh/image-gateway`) that holds the
+only Azure key; the build and the live site never talk to it.
+
 ## Develop
 
 ```bash
@@ -17,7 +110,7 @@ npm run dev    # http://localhost:4321
 - `npm test` — run unit tests (Vitest)
 - `npm run test:smoke` — Playwright smoke test (requires `npm run build` first)
 - `npm run astro check` — type-check `.astro` files
-- `npm run gen:cover <slug> [--style line-art|conceptual] [--force]` — generate a post's AI cover (Azure `gpt-image-1`)
+- `npm run gen:cover <slug> [--style line-art|conceptual] [--force]` — generate a post's AI cover (via the image-gateway)
 - `npm run gen:cover:all [--force]` — backfill AI covers across all posts
 
 ## Authoring posts
@@ -29,11 +122,11 @@ time (see `src/content.config.ts`). Tags map to display buckets in
 You can write a post by hand (create the MDX, commit, push, open a PR), or
 let the drafting agent write one for you — see [Content workflow](#content-workflow).
 
-Each post gets an on-brand **cover image** — AI-generated via Azure `gpt-image-1`
-and written to `hero.image` — plus a build-time **Open Graph image** (1200×630,
-one per post under `dist/og/`) so shared links preview cleanly. The drafting
-agent covers new posts automatically; `npm run gen:cover` / `gen:cover:all`
-do it by hand.
+Each post gets an on-brand **cover image** — AI-generated via the **image-gateway**
+(`img-gateway.shariq.dev`, which proxies Azure `gpt-image-1`) and written to
+`hero.image` — plus a build-time **Open Graph image** (1200×630, one per post under
+`dist/og/`) so shared links preview cleanly. The drafting agent covers new posts
+automatically; `npm run gen:cover` / `gen:cover:all` do it by hand.
 
 ## Deploy (Cloudflare Pages via GitHub Actions)
 

@@ -47,4 +47,7 @@ jobs:
           SCAN_REPO_ORG: ${{ vars.SCAN_REPO_ORG }}
           SCAN_REPO_INCLUDE: ${{ vars.SCAN_REPO_INCLUDE }}
           SCAN_REPO_ACTIVE_DAYS: ${{ vars.SCAN_REPO_ACTIVE_DAYS }}
+          # AI cover generation via the image-gateway (best-effort; cover failure never aborts a draft)
+          IMAGE_GATEWAY_URL: https://img-gateway.shariq.dev
+          IMAGE_GATEWAY_TOKEN: ${{ secrets.IMAGE_GATEWAY_TOKEN }}
         run: npm run agent:draft
