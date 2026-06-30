@@ -1,6 +1,7 @@
 ---
 title: 'Hooks, not vibes: deterministic guard-rails for an AI coding agent'
 date: '2026-06-29'
+draft: true
 tags:
   - ai
   - claude-code
@@ -50,7 +51,7 @@ Every coding agent I run has a list of rules.
 - Sync the docs after you finish a feature.
 - Get a review before you merge.
 
-Most of the time, those rules live as prose in a `CLAUDE.md` or a memory file or have to be prompted each iteration and that is a problem. Text in a config file is a suggestion the agent has to remember on every single turn. It might work in the beginning but when the context gets too long the runtime summarizes it to save tokens and your rule quietly evaporates along with the rest of the detail as he agent just stops doing the thing because the sentence that told it to is no longer in its "head". You find out later.
+Most of the time, those rules live as prose in a `CLAUDE.md` or a memory file or have to be prompted each iteration and that is a problem. Text in a config file is a suggestion the agent has to remember on every single turn. It might work in the beginning but when the context gets too long the runtime summarizes it to save tokens and your rule quietly evaporates along with the rest of the detail as the agent just stops doing the thing because the sentence that told it to is no longer in its "head". You find out later.
 
 So I stopped trusting memory and moved the rules into hooks.
 
@@ -79,7 +80,7 @@ Repo invariants ship to everyone who clones; my personal ways of working stay on
 
 ## Self catching bugs
 
-When my new hook-based auto-dispatch reviewer fired for the first time if was reviewing the guard hooks I had just finished writing. An independent model read them and reported that they were trivially bypassable. The tooling I built to catch bugs immediately caught the bugs in itself.
+When my new hook-based auto-dispatch reviewer fired for the first time it was reviewing the guard hooks I had just finished writing. An independent model read them and reported that they were trivially bypassable. The tooling I built to catch bugs immediately caught the bugs in itself.
 
 That loop, an independent model attacking my work the instant it exists, is an awesome payoff. The hook did not fix anything itself but it guaranteed the review happened on every PR no matter what state the context was in.
 
@@ -93,7 +94,7 @@ When the agent later went to merge the hardened PR, it got refused. The merge-ga
 
 Choosing a plan is *intent*; approval has to be given *at merge time*, when the thing being merged actually exists. A good gate distinguishes the two, and this one did, against its own author.
 
-# The takeaway
+## The takeaway
 
 Make the rules you currently rely on an agent to *remember* deterministic. Block or nudge on a lifecycle event; do not trust a sentence in a config file to survive a context summary. Where you genuinely cannot make it deterministic because the agent has to do real work make the *trigger* deterministic and document the boundary.
 
