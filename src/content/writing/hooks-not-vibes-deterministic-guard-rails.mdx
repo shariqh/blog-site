@@ -1,0 +1,101 @@
+---
+title: 'Hooks, not vibes: deterministic guard-rails for an AI coding agent'
+date: '2026-06-29'
+draft: false
+tags:
+  - ai
+  - claude-code
+  - agents
+  - engineering
+  - build-in-public
+summary: >-
+  The rules you give a coding agent live as prose in a config file and rely on
+  it remembering them every turn. That breaks when the context summarizes. I
+  moved seven of lognote's rules into Claude Code hooks, and learned where
+  determinism actually stops.
+hero:
+  image: /static/images/blog/hooks-not-vibes-deterministic-guard-rails/cover.png
+  alt: >-
+    Cover illustration for "Hooks, not vibes: deterministic guard-rails for an
+    AI coding agent".
+  prompt: >-
+    Style: rich conceptual editorial illustration, like a Wired or New Yorker
+    feature spread, with one clear central metaphor. Painterly flat shading,
+    depth, texture, sophisticated. Constrained to the palette.
+
+
+    Concept: Hooks, not vibes: deterministic guard-rails for an AI coding agent.
+    The rules you give a coding agent live as prose in a config file and rely on
+    it remembering them every turn. That breaks when the context summarizes. I
+    moved seven of lognote's rules into Claude Code hooks, and learned where
+    determinism actually stops.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, captions, labels, headlines, sentences, or
+    paragraphs — the image must contain no legible prose text, because a title
+    will be overlaid afterward. Stylized logos, app or screen UI, code symbols,
+    and abstract mark-making are fine as long as they are not spelled-out words.
+    No photorealistic human faces. Wide 3:2 landscape composition with
+    deliberate empty negative space in the LEFT third so a title can be overlaid
+    later.
+  style: conceptual
+---
+
+Every coding agent I run has a list of rules.
+
+- Never commit straight to `main`.
+- Work in a worktree, not the shared checkout.
+- Sync the docs after you finish a feature.
+- Get a review before you merge.
+
+Most of the time, those rules live as prose in a `CLAUDE.md` or a memory file or have to be prompted each iteration and that is a problem. Text in a config file is a suggestion the agent has to remember on every single turn. It might work in the beginning but when the context gets too long the runtime summarizes it to save tokens and your rule quietly evaporates along with the rest of the detail as the agent just stops doing the thing because the sentence that told it to is no longer in its "head". You find out later.
+
+So I stopped trusting memory and moved the rules into hooks.
+
+## What a hook can and cannot do
+
+A hook is a script the runtime fires on a lifecycle event, not a request the model chooses to honor. In Claude Code, a `PreToolUse` hook runs before a tool call and can hard-block it. A `PostToolUse` hook runs after and can inject text back into the conversation. The trigger is deterministic because it is wired to the runtime, not to the agent's attention.
+
+But, a hook makes the *trigger* deterministic. It does not make the *work* deterministic.
+
+A `PreToolUse` hook can deny a `git commit` on `main` before it ever runs - a real gate that is deterministic in, deterministic out. But anything generative, like spawning a reviewer or writing the fix, can only be done by the agent itself. The best a hook can do there is fire a reliable, summary-proof nudge that says "now do X." Whether the agent then does X well is back in non-deterministic territory.
+
+## The seven hooks
+
+I built seven hooks for [lognote](https://lognote.dev/?utm_source=shariq.dev&utm_medium=blog&utm_campaign=hooks).
+
+Four are committed and repo-wide as invariants every agent clone should enforce:
+
+- Block `git commit` and `git push` to `main`.
+- Block `wrangler` writes that lack `--remote`.
+- Remind the agent to sync docs after it edits feature code.
+- Run shellcheck on any `.sh` file it touches.
+
+The other three are personal and encode my working style, not the repo's invariants: auto-dispatch a background review agent the moment a PR is created, gate `gh pr merge` behind a checklist, and warn me when I am editing the shared `main` checkout instead of a worktree.
+
+Repo invariants ship to everyone who clones; my personal ways of working stay on my machine and never fire for a contributor who works differently.
+
+## Self catching bugs
+
+When my new hook-based auto-dispatch reviewer fired for the first time it was reviewing the guard hooks I had just finished writing. An independent model read them and reported that they were trivially bypassable. The tooling I built to catch bugs immediately caught the bugs in itself.
+
+That loop, an independent model attacking my work the instant it exists, is an awesome payoff. The hook did not fix anything itself but it guaranteed the review happened on every PR no matter what state the context was in.
+
+## Determinism has a floor
+
+At some point you stop chasing the asymptote and draw a threat-model line instead. These are guard-rails against accidental mistakes, not an adversary who already controls the shell. If something can already run arbitrary commands as me, a grep in a bash hook is not what is standing between it and the damage. I wrote that line into a comment at the top of the hook itself, so the next person reads the boundary in the same place they read the code. Be honest about where the determinism stops.
+
+## The guard blocked its own author
+
+When the agent later went to merge the hardened PR, it got refused. The merge-gate hook and the runtime's own safety classifier both declined until I gave explicit approval. Earlier in the session I had picked a Claude Code plan option whose label ended in "...and merge." The agent treated that as permission to merge. 
+
+Choosing a plan is *intent*; approval has to be given *at merge time*, when the thing being merged actually exists. A good gate distinguishes the two, and this one did, against its own author.
+
+## The takeaway
+
+Make the rules you currently rely on an agent to *remember* deterministic. Block or nudge on a lifecycle event; do not trust a sentence in a config file to survive a context summary. Where you genuinely cannot make it deterministic because the agent has to do real work make the *trigger* deterministic and document the boundary.
+
+The win here is smaller than "the AI follows the rules now," and more durable - it is that the rules no longer depend on the AI remembering them.
