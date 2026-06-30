@@ -5,33 +5,19 @@ import { config as loadEnv } from 'dotenv'
 loadEnv({ path: '.env.local' })
 loadEnv()
 
-function trimmed(key: string): string {
-  const v = process.env[key]
-  return v && v.length > 0 ? v : ''
-}
+export interface GatewayConfig { url: string; token: string }
 
-// Strip a single trailing slash so callers can always join paths with a leading slash.
-function endpoint(): string {
-  return trimmed('AZURE_OPENAI_ENDPOINT').replace(/\/$/, '')
-}
-
-function requireCreds(): { endpoint: string; key: string } {
-  const ep = endpoint()
-  const key = trimmed('AZURE_OPENAI_KEY')
-  if (!ep || !key) {
-    throw new Error(
-      'Cover generation needs AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY (set them in .env.local or the environment).'
-    )
+export function getGatewayConfig(): GatewayConfig {
+  // Trim so a whitespace-only value (e.g. a botched secret render) is rejected here,
+  // not silently turned into an invalid URL/token that the fail-safe later masks.
+  const url = (process.env.IMAGE_GATEWAY_URL ?? '').trim()
+  const token = (process.env.IMAGE_GATEWAY_TOKEN ?? '').trim()
+  if (!url) throw new Error('Missing IMAGE_GATEWAY_URL')
+  if (!token) throw new Error('Missing IMAGE_GATEWAY_TOKEN')
+  try {
+    new URL(url)
+  } catch {
+    throw new Error(`Invalid IMAGE_GATEWAY_URL: ${JSON.stringify(url)}`)
   }
-  return { endpoint: ep, key }
-}
-
-export function getImageConfig(): { endpoint: string; key: string; deployment: string } {
-  const { endpoint, key } = requireCreds()
-  return { endpoint, key, deployment: trimmed('AZURE_OPENAI_IMAGE_DEPLOYMENT') || 'gpt-image-1' }
-}
-
-export function getVisionConfig(): { endpoint: string; key: string; deployment: string } {
-  const { endpoint, key } = requireCreds()
-  return { endpoint, key, deployment: trimmed('AZURE_OPENAI_VISION_DEPLOYMENT') || 'gpt-4o-mini' }
+  return { url: url.replace(/\/+$/, ''), token }
 }

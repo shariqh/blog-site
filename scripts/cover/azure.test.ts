@@ -1,46 +1,39 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { generateImage } from './azure'
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const SAVED = { ...process.env }
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 beforeEach(() => {
-  process.env.AZURE_OPENAI_ENDPOINT = 'https://x.openai.azure.com'
-  process.env.AZURE_OPENAI_KEY = 'k'
-  process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT = 'gpt-image-1'
-})
-afterEach(() => {
-  process.env = { ...SAVED }
-  vi.restoreAllMocks()
-})
-
-const PNG_B64 = Buffer.from('hello-png').toString('base64')
+  process.env.IMAGE_GATEWAY_URL = 'https://gw.test';
+  process.env.IMAGE_GATEWAY_TOKEN = 'tok';
+});
 
 describe('generateImage', () => {
-  it('POSTs to the images endpoint and returns decoded PNG bytes', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [{ b64_json: PNG_B64 }] }),
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    const buf = await generateImage('a prompt')
-    expect(buf.toString()).toBe('hello-png')
-
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe(
-      'https://x.openai.azure.com/openai/deployments/gpt-image-1/images/generations?api-version=2025-04-01-preview'
-    )
-    expect(init.headers['api-key']).toBe('k')
-    const body = JSON.parse(init.body)
-    expect(body).toMatchObject({ prompt: 'a prompt', n: 1, size: '1536x1024', quality: 'high', output_format: 'png' })
-  })
-
-  it('throws on a non-OK response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429, text: async () => 'rate limited' }))
-    await expect(generateImage('p')).rejects.toThrow(/429/)
-  })
-
-  it('throws when no image is returned', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{}] }) }))
-    await expect(generateImage('p')).rejects.toThrow(/no image/i)
-  })
-})
+  it('POSTs the gateway generate endpoint and returns PNG bytes', async () => {
+    const png = Buffer.concat([PNG_MAGIC, Buffer.from('the rest of the image bytes')]);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(png, { status: 200, headers: { 'content-type': 'image/png' } }),
+    );
+    const { generateImage } = await import('./azure.js');
+    const out = await generateImage('a cover prompt');
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://gw.test/v1/images/generate');
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer tok');
+    expect(JSON.parse(init.body as string)).toMatchObject({ prompt: 'a cover prompt', size: '1536x1024', quality: 'high', output_format: 'png' });
+    expect(out.equals(png)).toBe(true);
+    fetchSpy.mockRestore();
+  });
+  it('throws on non-2xx', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('err', { status: 502 }));
+    const { generateImage } = await import('./azure.js');
+    await expect(generateImage('p')).rejects.toThrow();
+    fetchSpy.mockRestore();
+  });
+  it('throws when a 2xx body is not a PNG (misrouted HTML/JSON)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<html>not an image</html>', { status: 200, headers: { 'content-type': 'text/html' } }),
+    );
+    const { generateImage } = await import('./azure.js');
+    await expect(generateImage('p')).rejects.toThrow(/not a valid PNG/);
+    fetchSpy.mockRestore();
+  });
+});

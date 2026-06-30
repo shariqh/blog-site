@@ -1,43 +1,28 @@
-import { getVisionConfig } from './config'
+import { getGatewayConfig } from './config.js';
 
-const API_VERSION = '2024-10-21'
-const QUESTION =
-  'Does this image contain READABLE WORDS, captions, labels, headlines, or full sentences — actual spelled-out prose text a person could read (for example a word written on an object, a sign, or a caption)? Answer NO for logos and brand marks, code symbols like </> or {}, abstract or illegible squiggles meant to suggest code, single decorative letters, and numbers that are part of an icon or logo. Answer YES only if there is legible word-text that would visually compete with a title. Reply with only "yes" or "no".'
+const CHECK_TIMEOUT_MS = 60_000;
 
-// Provider-agnostic in spirit: the agent MAY swap this for its in-process Claude
-// vision. The default uses an Azure gpt-4o-mini chat-completions vision call.
 export async function hasText(png: Buffer): Promise<boolean> {
-  const { endpoint, key, deployment } = getVisionConfig()
-  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${API_VERSION}`
-  const dataUrl = `data:image/png;base64,${png.toString('base64')}`
+  // Read config OUTSIDE the fail-safe catch: a missing IMAGE_GATEWAY_URL/TOKEN is a
+  // deployment error that must surface, not be silently masked as "has text" (which would
+  // turn every cover into a branded fallback with no error).
+  const { url, token } = getGatewayConfig();
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      signal: AbortSignal.timeout(60000),
-      headers: { 'api-key': key, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        max_tokens: 3,
-        temperature: 0,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: QUESTION },
-              { type: 'image_url', image_url: { url: dataUrl } },
-            ],
-          },
-        ],
-      }),
-    })
-    if (!res.ok) return true
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
-    const answer = (json.choices?.[0]?.message?.content ?? '').trim().toLowerCase()
-    if (answer.startsWith('y')) return true
-    if (answer.startsWith('n')) return false
-    // Unparseable verdict (empty, content-filtered, shape-drift) → fail safe:
-    // treat as "has text" so the orchestrator retries rather than shipping a leak.
-    return true
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), CHECK_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${url}/v1/vision/check-text`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'image/png', 'x-client': 'blog-site' },
+        body: png as unknown as BodyInit, signal: ctrl.signal,
+      });
+      if (!res.ok) return true; // fail safe -> forces retry / fallback
+      const json = (await res.json()) as { hasText?: boolean };
+      return typeof json.hasText === 'boolean' ? json.hasText : true;
+    } finally {
+      clearTimeout(t);
+    }
   } catch {
-    return true
+    return true; // network/abort/parse failures fail safe to "has text"
   }
 }
