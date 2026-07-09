@@ -3,6 +3,7 @@ title: "Building Plan B: how I wired an autonomous draft pipeline into my blog"
 date: 2026-06-03
 summary: "Three GitHub Actions workflows, a Notion CMS handoff, and the Claude Agent SDK form the draft pipeline I built for this blog. Here's the discover → draft → promote loop from the inside: what each step does, where Notion fits, and what broke in CI first."
 tags: [engineering, ai, agents, process]
+draft: true
 ---
 
 The blog was publishing roughly once a month. Not because the ideas weren't there (I keep a Notion database of them), but because the gap between "this might be worth writing" and "this is ready to publish" was wide enough that most ideas just sat. Plan B is my attempt to close that gap with agents.
@@ -43,13 +44,13 @@ Three things failed before the first successful end-to-end run.
 
 **Empty-string env vars.** The workflow populates secrets as environment variables. I was guarding against missing config with `if (!process.env.NOTION_TOKEN)`, which evaluates to `false` when the variable is an empty string. The check passed, the agent ran without credentials, and it failed downstream in an unhelpful place. Changed to `if (!process.env.NOTION_TOKEN?.trim())` and the guard actually works now. Annoying to diagnose when the surface symptom is "agent silently produced nothing."
 
-**Snake-case property names from the Notion API.** I was destructuring Notion page properties with camelCase keys because that felt right for TypeScript — `stageSelect`, `contentType`. Notion returns properties using whatever case you used when naming the database fields, which in my case was title-case display names like `Stage` and `Content Type`. The property accessor returned `undefined` silently, so the agent received an empty idea list and generated nothing. Fixed by aligning the keys to Notion's actual response shape and wrapping the parse in a Zod schema so a mismatch surfaces as an explicit error rather than a mysteriously empty list.
+**Title-case property names from the Notion API.** I was destructuring Notion page properties with camelCase keys because that felt right for TypeScript — `stageSelect`, `contentType`. Notion returns properties using whatever case you used when naming the database fields, which in my case was title-case display names like `Stage` and `Content Type`. The property accessor returned `undefined` silently, so the agent received an empty idea list and generated nothing. Fixed by aligning the keys to Notion's actual response shape and wrapping the parse in a Zod schema so a mismatch surfaces as an explicit error rather than a mysteriously empty list.
 
 **The `finally`-wrapped git push.** After the agent runs, the workflow pushes a branch and opens a PR. I had the push in a `finally` block, reasoning that partial output is better than nothing. What actually happened: the agent failed before writing anything, `finally` ran anyway, pushed an empty branch, and CI opened a PR with no file changes while reporting success. Moved the push back into the happy path, added explicit error logging before re-throwing, and now CI marks the run failed when it actually fails.
 
 ## What's working
 
-Discovery runs without me. Every Monday I have a handful of Notion rows at `Stage=Proposed` that I didn't generate myself. Most aren't right, but a few always are. Reviewing the list takes two minutes.
+Discovery runs without me. Every Sunday I have a handful of Notion rows at `Stage=Proposed` that I didn't generate myself. Most aren't right, but a few always are. Reviewing the list takes two minutes.
 
 The draft quality is good enough that I'm mostly editing rather than rewriting. The editorial constraints in the system prompt seem to hold: I haven't seen the worst AI-tell patterns in the generated drafts, and Vale is catching em-dash overuse reliably.
 
