@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: shariqh/ai-code-review@a9bb0fe94767d8b250e2a06e293df2aa8c707db0
+      - uses: shariqh/ai-code-review@07592511accc379c8234733848755f016e1edf85
         with:
           copilot-token: ${{ secrets.COPILOT_REVIEW_PAT }}
           github-token: ${{ github.token }}
