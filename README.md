@@ -45,7 +45,7 @@ Cloudflare Pages CI. Here's how they fit.
      (by hand,      patch hero.image                 │
       or agent)                                       ▼
                                      PR checks: CI (vitest) · Vale ·
-                                     gpt-5.4 AI review · Pages preview
+                                  GPT-5.6 Sol AI review · Pages preview
                                                       │ review + merge
                                                       ▼
                                 push to main ─► build (+ OG) ─► Cloudflare

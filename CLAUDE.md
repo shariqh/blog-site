@@ -148,9 +148,10 @@ personal OAuth) with `CLOUDFLARE_API_TOKEN` (the CI secret).
 
 Two independent AI reviews can run on a PR:
 
-- **`gpt-5.4` via Copilot CLI** — a GitHub Action (`review` check + a
-  `## 🤖 AI code review` sticky comment). Re-runs automatically on every
-  push. Always watch it (and address findings) before calling a PR ready.
+- **GPT-5.6 Sol via the shared Copilot CLI action** — a GitHub Action
+  (`review` check + an `## AI code review` sticky comment). Runs when an
+  owner-authored PR becomes ready and after owner-triggered pushes. Always
+  watch it (and address findings) before calling a PR ready.
 - **Built-in GitHub Copilot reviewer** — triggered manually:
 
   ```sh
