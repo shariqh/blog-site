@@ -7,7 +7,7 @@ tags:
   - engineering
   - ollama
   - privacy
-summary: "Local LLMs give bespoke apps an on-device path, no per-token API bill, and pinned behavior. Here's how we built that choice into Oris's summarization pipeline."
+summary: "Local LLMs give bespoke apps an on-device path, no per-token API bill, and control over model updates. Here's how we built that choice into Oris's summarization pipeline."
 draft: false
 ---
 
@@ -17,14 +17,14 @@ For a class of bespoke apps, local LLMs solve these problems structurally. Here'
 
 ## The case for running models locally
 
-Privacy is the hardest thing to paper over with a terms-of-service link. When you run inference on-device, the data doesn't leave. Topology enforces what policy only promises. For apps that process personal content (meeting transcripts, notes, health data) this matters both to users and to you as the developer who has to explain your data handling.
+Privacy is the hardest thing to paper over with a terms-of-service link. When inference runs inside a trusted on-device runtime you control, there is no required network hop for the prompt. That removes a major data-transfer boundary, though the local runtime and machine still belong in your threat model. For apps that process personal content (meeting transcripts, notes, health data) this matters both to users and to you as the developer who has to explain your data handling.
 
 Beyond privacy:
 
 - **Latency** drops when you cut the network round-trip. A local model on Apple Silicon M-series hardware can summarize a short transcript in under two seconds. A cloud call adds at minimum 300–500ms of round-trip plus queue time.
 - **Cost** goes to zero per-inference once you've paid for the hardware. No per-token metering means you can summarize aggressively, retry freely, and stop optimizing prompts around token count.
 - **Offline operation** is real. An app that degrades gracefully without internet is a better app. A local model doesn't care about connectivity.
-- **Pinned behavior** is underrated. When you ship a specific local model, you know exactly what it does. Cloud providers update models on their own schedules; what worked in December may behave differently in March.
+- **Controlled updates** are underrated. With a local model, you can pin an exact artifact or digest and decide when to upgrade it. A mutable model tag is not enough. Cloud providers can update hosted models on their own schedules; what worked in December may behave differently in March.
 
 ## The honest tradeoffs
 
@@ -47,12 +47,12 @@ const client = new OpenAI({
 });
 
 const result = await client.chat.completions.create({
-  model: "llama3.2",
+  model: "llama3.2:3b", // pin an immutable digest/artifact in production
   messages: [{ role: "user", content: prompt }],
 });
 ```
 
-MLX on Apple Silicon works differently: it runs as a Python process you invoke directly or serve as a local HTTP endpoint. The `mlx-community` org on Hugging Face maintains quantized versions of most popular models. A 4-bit quantized Llama 3.2 3B runs comfortably on 8GB of unified memory, while a 4-bit Llama 3.1 8B fits on a 16GB Mac.
+MLX on Apple Silicon works differently: it runs as a Python process you invoke directly or serve as a local HTTP endpoint. The `mlx-community` org on Hugging Face maintains quantized versions of most popular models. A 4-bit quantized Llama 3.2 3B runs comfortably on 8GB of unified memory, while a 4-bit Llama 3.1 8B fits on a 16GB Mac. Whether you use MLX or Ollama, treat that local process as part of the app's trusted computing base rather than trusting any service that happens to answer on a localhost port.
 
 The pattern that works well for bespoke apps is a provider abstraction with an explicit fallback policy. Local can be the default. An off-device fallback should become eligible only after the user configures it, and the ordering should remain visible. If local-only processing is a hard requirement, fail closed instead of quietly routing the same input elsewhere.
 
@@ -80,7 +80,7 @@ The result: a user who selects Local (MLX), or puts it first without configuring
 
 ## What this unlocks for development
 
-Building bespoke apps with local-first model support changes what you can offer users. You can provide a genuinely on-device mode, ship features that work offline, and make a scoped privacy promise when that mode is selected. You can also pin a model and test against it with confidence that behavior won't drift between your test environment and production.
+Building bespoke apps with local-first model support changes what you can offer users. You can provide a genuinely on-device mode, ship features that work offline, and make a scoped privacy promise when that mode is selected. You can also pin an exact model artifact and test against it with confidence that behavior won't drift between your test environment and production.
 
 The setup cost is real but front-loaded. Once you have an abstraction layer that speaks to both local and cloud providers through a common interface, adding a new provider is a config change. The fallback cascade means you can ship local support incrementally: add it as an option, let users try it, promote it to default as model quality and hardware continue to improve.
 
