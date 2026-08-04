@@ -1,0 +1,96 @@
+---
+title: "AI Dev Workflow: What 86% Agent-Labeled PRs Actually Tell You"
+date: '2026-08-04'
+tags:
+  - ai-development
+  - engineering-workflow
+  - agent-systems
+  - measurement
+  - software-process
+summary: "86% of merged PRs were agent-labeled. Here's what those numbers actually reveal about running an AI-assisted software development workflow."
+draft: false
+---
+
+In the last 30 days on the Oris repo, 86% of merged pull requests carried an agent label, and those PRs accounted for 98% of all changed lines. Those numbers look significant. What they don't capture is that changed lines measure activity, not value or quality. PR count is throughput, not outcomes. Neither number answers whether the software is better, whether the architecture decisions were sound, or whether I shipped the right things.
+
+What matters more is how the unit of delegation changed, and whether the control system kept pace.
+
+
+
+<Image src="/static/images/blog/ai-became-my-operating-model/img4.png" alt="Four-card scorecard showing AI commit attribution, agent pull request share, changed-line share, and final-head review coverage for Oris." />
+
+
+
+## From co-author to execution layer
+
+AI was in this codebase from the start. Of 498 commits in the measured history, 71.5% carry a Claude or Copilot co-author trailer. That's attribution evidence only — a trailer means AI had a hand in the change; it says nothing about how much of the change or how consequential.
+
+A commit-level co-author and an agent-labeled pull request are different things. A co-author trailer means we produced something together, with me steering. A PR labeled `agent` means I wrote the specification and acceptance criteria, the agent produced a bounded implementation, and I reviewed the result before merging. The unit of work I was delegating shifted from a block of code inside something I was driving to a complete, scoped deliverable.
+
+The explicit agent PR label first appeared on July 5, 2026. Earlier PRs without that label aren't human-only — the instrumentation didn't exist yet. The timeline below reflects how the signals evolved as I got more deliberate about tracking what was actually happening.
+
+
+
+<Image src="/static/images/blog/ai-became-my-operating-model/img3.png" alt="Timeline showing AI moving from commit co-author attribution to pull-request delegation and repeatable review gates." />
+
+
+
+
+
+## Where human judgment moved
+
+The framing "AI writes code now" misses what actually shifted. My work moved in two directions simultaneously, upstream into problem framing and downstream into verification.
+
+Before an agent PR gets written, I'm doing specification work. That means scoping the problem, writing acceptance criteria, setting architecture constraints, and choosing which tradeoffs to prefer. That work didn't disappear; it concentrated. Vague input produces vague output. The quality of what comes back scales with the quality of what went in.
+
+After a PR lands, I'm doing triage. Which review comments flag real issues? Which are noise? What does this net change mean for the system? Merging at that volume without a structured review layer would be reckless. The review design isn't an afterthought.
+
+## Breadth across the work mix
+
+Of the 129 labeled agent PRs, 41 were feature work, 36 were fixes, 26 were documentation, and 26 were internal tooling and workflow. That spread matters because it shows agents became part of implementation, repair, documentation, and infrastructure, not just greenfield code generation or boilerplate.
+
+
+
+<Image src="/static/images/blog/ai-became-my-operating-model/img1.png" alt="Bar charts showing the mix of agent-labeled pull requests and the coverage of GPT, Copilot, and human merge gates." />
+
+
+
+Fixes are often the most context-sensitive work. An agent can produce a plausible fix; it still needs a human who's read the root cause to confirm the fix addresses the real problem and not just the symptom. The review responsibility didn't shrink here. It changed shape.
+
+## Control at the review layer
+
+In the latest 14 days there were 75 agent-labeled PRs. All 75 had an automated GPT review stamped against the final PR head (the same commit that was actually merged, not an earlier draft). 69 of 75 also had native GitHub Copilot review, and 59 of those 69 had that review against the final head. Of the 80 total merged PRs in that query window, every merge was done by me.
+
+
+
+These review gates don't replace judgment. They filter signal from noise and surface things that warrant attention before I decide what to look at closely. When the volume is 75 agent PRs in two weeks, I need that layer to be reliable and consistent.
+
+Increasing reliance on agents without building out the review infrastructure is how drift happens. The two have to scale together.
+
+## The delivery comparison, with the caveat
+
+The first 30 project days saw 100 merged PRs, 67,204 changed lines, and a median PR size of 165 lines. The latest 30 days saw 146 PRs, 151,340 changed lines, and a median PR size of 253.5 lines. That's 46% more PRs, 125% more changed lines, 54% larger PRs on average.
+
+I can't attribute those increases to AI delegation. Project scope expanded, the codebase matured, and what a normal PR looked like in month one versus now is not the same thing. The chart is correlation evidence, not a productivity calculation.
+
+
+
+<Image src="/static/images/blog/ai-became-my-operating-model/img2.png" alt="Three bar-chart panels comparing merged pull requests, changed lines, and median pull request size in the first and latest 30 project days." />
+
+
+
+What I can say is that the operating model described above is running at that scale without a visible breakdown in the control system. That's informative, even if it's not a causal claim.
+
+## What to actually instrument
+
+If you're thinking about how to track this in your own repo, four things are worth measuring.
+
+**Attribution.** Co-author trailers and PR labels tell you where AI is in the loop. They're imperfect signals but better than guessing.
+
+**Unit of delegation.** Are you delegating lines within a file, a complete function, a whole PR with defined acceptance criteria? The unit matters more than the percentage.
+
+**Review coverage.** What fraction of agent-produced work gets automated review against the final head? That number should be close to 100. If it's not, you're operating at scale without enough signal.
+
+**Decision ownership.** Who's writing the spec? Who decides what merges? Track those explicitly rather than leaving them as implicit assumptions.
+
+The thing I keep returning to is that reliance changes where control has to be designed, not whether you need it. Hand off execution without redesigning the specification and review layers, and you haven't built a better system. You've moved the failure modes somewhere less visible.
