@@ -1,0 +1,87 @@
+---
+title: "Local LLMs for Bespoke Apps: Why They're the Better Default"
+date: '2026-08-04'
+tags:
+  - local-llm
+  - bespoke-apps
+  - mlx
+  - ollama
+  - privacy
+summary: "Local LLMs give bespoke apps privacy, zero per-inference cost, and pinned behavior. Here's how we built that choice into Oris's summarization pipeline."
+draft: false
+---
+
+The default answer for "add AI to your app" has been to pick a cloud provider, grab an API key, and ship. That works until your users ask why their transcript went to a server in Virginia, or your monthly API bill grows faster than your user count, or the model you tuned your prompts against gets quietly deprecated.
+
+For a class of bespoke apps, local models solve these problems structurally. Here's how I think about the tradeoffs, and how we built the choice into Oris.
+
+## The case for running models locally
+
+Privacy is the hardest thing to paper over with a terms-of-service link. When you run inference on-device, the data doesn't leave. Topology enforces what policy only promises. For apps that process personal content (meeting transcripts, notes, health data) this matters both to users and to you as the developer who has to explain your data handling.
+
+Beyond privacy:
+
+- **Latency** drops when you cut the network round-trip. A local model on Apple Silicon M-series hardware can summarize a short transcript in under two seconds. A cloud call adds at minimum 300–500ms of round-trip plus queue time.
+- **Cost** goes to zero per-inference once you've paid for the hardware. No per-token metering means you can summarize aggressively, retry freely, and stop optimizing prompts around token count.
+- **Offline operation** is real. An app that degrades gracefully without internet is a better app. A local model doesn't care about connectivity.
+- **Pinned behavior** is underrated. When you ship a specific local model, you know exactly what it does. Cloud providers update models on their own schedules; what worked in December may behave differently in March.
+
+## The honest tradeoffs
+
+Local models aren't free. The setup surface is larger: users need Ollama installed, or you need to bundle MLX models, or you need to walk them through pulling a model. That's friction cloud providers don't have.
+
+Model capability is the bigger constraint. State-of-the-art reasoning still lives in large cloud models. For open-ended generation or complex multi-step tasks, a 7B or 8B local model makes more mistakes than GPT-4o or Claude. The gap has narrowed significantly in the past two years, but it's real, and it shows up in production.
+
+The practical ceiling is also hardware-gated. MLX inference on Apple Silicon is fast and efficient; on Intel Macs or lower-spec machines, local inference gets painful. Ollama broadens the hardware story but introduces a dependency on a running local server.
+
+The right framing: local models are excellent for well-scoped, repetitive tasks with structured outputs. Summarizing a meeting transcript, classifying text, extracting entities from a known schema — these are local-model-shaped problems. Novel reasoning across long, ambiguous documents is still cloud-model territory.
+
+## How to wire this up
+
+The enabling insight is that Ollama exposes an OpenAI-compatible API at `http://localhost:11434/v1`. If your inference code already targets the OpenAI API, you point it at Ollama by changing the base URL and model name. Nothing else changes.
+
+```ts
+const client = new OpenAI({
+  baseURL: "http://localhost:11434/v1",
+  apiKey: "ollama", // required by the client, ignored by Ollama
+});
+
+const result = await client.chat.completions.create({
+  model: "llama3.2",
+  messages: [{ role: "user", content: prompt }],
+});
+```
+
+MLX on Apple Silicon works differently: it runs as a Python process you invoke directly or serve as a local HTTP endpoint. The `mlx-community` org on Hugging Face maintains quantized versions of most popular models. A 4-bit quantized Llama 3.2 3B runs comfortably on 8GB of unified memory, and the 8B version fits in 16GB.
+
+The pattern that works well for bespoke apps is a provider abstraction with a local-first fallback cascade: try the local provider first, fall back to a cloud provider if local isn't configured or fails. Users who care about privacy get it by default; users on hardware that can't run local models get a sensible fallback.
+
+## How we built this in Oris
+
+Oris uses this exact pattern for its summarization step. After a recording ends, the transcript goes through a configurable pipeline. Audio is transcribed on-device; what the summarization step receives is text, not audio.
+
+
+
+A few things worth knowing about how the controls work in Oris → Summarization:
+
+**Summaries** is a simple on/off. Turning it off still captures and stores the transcript; the AI summary step is optional on top.
+
+**Provider** selects the inference backend: Auto, Local (MLX), Ollama, OpenAI, Anthropic, or Azure OpenAI. Local (MLX) keeps everything on-device. The cloud providers receive transcript text, not audio, so your recordings never leave, but the transcript text does.
+
+**Auto order** is the fallback sequence. You drag providers into priority order, and Oris walks the list at inference time, using the first configured and reachable provider. Providers without valid credentials are skipped automatically.
+
+
+
+**Model override** pins a specific model for the selected provider. Leave it blank and Oris applies length-based local model selection: shorter transcripts go to a lighter model, longer ones route to something with more context capacity.
+
+**Test connection** sends a minimal live request to validate credentials, endpoint reachability, and the model name before you start a recording. Worth running after any configuration change.
+
+The result: a user on an M-series Mac with Ollama configured gets fully local summarization with no extra setup. A user on older hardware who skips local configuration gets a cloud fallback without losing the feature. The ordering in Auto mode makes the privacy decision for them.
+
+## What this unlocks for development
+
+Building bespoke apps with local-first model support changes what you can promise users. You can say "your data stays on your device" without a footnote. You can ship features that work offline. You can pin a model and test against it with confidence that behavior won't drift between your test environment and production.
+
+The setup cost is real but front-loaded. Once you have an abstraction layer that speaks to both local and cloud providers through a common interface, adding a new provider is a config change. The fallback cascade means you can ship local support incrementally: add it as an option, let users try it, promote it to default as model quality and hardware continue to improve.
+
+Local models are getting better faster than cloud models are getting cheaper. The gap that made local-first a compromise in 2023 is narrower now. Building the abstraction today means you take advantage of that trajectory without rewriting your inference code.
