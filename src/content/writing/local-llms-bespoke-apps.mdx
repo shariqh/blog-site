@@ -70,12 +70,16 @@ The right framing: local models are excellent for well-scoped, repetitive tasks 
 
 ## How to wire this up
 
-The enabling insight is that Ollama exposes an OpenAI-compatible API at `http://localhost:11434/v1`. If your inference code already targets the OpenAI API, you point it at Ollama by changing the base URL and model name. Nothing else changes.
+The enabling insight is that Ollama exposes an OpenAI-compatible API. The request shape can stay the same while the transport points at a local runtime. For sensitive inputs, though, `localhost` is not an identity boundary: another process can bind a port. A production app should own and verify the model process, or put it behind an authenticated local proxy or socket and fail closed when that identity check fails.
 
 ```ts
+// App-specific helper: launch/verify the managed local runtime and return an
+// authenticated endpoint. Throw rather than sending sensitive input elsewhere.
+const local = await requireTrustedLocalInference();
+
 const client = new OpenAI({
-  baseURL: "http://localhost:11434/v1",
-  apiKey: "ollama", // required by the client, ignored by Ollama
+  baseURL: local.baseURL,
+  apiKey: local.sessionToken,
 });
 
 const result = await client.chat.completions.create({
@@ -84,7 +88,7 @@ const result = await client.chat.completions.create({
 });
 ```
 
-MLX on Apple Silicon works differently: it runs as a Python process you invoke directly or serve as a local HTTP endpoint. The `mlx-community` org on Hugging Face maintains quantized versions of most popular models. A 4-bit quantized Llama 3.2 3B runs comfortably on 8GB of unified memory, while a 4-bit Llama 3.1 8B fits on a 16GB Mac. Whether you use MLX or Ollama, treat that local process as part of the app's trusted computing base rather than trusting any service that happens to answer on a localhost port.
+MLX on Apple Silicon works differently: it runs as a process you invoke directly or expose through an app-managed local endpoint. The `mlx-community` org on Hugging Face maintains quantized versions of most popular models. A 4-bit quantized Llama 3.2 3B runs comfortably on 8GB of unified memory, while a 4-bit Llama 3.1 8B fits on a 16GB Mac. Whether you use MLX or Ollama, treat that local process as part of the app's trusted computing base rather than trusting any service that happens to answer on a localhost port.
 
 The pattern that works well for bespoke apps is a provider abstraction with an explicit fallback policy. Local can be the default. An off-device fallback should become eligible only after the user configures it, and the ordering should remain visible. If local-only processing is a hard requirement, fail closed instead of quietly routing the same input elsewhere.
 
