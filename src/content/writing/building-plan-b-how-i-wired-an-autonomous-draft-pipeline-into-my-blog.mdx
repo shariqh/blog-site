@@ -1,9 +1,48 @@
 ---
-title: "Building Plan B: how I wired an autonomous draft pipeline into my blog"
-date: 2026-06-03
-summary: "Three GitHub Actions workflows, a Notion CMS handoff, and the Claude Agent SDK form the draft pipeline I built for this blog. Here's the discover → draft → promote loop from the inside: what each step does, where Notion fits, and what broke in CI first."
-tags: [engineering, ai, agents, process]
+title: 'Building Plan B: how I wired an autonomous draft pipeline into my blog'
+date: 2026-06-03T00:00:00.000Z
+summary: >-
+  Three GitHub Actions workflows, a Notion CMS handoff, and the Claude Agent SDK
+  form the draft pipeline I built for this blog. Here's the discover → draft →
+  promote loop from the inside: what each step does, where Notion fits, and what
+  broke in CI first.
+tags:
+  - engineering
+  - ai
+  - agents
+  - process
 draft: true
+hero:
+  image: >-
+    /static/images/blog/building-plan-b-how-i-wired-an-autonomous-draft-pipeline-into-my-blog/cover.png
+  alt: >-
+    Cover illustration for "Building Plan B: how I wired an autonomous draft
+    pipeline into my blog".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: Three connected mechanical stations forming an
+    editorial loop: a radar-like discovery lens gathers signal fragments, passes
+    them through a central paper-card gate controlled by a human hand, then into
+    a drafting machine that returns finished pages into the loop. Emphasize
+    visible checkpoints and one human approval lever.. Do not depict or quote
+    any phrase from the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
 ---
 
 The blog was publishing roughly once a month. Not because the ideas weren't there (I keep a Notion database of them), but because the gap between "this might be worth writing" and "this is ready to publish" was wide enough that most ideas just sat. Plan B is my attempt to close that gap with agents.
