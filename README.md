@@ -77,12 +77,12 @@ Two separate image paths — one generative (remote, via the gateway), one
 deterministic (local, at build):
 
 ```
-  AI COVER  (generative — at draft/CLI time, NOT during the build)
-    gen:cover / agent → build prompt (palette + bucket→style spine)
+  AI COVER  (generative — at draft/CLI/workflow time, NOT during the build)
+    gen:cover / agent / Attach blog cover → canonical prompt + style pipeline
       ├─ POST img-gateway.shariq.dev /v1/images/generate ─┐ retry ≤3
       ├─ POST                        /v1/vision/check-text┘ "readable text?"
       │     gateway holds the Azure key → gpt-image-1 + gpt-4o-mini
-      ├─ 3 strikes → render branded fallback LOCALLY (Satori)
+      ├─ 3 strikes → render a seeded, article-unique fallback locally
       └─ write public/static/images/blog/<slug>/cover.png + patch hero
 
   OG IMAGE  (deterministic — LOCAL, at build, no network)
@@ -110,7 +110,7 @@ npm run dev    # http://localhost:4321
 - `npm test` — run unit tests (Vitest)
 - `npm run test:smoke` — Playwright smoke test (requires `npm run build` first)
 - `npm run astro check` — type-check `.astro` files
-- `npm run gen:cover <slug> [--style line-art|conceptual] [--force]` — generate a post's AI cover (via the image-gateway)
+- `npm run gen:cover <slug> [--style line-art|conceptual] [--concept "..."] [--force]` — generate a post's AI cover (via the image-gateway)
 - `npm run gen:cover:all [--force]` — backfill AI covers across all posts
 
 ## Authoring posts
@@ -127,6 +127,10 @@ Each post gets an on-brand **cover image** — AI-generated via the **image-gate
 `hero.image` — plus a build-time **Open Graph image** (1200×630, one per post under
 `dist/og/`) so shared links preview cleanly. The drafting agent covers new posts
 automatically; `npm run gen:cover` / `gen:cover:all` do it by hand.
+External drafting services must dispatch `.github/workflows/attach-cover.yml`
+instead of reimplementing prompts, text checks, fallbacks, frontmatter edits, or
+asset paths. The workflow always runs the canonical tooling from `main` against
+the requested same-repository branch.
 
 ## Deploy (Cloudflare Pages via GitHub Actions)
 

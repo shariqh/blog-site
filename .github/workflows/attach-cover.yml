@@ -1,7 +1,9 @@
 name: Attach blog cover
-run-name: Attach cover ${{ inputs.request_id }}
+run-name: Attach cover ${{ github.event.client_payload.request_id || inputs.request_id }}
 
 on:
+  repository_dispatch:
+    types: [attach-cover]
   workflow_dispatch:
     inputs:
       branch:
@@ -26,7 +28,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: attach-cover-${{ inputs.branch }}
+  group: attach-cover-${{ github.event.client_payload.branch || inputs.branch }}
   cancel-in-progress: false
 
 jobs:
@@ -36,9 +38,9 @@ jobs:
     steps:
       - name: Validate inputs
         env:
-          TARGET_BRANCH: ${{ inputs.branch }}
-          SLUG: ${{ inputs.slug }}
-          REQUEST_ID: ${{ inputs.request_id }}
+          TARGET_BRANCH: ${{ github.event.client_payload.branch || inputs.branch }}
+          SLUG: ${{ github.event.client_payload.slug || inputs.slug }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id || inputs.request_id }}
         run: |
           [[ "$TARGET_BRANCH" =~ ^(blog|agent/draft)/[a-z0-9][a-z0-9-]*$ ]] || {
             echo "Unsupported branch: $TARGET_BRANCH" >&2
@@ -63,7 +65,7 @@ jobs:
       - name: Check out target branch
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ github.event.client_payload.branch || inputs.branch }}
           path: target
           fetch-depth: 0
           token: ${{ secrets.AGENT_GH_TOKEN }}
@@ -79,8 +81,8 @@ jobs:
 
       - name: Generate and attach cover
         env:
-          SLUG: ${{ inputs.slug }}
-          COVER_CONCEPT: ${{ inputs.concept }}
+          SLUG: ${{ github.event.client_payload.slug || inputs.slug }}
+          COVER_CONCEPT: ${{ github.event.client_payload.concept || inputs.concept }}
           IMAGE_GATEWAY_URL: https://img-gateway.shariq.dev
           IMAGE_GATEWAY_TOKEN: ${{ secrets.IMAGE_GATEWAY_TOKEN }}
         run: |
@@ -93,8 +95,8 @@ jobs:
 
       - name: Commit cover to target branch
         env:
-          TARGET_BRANCH: ${{ inputs.branch }}
-          SLUG: ${{ inputs.slug }}
+          TARGET_BRANCH: ${{ github.event.client_payload.branch || inputs.branch }}
+          SLUG: ${{ github.event.client_payload.slug || inputs.slug }}
         run: |
           cd target
           git add -- "src/content/writing/${SLUG}.mdx" "public/static/images/blog/${SLUG}/cover.png"
