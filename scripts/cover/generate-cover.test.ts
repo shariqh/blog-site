@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+  readFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, it, expect, vi, afterEach } from 'vitest'
@@ -24,7 +31,7 @@ describe('generateCover', () => {
     expect(d.writeImage).toHaveBeenCalledWith(
       'public/static/images/blog/a-post/cover.png',
       Buffer.from('gen'),
-      expect.any(String) // realRoot (symlink-safe write check)
+      expect.any(String), // realRoot (symlink-safe write check)
     )
     expect(r).toMatchObject({
       imagePath: '/static/images/blog/a-post/cover.png',
@@ -33,11 +40,27 @@ describe('generateCover', () => {
       usedFallback: false,
     })
     expect(r.alt).toContain('A Post')
-    expect(r.prompt).toContain('Concept: A Post. s')
+    expect(r.prompt).toContain(
+      'Visual concept only, inspired by this subject: s',
+    )
+  })
+
+  it('passes an explicit visual concept into the prompt', async () => {
+    const d = deps()
+    await generateCover(
+      { ...input, concept: 'Modular model blocks inside a laptop boundary' },
+      d,
+    )
+    expect(d.generateImage).toHaveBeenCalledWith(
+      expect.stringContaining('Modular model blocks inside a laptop boundary'),
+    )
   })
 
   it('retries when text is detected, then succeeds', async () => {
-    const hasText = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    const hasText = vi
+      .fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
     const d = deps({ hasText })
     const r = await generateCover(input, d)
     expect(d.generateImage).toHaveBeenCalledTimes(2)
@@ -53,7 +76,7 @@ describe('generateCover', () => {
     expect(d.writeImage).toHaveBeenCalledWith(
       'public/static/images/blog/a-post/cover.png',
       Buffer.from('fallback'),
-      expect.any(String) // realRoot (symlink-safe write check)
+      expect.any(String), // realRoot (symlink-safe write check)
     )
     expect(r).toMatchObject({ attempts: 3, usedFallback: true })
   })
@@ -80,7 +103,11 @@ describe('generateCover symlink-write safety (real FS)', () => {
   const temps: string[] = []
   afterEach(() => {
     for (const t of temps) {
-      try { rmSync(t, { recursive: true, force: true }) } catch { /* ignore */ }
+      try {
+        rmSync(t, { recursive: true, force: true })
+      } catch {
+        /* ignore */
+      }
     }
     temps.length = 0
   })
@@ -95,11 +122,16 @@ describe('generateCover symlink-write safety (real FS)', () => {
       renderFallback: vi.fn(async () => Buffer.from('fallback')),
       // writeImage not overridden — uses the real writeToDisk
     }
-    const result = await generateCover({ slug: 'normal-slug', title: 'T', tags: ['ai'], publicDir }, d)
+    const result = await generateCover(
+      { slug: 'normal-slug', title: 'T', tags: ['ai'], publicDir },
+      d,
+    )
     expect(result.imagePath).toBe('/static/images/blog/normal-slug/cover.png')
     // File should exist at expected path
     const { existsSync } = await import('node:fs')
-    expect(existsSync(`${publicDir}/static/images/blog/normal-slug/cover.png`)).toBe(true)
+    expect(
+      existsSync(`${publicDir}/static/images/blog/normal-slug/cover.png`),
+    ).toBe(true)
   })
 
   it('rejects writing when the slug directory is a symlink pointing outside publicDir', async () => {
@@ -124,7 +156,7 @@ describe('generateCover symlink-write safety (real FS)', () => {
 
     // generateCover with slug 'evil' should throw on the symlink containment check.
     await expect(
-      generateCover({ slug: 'evil', title: 'T', tags: ['ai'], publicDir }, d)
+      generateCover({ slug: 'evil', title: 'T', tags: ['ai'], publicDir }, d),
     ).rejects.toThrow(/[Ss]ymlink|containment/)
   })
 
@@ -154,7 +186,10 @@ describe('generateCover symlink-write safety (real FS)', () => {
 
     // The write must throw (ELOOP on POSIX when O_NOFOLLOW encounters a symlink).
     await expect(
-      generateCover({ slug: 'my-post', title: 'T', tags: ['ai'], publicDir }, d)
+      generateCover(
+        { slug: 'my-post', title: 'T', tags: ['ai'], publicDir },
+        d,
+      ),
     ).rejects.toThrow()
 
     // The outside file must be untouched — the symlink was not followed.
