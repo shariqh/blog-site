@@ -1,0 +1,108 @@
+name: Attach blog cover
+run-name: Attach cover ${{ inputs.request_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Same-repository branch containing the post
+        required: true
+        type: string
+      slug:
+        description: Blog post slug
+        required: true
+        type: string
+      concept:
+        description: Optional visual-only cover concept
+        required: false
+        default: ""
+        type: string
+      request_id:
+        description: Unique dispatch correlation ID
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: attach-cover-${{ inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate inputs
+        env:
+          TARGET_BRANCH: ${{ inputs.branch }}
+          SLUG: ${{ inputs.slug }}
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: |
+          [[ "$TARGET_BRANCH" =~ ^(blog|agent/draft)/[a-z0-9][a-z0-9-]*$ ]] || {
+            echo "Unsupported branch: $TARGET_BRANCH" >&2
+            exit 1
+          }
+          [[ "$SLUG" =~ ^[a-z0-9][a-z0-9-]*$ ]] || {
+            echo "Invalid slug: $SLUG" >&2
+            exit 1
+          }
+          [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]+$ ]] || {
+            echo "Invalid request_id" >&2
+            exit 1
+          }
+
+      - name: Check out canonical cover tooling
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: tooling
+          token: ${{ secrets.AGENT_GH_TOKEN }}
+
+      - name: Check out target branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.branch }}
+          path: target
+          fetch-depth: 0
+          token: ${{ secrets.AGENT_GH_TOKEN }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tooling/package-lock.json
+
+      - name: Install canonical tooling
+        run: npm ci --prefix tooling
+
+      - name: Generate and attach cover
+        env:
+          SLUG: ${{ inputs.slug }}
+          COVER_CONCEPT: ${{ inputs.concept }}
+          IMAGE_GATEWAY_URL: https://img-gateway.shariq.dev
+          IMAGE_GATEWAY_TOKEN: ${{ secrets.IMAGE_GATEWAY_TOKEN }}
+        run: |
+          cd target
+          if [[ -n "$COVER_CONCEPT" ]]; then
+            ../tooling/node_modules/.bin/tsx ../tooling/scripts/cover/cli.ts "$SLUG" --concept "$COVER_CONCEPT"
+          else
+            ../tooling/node_modules/.bin/tsx ../tooling/scripts/cover/cli.ts "$SLUG"
+          fi
+
+      - name: Commit cover to target branch
+        env:
+          TARGET_BRANCH: ${{ inputs.branch }}
+          SLUG: ${{ inputs.slug }}
+        run: |
+          cd target
+          git add -- "src/content/writing/${SLUG}.mdx" "public/static/images/blog/${SLUG}/cover.png"
+          if git diff --cached --quiet; then
+            echo "Cover already attached; nothing to commit."
+            exit 0
+          fi
+          git config user.name "shariq-dev-agent"
+          git config user.email "agent@shariq.dev"
+          git commit -m "blog: add generated cover"
+          git push origin "HEAD:${TARGET_BRANCH}"
