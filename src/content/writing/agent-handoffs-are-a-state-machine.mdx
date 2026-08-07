@@ -77,6 +77,8 @@ WHERE id = ?
 
 If an unread inbox answer is waiting, the chat update affects zero rows and returns `unread_inbox_answer` with the answer that won. A fresh inbox answer can always supersede a chat-recorded one. Once an agent has picked up an inbox answer, a newer answer given in chat may replace it. This is not timestamp-based last-write-wins, and it is not simple first-writer-wins. It is inbox precedence until acknowledgement.
 
+The `reply = ''` branch is defensive compatibility for an old empty representation, not an unread inbox answer. The current viewer trims an empty response to `NULL`, clears its source, and only permits that clear before pickup. A real inbox answer is therefore non-empty with `reply_seen_at IS NULL`, which the chat update cannot overwrite.
+
 The single conditioned statement matters because the viewer writes from a separate OS process. A SELECT followed by an UPDATE would leave a window where the human could answer between the two statements and have that answer clobbered. The condition and write have to be one atomic operation.
 
 ## One ask, one surface
