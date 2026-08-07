@@ -1,5 +1,5 @@
 ---
-title: "AI Agent Handoff: A State Machine, Not a Message Thread"
+title: 'AI Agent Handoff: A State Machine, Not a Message Thread'
 date: '2026-08-07'
 tags:
   - ai
@@ -7,8 +7,41 @@ tags:
   - sqlite
   - state-machines
   - human-in-the-loop
-summary: "Building Agent Inbox showed me that an AI agent handoff is a state machine: explicit state ownership, version tokens, and acknowledgement semantics."
+summary: >-
+  Building Agent Inbox showed me that an AI agent handoff is a state machine:
+  explicit state ownership, version tokens, and acknowledgement semantics.
 draft: false
+hero:
+  image: /static/images/blog/agent-handoffs-are-a-state-machine/cover.png
+  alt: >-
+    Cover illustration for "AI Agent Handoff: A State Machine, Not a Message
+    Thread".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: Create a wide 3:2 conceptual editorial cover for an
+    engineering feature about agent handoffs as a state machine. Show an
+    abstract baton or sealed decision packet moving through a sequence of sturdy
+    gates, receipts, and versioned checkpoints between machine-like agents and a
+    human hand, with one clear path and no loose chat bubbles. The visual
+    metaphor is ownership, acknowledgement, and atomic tran. Do not depict or
+    quote any phrase from the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
 ---
 
 The first version of [Agent Inbox](https://github.com/shariqh/agent-inbox) took an afternoon to sketch. A table in SQLite, a column for the question, a column for the answer, a status flag. When the agent needed a human decision, it wrote a row. When the human responded, the agent read it. Clean, obvious, done.
