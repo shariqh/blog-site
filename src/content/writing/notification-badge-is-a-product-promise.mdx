@@ -1,0 +1,84 @@
+---
+title: "Notification Badge UX: An Attention Count Is a Product Promise"
+date: '2026-08-07'
+tags:
+  - ai
+  - agent-inbox
+  - attention
+  - human-in-the-loop
+  - product-engineering
+summary: "Agent Inbox gets notification badge UX right by defining attention in exactly one place and deriving every surface from the same predicate."
+draft: false
+---
+
+Agent Inbox started as a personal bet — one place to see everything my AI agents are doing across multiple projects, without opening each project's board. That scope creates a specific failure mode. The more surfaces you add to a cross-project view, the faster the ambient signal degrades into dashboard noise, another number you stop reading because it stopped meaning something.
+
+The goal was a single ambient signal reliable enough that glancing at it and walking away felt safe. If the dock badge says 3, I need to believe three things actually want my attention right now. The moment it shows 3 when the real count is 0 (or 0 when an agent is stuck waiting), I stop trusting all of it. That's the tension the attention system in Agent Inbox was designed to hold.
+
+## One predicate, five surfaces
+
+The solution was structural. Define a single attention predicate in one place, then derive every surface from it. No surface computes its own count. The predicate lives in `public/attention.js` and answers one question: does this row require a human right now?
+
+
+
+Five surfaces read from that single source: the Electron dock badge, the browser-tab title prefix, the global inbox count in the top nav, per-project rail counts in the sidebar, and the opt-in review queue. Each is a projection of the same value, not an independent judgment.
+
+When I experimented with a second predicate (a looser one for the review queue that included "probably worth seeing" items), the surfaces started disagreeing. The dock badge said 2; the inbox header said 4; the per-project rail said 1. All technically correct by their own logic, and all wrong from the user's perspective. A unified count is a product promise; splitting the predicate breaks that promise.
+
+The distinction that clarified this: **attention** means a human is blocking progress right now. Ambient context is everything else (build state, milestone proximity, things worth knowing eventually). Those belong in the detail view, not in the badge. That line held up across every edge case during development, and it's the reason the design spec draws it explicitly rather than leaving it to judgment at implementation time.
+
+## What the predicate excludes
+
+The harder design work was specifying exclusions precisely. Notes and milestone updates are context, not blockers, so they don't change the count. Red CI and open PRs are project health signals; they belong on the board. Answered work waiting on an agent is excluded once the human has acted; the process is live, and pinging the user again would turn the badge into a progress ticker rather than an attention signal.
+
+Human-acted board rows drop out after the human acts. Snoozed work doesn't count until its due time. Closed projects are excluded entirely.
+
+
+
+The trickiest category is questions older than the stale threshold when no live session is running. Those still appear in the inbox (they haven't been resolved) but lose the escalating color pressure that live blockers carry. A parked question persists; its visual weight drops. Liveness changes presentation before it changes retention.
+
+Build staleness is a clear example of a deliberate non-attention item. Stale packages matter; I track them. But a stale dependency is never a human blocker in the same sense as an agent waiting for approval, so it never touches the badge count. Making that distinction explicit in the design spec proved useful. Someone will always push for "can we add X to the badge" and you need a principled answer ready rather than relitigating the definition every time.
+
+## Two stamps, one truth
+
+Activity tracking in Agent Inbox uses two timestamps: `updated_at` and `last_call_at`. The difference matters more than it looks.
+
+`updated_at` tells you the session row was touched (a heartbeat, a status write, anything at all). `last_call_at` tells you real MCP work happened, specifically that a tool was called or an agent made an outbound request. Those are different claims about different things.
+
+
+
+During development, a heartbeat process was refreshing both timestamps. A session that had been genuinely idle for days kept looking live because the heartbeat kept advancing `last_call_at`. The "doing" claim was technically supported by the database but false from the user's perspective. An agent that hadn't done real work in days appeared active.
+
+The current design keeps the session row but lets the `last_call_at` claim decay naturally. Dropping the session row would make a genuinely live blocker look parked, which is a worse failure. Instead, the session persists, and the staleness signal kicks in after the threshold, changing presentation without losing the record.
+
+If you're building any kind of activity-aware UI, separate the stamp that proves process liveness from the stamp that proves real work. Conflating them creates trust problems that are genuinely hard to diagnose, because the database looks correct the entire time.
+
+## When the database is right but the screen lies
+
+Two issues from the build taught me that a correct database and a correct UI are separate problems.
+
+Issue [#38](https://github.com/shariqh/agent-inbox/issues/38) was subtle. A successful human write (approving something, moving a row) followed the normal poll-gated load path back to the inbox view. If a draft was open in another pane when the poll fired, the completed action could be hidden behind the draft's state. The fix was `reloadAndPaint` — human actions bypass the poll gate and trigger a direct reload, so what the user just did is immediately reflected in what they see.
+
+
+
+Issue [#39](https://github.com/shariqh/agent-inbox/issues/39) was a timing problem at the interaction level. A 3-second DOM rebuild can consume the window between `pointerdown` and `pointerup`. The browser registers the down, renders new content during the gap, and the up event fires on different content than the down targeted. Clicks get eaten by renders.
+
+The fix is a bounded press guard. When a render is pending, defer it until the current press completes. This is not the same as pausing the app or showing a spinner. The data is fresh; only the DOM update waits a few hundred milliseconds to avoid swallowing an interaction. The inbox shouldn't pretend it's loading when it's just being careful about timing.
+
+Both are versions of the same problem. Controls lie even when the database is correct. The attention count can be exactly right, and users still see the wrong thing if the render path doesn't treat human actions specially.
+
+
+
+<Image src="/static/images/blog/notification-badge-is-a-product-promise/img1.png" alt="Agent Inbox mobile layout with the project selector expanded and attention counts visible" />
+
+
+
+The screenshot above is a synthetic demo (all rows are illustrative, no real work) showing the compact project disclosure preserving both the global and per-project attention counts on a narrow screen. The global count is one projection of the predicate; per-project counts are another. Both derived from the same source, so they stay consistent without any coordination logic between surfaces.
+
+## The design rule
+
+Attention counts are promises. A badge that disagrees with the inbox, or an inbox that disagrees with the per-project rail, teaches the user to distrust all three. Once that trust is gone, fixing the bug doesn't restore it. You earn it back slowly, and the user's default in the meantime is to ignore the signal.
+
+The rule I'd take from building this: define attention once, name what does not count, and test every surface against the same set. "Does this row pass the attention predicate?" should have one answer, computed in one place, readable by any surface. The value of that constraint shows up the moment you add a new surface or change an inclusion rule; you change one place, and all five surfaces update correctly.
+
+The design spec is `docs/superpowers/specs/2026-07-24-glanceable-viewer-design.md` in the [Agent Inbox repo](https://github.com/shariqh/agent-inbox), and the predicate is in `public/attention.js`. They're worth reading together. The spec explains the reasoning behind each exclusion; the code shows where the lines landed.
