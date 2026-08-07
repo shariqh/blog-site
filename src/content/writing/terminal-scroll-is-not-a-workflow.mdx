@@ -1,0 +1,78 @@
+---
+title: "Building a Coding Agent Inbox"
+date: '2026-08-07'
+tags:
+  - agents
+  - mcp
+  - local-first
+  - sqlite
+  - developer-tools
+summary: "I built a coding agent inbox when terminal scroll ate the decisions and assumptions my agents made across Claude Code, Copilot CLI, and multiple repos."
+draft: false
+---
+
+The first time I lost something important in terminal scroll, I shrugged. Claude Code had flagged an assumption about a database migration, buried two hundred lines above where I was looking, and I missed it. I caught it in code review, which is what code review is for, so no harm done.
+
+The second time cost me forty minutes. I was running Claude Code across one repository and GitHub Copilot CLI in another, switching contexts every few minutes. Copilot had asked a clarifying question, I tabbed away, and by the time I came back the assumption it made in my absence was wrong. The model had made a reasonable guess and kept going, which is what models do.
+
+After the third incident I stopped calling it a pattern and started calling it a design problem.
+
+Chat interfaces are built for conversation, not for maintaining a durable record of the moments that need your attention. When you're running one agent, the cognitive overhead is manageable. When you're running two or three sessions across different tools and repositories, the signal that matters is indistinguishable from the noise around it, unless something routes it somewhere you can actually find it.
+
+That's the specific gap Agent Inbox was built to fill.
+
+## What Agent View covers, and where it ends
+
+Claude Code ships an Agent View that surfaces blocked status and pending decisions for Claude Code sessions. This is useful and I use it regularly. Agent View does what it says. Two things fall outside its scope by design. Sessions from other tools don't appear in it, and neither does the non-blocking signal category.
+
+If you're also running Copilot CLI, or an agent built on a different SDK, those sessions don't appear in Agent View. And even within Claude Code, there's a category of non-blocking signal worth capturing. The workaround a model quietly applied, the tech debt it noted, the assumption it made without stopping to ask, the milestone it passed. That signal isn't noise, but it doesn't require a decision, so it has nowhere useful to go.
+
+Agent Inbox sits alongside Agent View rather than replacing it. The cross-project queue is the central thesis. Any configured agent can emit to it, regardless of which SDK or CLI produced the session.
+
+The queue in practice looks like this — all data in the demo is synthetic and illustrative.
+
+
+
+<Image src="/static/images/blog/terminal-scroll-is-not-a-workflow/img1.png" alt="Agent Inbox desktop queue with cross-project decisions and an expanded response panel" />
+
+
+
+## The architecture is deliberately small
+
+The first design constraint I set was no second model. Agent Inbox adds no AI. It's infrastructure built around the intelligence that's already running. That framing kept the scope honest and the implementation tractable.
+
+The core is a user-scoped stdio MCP server. Agents connect to it the way they connect to any other MCP tool server, by calling a tool (`emit`) with a structured payload. The server reads from stdin and writes to stdout. It doesn't open any network connections. An agent running in a sandboxed environment with restricted outbound access can still emit without friction.
+
+
+
+Every emitted item lands in a single SQLite database in WAL mode, stored in the user's home directory. WAL mode means the Hono viewer can read while agents are actively writing, without contention. The database is shared across every agent session on the machine, which is how the cross-project view works, not through network aggregation but because every agent writes to the same local file.
+
+Project, branch, and client are inferred lazily from the environment when an agent emits. The inference has been reliable in practice; the emit payload accepts explicit overrides when it's not. The viewer is a Hono server on localhost, with the same plain JavaScript frontend wrapped in Electron for a desktop experience. No browser tab to manage, no port to remember. Live PR state, when you want it, is fetched at read time by the viewer and kept separate from the MCP process.
+
+## What agents can emit
+
+The emit contract defines six types: `question`, `note`, `assumption`, `workaround`, `milestone`, and `debt`. Each maps to a different urgency level and a different treatment in the viewer.
+
+A `question` is blocking. It creates a row marked as waiting, surfaced with direct response choices so you can answer from the inbox without switching to a terminal. The answer writes back to the database; the agent picks it up on its next poll.
+
+The other five types are non-blocking. The agent keeps running. Items land in the queue organized by project and branch on a tracking board. `note`, `assumption`, `workaround`, and `debt` are the signals that were disappearing into terminal scroll before. Agents were generating them; they just had nowhere persistent to go. `milestone` is a checkpoint, a signal that a meaningful unit of work completed, useful for long-running tasks where you want to track progress without being interrupted.
+
+
+
+Live presence rounds out the surface. The MCP server sends a heartbeat on a configurable interval; the viewer shows a live indicator next to each active project. When an agent goes quiet, the indicator clears after a timeout. Small feature in implementation terms, and one of the more practically useful in daily use. A glance at the inbox tells you whether an agent is still running without going back to a terminal.
+
+## The reporting contract is half the product
+
+Shipping the store was the easier part.
+
+The harder problem is teaching agents when to use it. An MCP tool is just a callable surface; the agent decides whether to call it and when. Emit too aggressively, and the inbox fills with noise. Emit too conservatively, and the inbox is empty and you're back to watching scroll. The filing discipline is what determines whether the queue is useful.
+
+The reporting contract I settled on lives in the agent's system prompt. It gives the agent a taxonomy of when each emit type is appropriate, with concrete examples. A `question` is warranted when the agent cannot proceed without a decision that changes the scope or direction of the task. An `assumption` should be logged any time the agent makes a choice the human didn't explicitly authorize. A `workaround` goes in when the agent takes a path it knows is suboptimal and wants a record of why. The agent exercises judgment about what's worth surfacing; the contract gives it the frame to reason within.
+
+Getting this right took more iteration than any other part of the project. An early version of the prompt produced too many questions. Models are well-trained to ask before acting, and given latitude they'll surface things that genuinely don't require a human in the loop — whether to create a helper function or inline the logic, say. Tightening the definition of when a `question` is warranted, and being explicit that non-blocking types exist for everything that doesn't require a decision, changed the behavior significantly.
+
+The contract is still evolving. The lesson I keep returning to is that a queue without a filing discipline is just another pile. The reporting contract is what turns the MCP server from a sink into an attention system. If you're building something in this space, plan to spend as much time on the prompt that teaches the agent what to file as on the infrastructure that stores it.
+
+---
+
+The project is at [github.com/shariqh/agent-inbox](https://github.com/shariqh/agent-inbox). The README covers setup, and the design documents in `docs/superpowers/specs/` walk through the emit contract and the database schema in detail. If you're running more than one coding agent and losing decisions to terminal scroll, the code is there to inspect or adapt.
