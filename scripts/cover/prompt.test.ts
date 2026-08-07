@@ -75,4 +75,15 @@ describe('buildCoverPrompt', () => {
     expect(conceptLine!.length).toBeLessThan(600)
     expect(style).toBe('line-art')
   })
+  it('truncates long concepts at a word boundary', () => {
+    const { prompt } = buildCoverPrompt({
+      title: 'Title',
+      concept: 'token '.repeat(80),
+      tags: ['ai'],
+    })
+    const subject = prompt.match(/Visual concept only: (.+)\. Do not depict/)?.[1]
+    expect(subject).toBeDefined()
+    expect(subject!.length).toBeLessThanOrEqual(400)
+    expect(subject!.endsWith('token')).toBe(true)
+  })
 })
