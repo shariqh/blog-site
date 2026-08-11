@@ -1,4 +1,11 @@
-import { mkdirSync, realpathSync, openSync, writeFileSync, closeSync, constants } from 'node:fs'
+import {
+  mkdirSync,
+  realpathSync,
+  openSync,
+  writeFileSync,
+  closeSync,
+  constants,
+} from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 import { buildCoverPrompt, type CoverStyle } from './prompt'
 import { generateImage as defaultGenerate } from './azure'
@@ -20,7 +27,12 @@ export type CoverResult = {
 export type CoverDeps = {
   generateImage: (prompt: string) => Promise<Buffer>
   hasText: (png: Buffer) => Promise<boolean>
-  renderFallback: (args: { title: string; tags: string[] }) => Promise<Buffer>
+  renderFallback: (args: {
+    title: string
+    summary?: string
+    concept?: string
+    tags: string[]
+  }) => Promise<Buffer>
   writeImage: (absPath: string, data: Buffer, realRoot?: string) => void
 }
 
@@ -34,16 +46,27 @@ function writeToDisk(absPath: string, data: Buffer, realRoot?: string): void {
     const realDir = realpathSync(dir)
     if (realDir !== realRoot && !realDir.startsWith(realRoot + sep)) {
       throw new Error(
-        `Symlink containment violation: "${realDir}" escapes blog image root "${realRoot}"`
+        `Symlink containment violation: "${realDir}" escapes blog image root "${realRoot}"`,
       )
     }
   }
   // O_NOFOLLOW: if absPath itself is a symlink, openSync throws ELOOP.
   // This prevents a pre-planted cover.png symlink from redirecting the write.
-  const fd = openSync(absPath, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o644)
+  const fd = openSync(
+    absPath,
+    constants.O_WRONLY |
+      constants.O_CREAT |
+      constants.O_TRUNC |
+      constants.O_NOFOLLOW,
+    0o644,
+  )
   // writeFileSync(fd, ...) writes the whole buffer (loops internally), unlike a
   // single writeSync which may short-write and silently truncate a large PNG.
-  try { writeFileSync(fd, data) } finally { closeSync(fd) }
+  try {
+    writeFileSync(fd, data)
+  } finally {
+    closeSync(fd)
+  }
 }
 
 const DEFAULTS: CoverDeps = {
@@ -58,16 +81,20 @@ export async function generateCover(
     slug: string
     title: string
     summary?: string
+    concept?: string
     tags: string[]
     style?: CoverStyle
     publicDir?: string
   },
-  deps: Partial<CoverDeps> = {}
+  deps: Partial<CoverDeps> = {},
 ): Promise<CoverResult> {
   // Security choke point: reject any slug that isn't a safe post slug.
   assertSafeSlug(input.slug)
 
-  const { generateImage, hasText, renderFallback, writeImage } = { ...DEFAULTS, ...deps }
+  const { generateImage, hasText, renderFallback, writeImage } = {
+    ...DEFAULTS,
+    ...deps,
+  }
   const publicDir = input.publicDir ?? 'public'
   const imagePath = `/static/images/blog/${input.slug}/cover.png`
   const absPath = `${publicDir}${imagePath}`
@@ -76,8 +103,13 @@ export async function generateCover(
   // the allowed tree (catches traversal in publicDir itself).
   const allowedRoot = resolve(publicDir, 'static/images/blog')
   const resolvedAbs = resolve(absPath)
-  if (!resolvedAbs.startsWith(allowedRoot + sep) && resolvedAbs !== allowedRoot) {
-    throw new Error(`Path containment violation: "${resolvedAbs}" escapes "${allowedRoot}"`)
+  if (
+    !resolvedAbs.startsWith(allowedRoot + sep) &&
+    resolvedAbs !== allowedRoot
+  ) {
+    throw new Error(
+      `Path containment violation: "${resolvedAbs}" escapes "${allowedRoot}"`,
+    )
   }
 
   // Symlink-safe: compute the real path of the blog image root so writeToDisk
@@ -89,7 +121,14 @@ export async function generateCover(
     realRoot = realpathSync(allowedRoot)
   } catch {
     // allowedRoot doesn't exist yet — resolve up to publicDir (which must exist).
-    realRoot = realpathSync(resolve(publicDir)) + sep + 'static' + sep + 'images' + sep + 'blog'
+    realRoot =
+      realpathSync(resolve(publicDir)) +
+      sep +
+      'static' +
+      sep +
+      'images' +
+      sep +
+      'blog'
   }
 
   const alt = `Cover illustration for "${input.title}".`
@@ -97,6 +136,7 @@ export async function generateCover(
   const { prompt, style } = buildCoverPrompt({
     title: input.title,
     summary: input.summary,
+    concept: input.concept,
     tags: input.tags,
     style: input.style,
   })
@@ -105,12 +145,31 @@ export async function generateCover(
     const png = await generateImage(prompt)
     if (!(await hasText(png))) {
       writeImage(absPath, png, realRoot)
-      return { imagePath, alt, prompt, style, attempts: attempt, usedFallback: false }
+      return {
+        imagePath,
+        alt,
+        prompt,
+        style,
+        attempts: attempt,
+        usedFallback: false,
+      }
     }
   }
 
   // Exhausted retries — ship the deterministic branded cover.
-  const fallback = await renderFallback({ title: input.title, tags: input.tags })
+  const fallback = await renderFallback({
+    title: input.title,
+    summary: input.summary,
+    concept: input.concept,
+    tags: input.tags,
+  })
   writeImage(absPath, fallback, realRoot)
-  return { imagePath, alt, prompt, style, attempts: MAX_ATTEMPTS, usedFallback: true }
+  return {
+    imagePath,
+    alt,
+    prompt,
+    style,
+    attempts: MAX_ATTEMPTS,
+    usedFallback: true,
+  }
 }

@@ -3,12 +3,27 @@ import { parseCliArgs } from './cli'
 
 describe('parseCliArgs', () => {
   it('reads the slug positionally', () => {
-    expect(parseCliArgs(['my-post'])).toEqual({ slug: 'my-post', style: undefined, force: false })
+    expect(parseCliArgs(['my-post'])).toEqual({
+      slug: 'my-post',
+      style: undefined,
+      concept: undefined,
+      force: false,
+    })
   })
-  it('reads --style and --force', () => {
-    expect(parseCliArgs(['my-post', '--style', 'conceptual', '--force'])).toEqual({
+  it('reads --style, --concept, and --force', () => {
+    expect(
+      parseCliArgs([
+        'my-post',
+        '--style',
+        'conceptual',
+        '--concept',
+        'A visual metaphor',
+        '--force',
+      ]),
+    ).toEqual({
       slug: 'my-post',
       style: 'conceptual',
+      concept: 'A visual metaphor',
       force: true,
     })
   })
@@ -17,5 +32,8 @@ describe('parseCliArgs', () => {
   })
   it('throws when no slug is given', () => {
     expect(() => parseCliArgs(['--force'])).toThrow(/slug/)
+  })
+  it('rejects an empty --concept', () => {
+    expect(() => parseCliArgs(['p', '--concept', ''])).toThrow(/concept/)
   })
 })

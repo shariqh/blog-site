@@ -50,6 +50,7 @@
 *.tag             text
 *.ts              text
 *.tsx             text
+scripts/cover/prompt.ts text diff
 *.xml             text
 *.xhtml           text diff=html
 
