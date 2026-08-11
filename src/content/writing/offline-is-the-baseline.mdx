@@ -1,0 +1,60 @@
+---
+title: "Offline-First Is the Baseline"
+date: '2026-08-11'
+tags:
+  - ai
+  - offline-first
+  - product-engineering
+  - on-device
+  - oris
+summary: "Building an offline-first AI meeting recorder forced me to invert the cloud default, changing reliability, privacy claims, pricing, and the stack."
+draft: false
+---
+
+The phrase "offline is the baseline" came out of [the Oris 0.8 release notes](https://orisnotes.com/blog/apple-notes-destination) and I've been turning it over since. It sounds like a feature claim. It's actually a design constraint that shaped almost every hard engineering decision in [Oris](https://orisnotes.com).
+
+The default architecture for an AI product is thin client, fat cloud. Your frontend captures input, sends it over the wire, and the cloud does the interesting work. A GPU cluster transcribes the audio, a large model writes the summary. This is the sensible choice. The model lives in one place, you update it once, you know exactly what hardware it runs on. For most products, when the network goes down the failure mode is a temporarily broken feature — annoying, but recoverable. You retry. The user comes back later.
+
+A meeting recorder can't make that deal.
+
+The meeting is happening right now, once, with people who blocked out an hour of their calendar. If transcription depends on a connection you don't control (your uptime, their hotel Wi-Fi, a captive portal that demands a click-through before it lets packets through), the failure mode isn't a temporarily broken feature. It's losing something that cannot be re-created. The recording might exist, but if transcription and summarization are cloud-dependent, you've handed the reliability of the whole system to the weakest link in a chain you don't own.
+
+
+
+## The inversion
+
+So [Oris inverts it](https://orisnotes.com/blog/on-device-by-default). Audio capture runs locally. Transcription runs through WhisperKit on the Apple Neural Engine. Summarization defaults to an on-device Llama model via MLX. The network does two things. On first setup, it downloads models into a local cache; beyond that, there's an optional cloud summarize path for people who want a larger model on their own API key.
+
+That second option matters for the honesty of the claim. Offline-first doesn't mean cloud-never. It means the core loop works without a connection, and anything that does touch a network is optional, bring-your-own, and explicitly labeled. When a user connects their own OpenAI key to get GPT-4 summaries, they've made a deliberate tradeoff. The default path (the thing that runs when you open the app on a plane) touches nothing outside the machine.
+
+
+
+## What the inversion buys
+
+Three things, in roughly ascending order of importance.
+
+The obvious one is reliability. I've used Oris in a café with a captive portal that dropped every few minutes, on a flight with the seat-back Wi-Fi off, and during a call where my home internet hiccupped mid-meeting. Same experience either way, because the baseline doesn't depend on the network.
+
+The second is honest privacy claims. A lot of software promises "your data stays private" and means "we try not to look at it," which is a policy claim, not an architectural one. When audio capture, transcription, and summarization all run on the device, "your audio stays on your Mac" is just a description of the default path, not a promise that requires organizational enforcement to keep.
+
+The third is pricing freedom. Per-use cloud AI costs money on every note. When the core loop has no per-use cost underneath it, when the compute is the user's own Apple Neural Engine, you can charge a flat price or offer a free tier without bleeding on every transcription. The economics of the product stop being hostage to GPU time.
+
+## What it costs
+
+Offline-first is more engineering, not less, and that's exactly why thin clients are the default.
+
+Shipping multi-gigabyte models means owning the download experience (progress, resume, and failure states on bad connections). The first time WhisperKit compiles to the Apple Neural Engine, the startup pause looks exactly like a hang unless you tell the user something is happening. [Oris grew explicit "preparing model" states for this](https://orisnotes.com/blog/never-looks-frozen), with progress indicators that explain what's warming up and why. That UX didn't exist in the first version; I added it after watching people think the app had frozen.
+
+Model selection gets constrained by the user's RAM. On an 8GB machine, you ship a different Whisper variant than on a 32GB machine. This isn't hard to implement, but it's a layer of decision-making that cloud deployments don't need — the server has whatever you provision. On-device, you're making choices on behalf of a heterogeneous fleet.
+
+[Moving to native Swift](https://orisnotes.com/blog/going-native-cleaner-transcripts-more-macs) was a direct consequence of trying to stop paying a Python runtime tax on every transcription. The offline-first constraint pushed the architecture from a Python backend all the way toward a native stack, because latency and resource usage matter when you're running on a MacBook that's also running the meeting you're recording.
+
+None of that work is regrettable; it produced a better product. But offline-first is a constraint you choose, and choosing it means signing up for problems that a cloud-dependent architecture simply doesn't have.
+
+## The principle, generalized
+
+The question worth asking before you commit to an architecture: what is your product's baseline? Not which features you ship, but what absolutely must work when your API is down, the user's network is flaky, and your pricing changes? Build so that baseline depends on nothing you don't control. Everything else can be an add-on.
+
+For Oris, the baseline is simple. You go into a meeting, you come out with a transcript and a summary. That has to work on a plane. Everything beyond that (sync to your note-taking app, a richer model if you want one) can layer on top and remain optional. The core loop is yours, running on hardware the user already owns.
+
+Most products can afford to skip this reasoning. The thin-client default is fine when your worst-case is a temporarily broken feature. But if there's a class of failure where "try again later" isn't an answer, where the event is unrepeatable, or the privacy claim is structural, or you can't afford to be hostage to per-use cloud costs, the architecture of offline-first is worth what it costs to build.
