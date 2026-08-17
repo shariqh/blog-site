@@ -1,0 +1,78 @@
+---
+title: "AI Search Architecture Is a System, Not a Chat Bubble"
+date: '2026-08-17'
+tags:
+  - ai
+  - search
+  - documentation
+  - web-components
+  - architecture
+summary: "AI search architecture for product documentation separates lexical, retrieval, and generation into distinct layers. Collapsing them makes each one worse."
+draft: false
+---
+
+Most documentation search gets shipped as a text box that calls an LLM. Engineers write a prompt, wire a completion endpoint, and close the ticket. That handles synthesis. The other jobs never got a ticket.
+
+I've been building Askdocs and its Oris integration as an attempt to actually cover all of them. Each layer solves a distinct problem that no other layer can absorb. This post walks through what those layers are, why they each need to exist separately, and where the architectural line between them belongs.
+
+## Lexical search first
+
+The first thing a user does on a docs page is type a word. They're not asking a question; they're checking whether what they need even lives here.
+
+That job belongs to a lexical index, not a model. Responsive typeahead has a hard latency ceiling that a model round-trip can't meet. Lexical search is also deterministic. The same query on the same index returns the same ranked results, which makes debugging a missing or stale entry tractable. Semantic similarity scores don't have that property.
+
+Oris wires into Askdocs's lexical layer first. The screenshot below shows the live command surface. Section-aware titles and snippets render as the query changes, with no model call in the critical path. The "Ask Oris" row pinned at the bottom is the handoff point to reasoning.
+
+
+
+<Image src="/static/images/blog/ai-search-is-a-product-system/img1.png" alt="Oris homepage dimmed behind the open Askdocs command bar showing roadmap search results and a pinned Ask Oris action" />
+
+
+
+## The Ask transition and why it's deliberate
+
+The pinned row matters. Oris doesn't automatically fire a generation call when the user types. The user has to explicitly choose Ask. That's a cost and trust model.
+
+Every Ask call runs retrieval and then generation. Making the transition deliberate means synthesis happens when the user actually needs it, not on every keystroke. It also gives users a chance to see whether lexical results already answered the question — often they do.
+
+Here's the complete path from keypress to follow-up state.
+
+
+
+## Retrieval and grounding
+
+The retrieval step is where quality and hype diverge most visibly. Embedding similarity alone doesn't reliably surface the right chunks for narrow, precise queries. Askdocs runs a retrieval strategy over its indexed content; those chunks ground what the model produces. Without this step, the model answers from its training distribution rather than the actual documentation.
+
+Askdocs indexes and reads from public documentation content only. Private notes and unpublished drafts are out of scope. That's a tenant-safety boundary baked into the system, not a per-host configuration.
+
+The model generates against the retrieved chunks and streams output back to the Oris component. Citations attach to spans in the answer as the stream resolves, so the reader can follow a claim back to its source section without hunting.
+
+## Streaming and follow-up state
+
+Streaming matters beyond aesthetics. A complete answer arriving at once creates a hard wait; progressive output gives the user information to act on before the answer finishes. Oris renders the stream token by token, including partially-resolved citations mid-answer.
+
+Follow-up state is the other piece most bolt-on tools drop. After an answer, conversation context needs to persist so a follow-up can narrow or extend the previous answer without re-explaining the context. Oris holds that state for the duration of the session, with an optional same-tab persistence mode for hosts that want it to survive page navigation.
+
+## What Askdocs owns, what Oris owns
+
+This is the tradeoff worth reasoning about carefully.
+
+
+
+Askdocs owns everything that needs to be tenant-safe by default. Indexing, retrieval, generation, citation linking, grounding constraints, and rate limiting are all baked in at the service level. The host doesn't configure any of this.
+
+Oris owns everything that needs to match the host's brand: the command surface's visual weight, color, typography, spacing, and motion. These come through CSS custom properties on a Web Component substrate. The host sets the properties; Askdocs never touches them.
+
+The Web Component boundary is doing real structural work. It gives Oris encapsulation. The host page's styles don't leak into the component, and the component's styles don't leak back. Accessibility (focus management, ARIA roles, keyboard navigation through results and the answer surface) lives inside the component too, so the host doesn't re-implement it and can't accidentally break it.
+
+Tenant safety and brand expression have genuinely different owners. Collapsing them into a single endpoint makes both harder to guarantee.
+
+## Why fewer layers doesn't mean simpler
+
+The appeal of a single semantic-search-or-chat endpoint is real: fewer moving parts, simpler deployment. But you drop the lexical feedback loop that confirms something exists before a model call. You lose the deliberate Ask boundary. You lose the streaming and citation surface that makes generated answers actionable. You lose the architectural seam between what the backend controls and what the host controls.
+
+Each layer in this stack answers a different question for a different user at a different moment. Removing one doesn't simplify the system. It shifts a problem onto the user, who now has to work around something the product didn't bother to solve.
+
+---
+
+The Askdocs repository is public. If you're building documentation search or thinking through what a complete search system looks like end-to-end, that's the right starting point.
