@@ -1,6 +1,6 @@
 # Editorial style guide
 
-Rules for **any public-facing prose** on shariq.dev: blog posts, the about page, projects page, post summaries. Adopted (and adapted) from sibling project [lognote](https://github.com/shariqh/lognote)'s editorial guide.
+Rules for **any public-facing prose** on shariq.dev: blog posts, the about page, projects page, post summaries. Adopted (and adapted) from sibling project [Oris](https://github.com/shariqh/oris)'s editorial guide.
 
 This document is authoritative. Every writer — human, agent, or hybrid — applies these rules before publishing. The AI drafting agent (Plan B) loads this file into its system prompt as required reading.
 

@@ -13,7 +13,7 @@ export const HOME = {
     italic: 'Disciplined',
     tail: ' about everything else.',
   },
-  currently: 'lognote',
+  currently: 'Oris + agent tools',
   tags: ['Engineer', 'Founder'],
   portraits: [
     { src: '/static/images/home/portrait-1.jpg', alt: 'Shariq Hirani' },
