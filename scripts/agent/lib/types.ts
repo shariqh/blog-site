@@ -75,7 +75,7 @@ export interface CommitFile {
 }
 
 export interface CommitInfo {
-  repo: string // e.g. "shariqh/lognote"
+  repo: string // e.g. "shariqh/oris"
   sha: string
   message: string
   date: string

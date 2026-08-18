@@ -26,7 +26,9 @@ test('homepage renders the zine hero', async ({ page }) => {
   await expect(page.locator('h1')).toContainText(['Shariq'])
   await expect(page.locator('[data-deck] .deck img')).toHaveCount(5)
   await expect(page.locator('.featured')).toBeVisible()
-  await expect(page.getByText('I build a few things, and break a lot of things')).toBeVisible()
+  await expect(
+    page.getByText('I build a few things, and break a lot of things'),
+  ).toBeVisible()
 })
 
 test('header nav + footer socials', async ({ page }) => {
@@ -63,6 +65,42 @@ test('blog listing renders + filters', async ({ page }) => {
   }
 })
 
+test('current projects stay in sync across key pages', async ({ page }) => {
+  await page.goto('/')
+  await expect(
+    page.getByRole('link', { name: 'Oris', exact: true }).first(),
+  ).toHaveAttribute('href', 'https://orisnotes.com')
+  await expect(
+    page.getByRole('link', { name: 'Agent Inbox', exact: true }).first(),
+  ).toBeVisible()
+  await expect(
+    page.locator('.right-now').getByText('AskDocs', { exact: true }),
+  ).toBeVisible()
+
+  await page.goto('/now')
+  await expect(page.getByRole('heading', { name: 'Oris' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Agent Inbox' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'AskDocs' })).toBeVisible()
+
+  await page.goto('/projects')
+  await expect(page.getByRole('heading', { name: 'Oris' })).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'AskDocs', exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('link', { name: 'GitHub Enterprise Settings Configurator' }),
+  ).toBeVisible()
+  for (const retired of ['coffee-ui', 'unrivaledpro', 'myspace']) {
+    await expect(page.getByText(retired, { exact: true })).toHaveCount(0)
+  }
+
+  await page.goto('/about')
+  await expect(page.getByText('shariq.dev · portalrewards', { exact: true })).toBeVisible()
+  await expect(page.getByText('Swift', { exact: true })).toBeVisible()
+  await expect(page.getByText('TypeScript', { exact: true })).toBeVisible()
+  await expect(page.getByText('unrivaledpro', { exact: true })).toHaveCount(0)
+})
+
 for (const slug of SLUGS) {
   test(`/blog/${slug} renders`, async ({ page }) => {
     const res = await page.goto(`/blog/${slug}`)
@@ -71,14 +109,26 @@ for (const slug of SLUGS) {
   })
 }
 
-test('blog post exposes OG image meta and the PNG is built', async ({ page }) => {
-  const slug = 'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
+test('blog post exposes OG image meta and the PNG is built', async ({
+  page,
+}) => {
+  const slug =
+    'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
   await page.goto(`/blog/${slug}`)
 
   const ogImage = page.locator('meta[property="og:image"]')
-  await expect(ogImage).toHaveAttribute('content', new RegExp(`/og/${slug}\\.png$`))
-  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute('content', '1200')
-  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image')
+  await expect(ogImage).toHaveAttribute(
+    'content',
+    new RegExp(`/og/${slug}\\.png$`),
+  )
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute(
+    'content',
+    '1200',
+  )
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+    'content',
+    'summary_large_image',
+  )
 
   expect(existsSync(`dist/og/${slug}.png`)).toBe(true)
 })
