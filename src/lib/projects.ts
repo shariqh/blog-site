@@ -66,13 +66,6 @@ export const built: Project[] = [
     repo: "https://github.com/shariqh/blog-site",
   },
   {
-    name: "unrivaledpro",
-    description:
-      "Reviews and deals on gaming peripherals, from chairs and speakers to power banks.",
-    kind: "product",
-    site: "https://unrivaledpro.com",
-  },
-  {
     name: "portalrewards",
     description:
       "A gateway for brands to build consumer loyalty programs with scan-to-earn rewards.",
@@ -85,20 +78,6 @@ export const built: Project[] = [
       "A collection of docker-compose files I use to run my home server. With comments.",
     kind: "tool",
     repo: "https://github.com/shariqh/home-server-docker-compose",
-  },
-  {
-    name: "myspace",
-    description: "A personal sandbox / landing page from a while back.",
-    kind: "site",
-    site: "https://shariqh.github.io/myspace/",
-    repo: "https://github.com/shariqh/myspace",
-  },
-  {
-    name: "coffee-ui",
-    description: "Coffee-themed UI experiments.",
-    kind: "site",
-    site: "https://coffee-ui.vercel.app",
-    repo: "https://github.com/shariqh/coffee-ui",
   },
   {
     name: "bullmq + bull-board + redis docker starter",

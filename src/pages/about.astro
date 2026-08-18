@@ -16,18 +16,19 @@ const offClock = [
 
 // Tools I actually use day-to-day. icon = a slug in /public/static/icons/ (or null).
 const tools = [
-  { name: "Docker", icon: "docker" },
-  { name: "Notion", icon: "notion" },
-  { name: "1Password", icon: "1password" },
   { name: "GitHub", icon: "github" },
   { name: "GitHub Copilot", icon: "githubcopilot" },
   { name: "Claude", icon: "claude" },
+  { name: "Notion", icon: "notion" },
+  { name: "1Password", icon: "1password" },
   { name: "iTerm2", icon: "iterm2" },
-  { name: "Soloterm", icon: null },
   { name: "Obsidian", icon: "obsidian" },
-  { name: "Spotify", icon: "spotify" },
-  { name: "Apple Music", icon: "applemusic" },
-  { name: "Sublime Text", icon: "sublimetext" },
+  { name: "Docker", icon: "docker" },
+  { name: "Swift", icon: null },
+  { name: "TypeScript", icon: null },
+  { name: "Astro", icon: null },
+  { name: "Cloudflare", icon: null },
+  { name: "SQLite", icon: null },
 ];
 const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
 const focusProjects = active.filter((project) => focusNames.has(project.name));
@@ -45,8 +46,9 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
       <dl>
         <div><dt>Role</dt><dd>Senior Solutions Engineer, GitHub</dd></div>
         <div><dt>Building</dt><dd><span class="live">Oris · Agent Inbox · AskDocs</span></dd></div>
-        <div><dt>Also shipped</dt><dd>unrivaledpro · portalrewards</dd></div>
-        <div><dt>Writes about</dt><dd>Engineering, teams, the AI shift</dd></div>
+        <div><dt>Also active</dt><dd>GitHub Enterprise Settings Configurator</dd></div>
+        <div><dt>Also shipped</dt><dd>shariq.dev · portalrewards</dd></div>
+        <div><dt>Writes about</dt><dd>AI systems, engineering, technical leadership</dd></div>
         <div><dt>Off the clock</dt><dd>DJ sets, hiking, cooking, an over-built home server</dd></div>
         <div><dt>Experience</dt><dd>10+ yrs — architecture, distributed systems, infra, platform</dd></div>
       </dl>
