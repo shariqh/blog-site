@@ -54,6 +54,7 @@ test('custom site icons serve', async ({ request }) => {
   const source = await svg.text()
   expect(source).toContain('#b04a3a')
   expect(source).toContain('#15233a')
+  expect(source).not.toContain('M48 58h6v12h-6Z')
 
   const touchIcon = await request.get('/static/favicons/apple-touch-icon.png')
   expect(touchIcon.status()).toBe(200)
