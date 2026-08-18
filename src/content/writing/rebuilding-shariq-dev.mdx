@@ -108,7 +108,7 @@ The fix was mode-aware bucket colors. In light mode, leadership cells are navy o
 
 I haven't built the agent yet. That's Plan B: a scheduled GitHub Action that runs a TypeScript script using the Claude Agent SDK. The agent will have tools for reading my Notion ideas, scanning recent commits across configured repos, generating heroes, writing MDX, and opening a PR.
 
-What I did build is the scaffolding the agent will hook into. Every push triggers a Cloudflare Pages preview deploy. Every PR gets a preview URL auto-commented (via a GitHub Action lifted from [`lognote`](https://github.com/shariqh/oris)). The preview renders the post identically to production. Reviewing on a phone is the same as on a laptop.
+What I did build is the scaffolding the agent will hook into. Every push triggers a Cloudflare Pages preview deploy. Every PR gets a preview URL auto-commented (via a GitHub Action lifted from `lognote`). The preview renders the post identically to production. Reviewing on a phone is the same as on a laptop.
 
 The reviewer is me. The agent's job is to draft and propose; mine is to read on the preview, edit prose directly in GitHub's web editor, and merge when it sounds right. Merging is publishing.
 
@@ -132,7 +132,7 @@ tokens:
   - 'at the end of the day'
 ```
 
-Both files were lifted near-wholesale from [`lognote`](https://github.com/shariqh/oris)'s editorial setup. The phrases are universal; the bucket mappings, length guidance, and frontmatter spec are this-blog-specific.
+Both files were lifted near-wholesale from `lognote`'s editorial setup. The phrases are universal; the bucket mappings, length guidance, and frontmatter spec are this-blog-specific.
 
 I caught one of my own claims with this discipline. The projects page on the new site originally said "the whole rebuild is documented in the blog." It wasn't. That's exactly the aspirational-present-tense thing the editorial guide warns about, and the only fix was actually writing this post.
 
