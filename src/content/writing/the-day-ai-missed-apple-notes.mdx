@@ -1,0 +1,92 @@
+---
+title: "Building Trustworthy AI Products: The Screenshot I Almost Deleted"
+date: '2026-08-18'
+tags:
+  - ai
+  - ai-systems
+  - retrieval
+  - evaluation
+  - product-quality
+summary: "The assistant had the corpus to answer a broad question and still abstained. Building trustworthy AI products means fixing the system, not swapping models."
+draft: false
+---
+
+The screenshot sat in a folder I'd labeled "embarrassing." A user asked Oris's documentation assistant which apps and export destinations were supported. The assistant responded with *Not enough indexed evidence.* Seconds earlier, on the same session, a narrower question about Apple Notes permissions had answered correctly, with numbered citations and real source references.
+
+The corpus contained the answer to the broad question. The system just hadn't found it.
+
+
+
+<Image src="/static/images/blog/the-day-ai-missed-apple-notes/img1.png" alt="Askdocs conversation showing a broad supported-apps question failing while a narrower Apple Notes question succeeds" />
+
+
+
+The model barely touched it. The failure lived in the product system around the model, and the visual presentation made both the wrong answer and the right one look identical, all showing clean framing, a confident tone, and cited sources. If you didn't already know what the correct answer looked like, you couldn't tell them apart.
+
+## Why the product system failed, not the model
+
+When a user asks a narrow question like "how do I grant Apple Notes permission," the retriever has a direct surface to hit. Vocabulary matches chunk headings. A handful of dense-vector neighbors are topically close, and they clear the evidence gate with room to spare. The model gets real context and produces a grounded answer.
+
+Ask "which apps and export destinations are supported" and you're asking the retriever to aggregate across a sparse, spread-out corpus. None of the individual chunks are close neighbors to that query phrasing. They're close to "Obsidian," "Apple Notes," "permissions," "setup" individually. The evidence gate fires (correctly, by its own logic) and the system reports insufficient evidence.
+
+The chunks existed. The evidence gate was doing what I asked it to do. The problem was that the retriever couldn't surface the right spread of content for a broad aggregation query.
+
+
+
+The second failure was subtler, and it came down to citations. The response included source references, which reads as grounded and careful. But I hadn't verified that each cited source actually contributed to the specific claim it appeared next to. A citation can be present and still be decorative. The model knows the documents exist, so it names them, but the text that shaped the answer may have come from somewhere else.
+
+Both failures were invisible. False abstentions look like responsible hedging. Decorative citations look like verification. The only way to catch either one was to have the expected answer in hand and compare.
+
+## What I resisted doing
+
+The reflex when a model-adjacent system fails is to swap in a bigger model. I've done that before. It's rarely the right first move.
+
+I kept the failure transcript instead. Then I split the problem into three separate workstreams — retrieval scope, citation truthfulness, and correction-aware UX. Fixing all three at once in a single branch would have made it impossible to attribute any improvement to any specific change.
+
+## The fix
+
+The retrieval side needed a hybrid approach, combining dense-vector similarity for narrow factual lookups with sparse (BM25-style) term matching for broad aggregation queries. A re-ranker merges the candidates before they reach the evidence gate. The gate threshold stayed the same; the inputs to it changed.
+
+
+
+Citation truthfulness required logging which chunks actually entered the context window, then cross-referencing against every citation in the response. Anything cited but not provably used gets flagged. The system now only surfaces sources it can verify it drew from.
+
+Correction-aware UX meant building an explicit acknowledgement flow. When a user pushes back on an answer, the system says it missed information rather than silently producing a corrected one. A system that says "I missed that" is one a user can calibrate. One that silently corrects itself reads as potentially silently wrong again.
+
+## Evaluation before deploy
+
+The evaluation suite ran conversations, not isolated prompts. Single-turn testing had hidden the original failure; it only surfaced in multi-turn sessions where a prior wrong answer could be compared against a correction.
+
+A bounded set of smoke queries ran against a staging environment before I touched the live instance. An independent review pass found one edge case the suite hadn't covered. A terminal citation (the last source in a numbered list) was getting dropped when the response hit a character limit. That got a fix before merge.
+
+The deploy used the exact validated SHA, not a branch tip. After deployment, the first verification step was re-running the original failure queries live.
+
+
+
+
+
+<Image src="/static/images/blog/the-day-ai-missed-apple-notes/img2.png" alt="Askdocs conversation with grounded Apple Notes answers, setup steps, linked citations, and a safe abstention" />
+
+
+
+Apple Notes permissions: grounded answer, numbered citations, sources provably used. The broad supported-apps question returned a correct, scoped response this time, with explicit acknowledgement that earlier sessions had returned insufficient evidence.
+
+## What this cost in trust
+
+False abstentions don't feel safe from the outside. "Not enough evidence" sounds like responsible hedging, but if the user asked a reasonable question and the corpus had the answer, they got a wrong response, one that looked exactly like a right one. The trust cost is roughly equivalent to a hallucination. The user doesn't know which kind of failure they got; they just know the system didn't help.
+
+I'd been treating abstention as the conservative outcome. After this, it's a potential failure mode that needs its own evaluation coverage.
+
+A few other things I'll carry forward.
+
+Sources in an AI response should mean the system actually drew from them when composing a specific claim. Citing a document that was retrieved but not used is a kind of soft hallucination — the citations look real, but they're not evidence of the thing they appear next to.
+
+Testing conversations rather than prompts catches a different failure class. A conversation has memory, correction dynamics, prior-answer supersession. If your eval suite doesn't include multi-turn cases, you're testing a simpler system than you've built.
+
+Deploy the exact SHA you validated. It sounds obvious. It's easier to skip than it sounds.
+
+## Save the embarrassing screenshots
+
+If you're building in this space and you have a folder of failure screenshots, keep it. Those frames reveal what your retrieval scope misses, where your evidence gates misbehave, and which UX affordances make failures invisible. They're the most honest product backlog you have.
+
+The screenshot I almost deleted was the one that shaped the next six weeks of work.
