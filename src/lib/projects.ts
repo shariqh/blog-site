@@ -12,49 +12,65 @@ export interface Project {
   repo?: string;
   /** Optional badge text like "active" / "archived" / a year. */
   status?: string;
+  /** Technology or product traits shown when this project is spotlighted. */
+  stack?: readonly string[];
 }
 
 export const active: Project[] = [
   {
-    name: "lognote",
-    blurb: "Local transcription & summarization for Mac.",
+    name: "Oris",
+    blurb: "Local-first meeting notes for Mac.",
     description:
-      "Local audio transcription + summarization for Mac. Records mic + system audio, runs MLX-Whisper on-device, lands a Markdown transcript and summary in your notes.",
+      "A local-first Mac app that records meetings without a call bot, transcribes on-device with WhisperKit, and lands structured notes in Obsidian, Apple Notes, or a Markdown folder.",
     kind: "product",
-    site: "https://lognote.dev",
+    site: "https://orisnotes.com",
     status: "active",
+    stack: ["Swift", "WhisperKit", "macOS", "local-first"],
   },
   {
-    name: "unrivaledpro",
-    blurb: "Reviews & deals on gaming peripherals.",
+    name: "Agent Inbox",
+    blurb: "A local command center for coding agents.",
     description:
-      "Reviews and deals on gaming peripherals — chairs, speakers, power banks, and the gear in between.",
-    kind: "product",
-    site: "https://unrivaledpro.com",
-    status: "active",
+      "A local, cross-project attention inbox where Copilot CLI and Claude Code surface decisions, plans, and handoffs through MCP.",
+    kind: "tool",
+    repo: "https://github.com/shariqh/agent-inbox",
+    status: "building",
   },
   {
-    name: "portalrewards",
-    blurb: "A loyalty-rewards gateway for brands.",
+    name: "AskDocs",
+    blurb: "Embeddable search and RAG for product sites.",
     description:
-      "A gateway for brands to build consumer loyalty programs. Users scan to earn rewards and redeem them for brand prizes.",
-    kind: "product",
-    site: "https://portalrewards.com",
-    status: "active",
+      "Multi-tenant search and RAG delivered as a Web Component. It currently powers the site search for Oris.",
+    kind: "tool",
+    status: "private",
   },
   {
-    name: "shariq.dev",
-    blurb: "This site — Astro, Tailwind & MDX.",
+    name: "GitHub Enterprise Settings Configurator",
+    blurb: "Desired-state planning for GitHub Enterprise.",
     description:
-      "This site. Astro + Tailwind 4 + MDX on Cloudflare Pages — the rebuild is documented on the blog.",
-    kind: "site",
-    site: "https://shariq.dev",
-    repo: "https://github.com/shariqh/blog-site",
+      "An interactive planner for GitHub Enterprise settings, security posture, governance, and rollout complexity.",
+    kind: "tool",
+    site: "https://shariqh.github.io/github-enterprise-settings-configurator/",
+    repo: "https://github.com/shariqh/github-enterprise-settings-configurator",
     status: "active",
   },
 ];
 
 export const built: Project[] = [
+  {
+    name: "shariq.dev",
+    description: "This site: Astro, Tailwind 4, and MDX on Cloudflare Pages.",
+    kind: "site",
+    site: "https://shariq.dev",
+    repo: "https://github.com/shariqh/blog-site",
+  },
+  {
+    name: "portalrewards",
+    description:
+      "A gateway for brands to build consumer loyalty programs with scan-to-earn rewards.",
+    kind: "product",
+    site: "https://portalrewards.com",
+  },
   {
     name: "home-server-docker-compose",
     description:
@@ -63,22 +79,9 @@ export const built: Project[] = [
     repo: "https://github.com/shariqh/home-server-docker-compose",
   },
   {
-    name: "myspace",
-    description: "A personal sandbox / landing page from a while back.",
-    kind: "site",
-    site: "https://shariqh.github.io/myspace/",
-    repo: "https://github.com/shariqh/myspace",
-  },
-  {
-    name: "coffee-ui",
-    description: "Coffee-themed UI experiments.",
-    kind: "site",
-    site: "https://coffee-ui.vercel.app",
-    repo: "https://github.com/shariqh/coffee-ui",
-  },
-  {
     name: "bullmq + bull-board + redis docker starter",
-    description: "Quickstart for running BullMQ with Bull-Board behind Redis, in Docker.",
+    description:
+      "Quickstart for running BullMQ with Bull-Board behind Redis, in Docker.",
     kind: "tool",
     repo: "https://github.com/shariqh/bullmq_bull-board_redis_docker_starter",
   },
@@ -99,7 +102,8 @@ export const talks: Project[] = [
   },
   {
     name: "Managing in high-turnover environments",
-    description: "Internal presentation on engineering management during attrition.",
+    description:
+      "Internal presentation on engineering management during attrition.",
     kind: "talk",
     repo: "https://github.com/shariqh/presentation_managing-in-high-turnover",
   },
@@ -115,11 +119,11 @@ export function host(url: string): string {
 
 /** Only allow http(s) project URLs into hrefs (defends against javascript:/data: values). */
 export function safeHref(url?: string): string | undefined {
-  if (!url) return undefined
+  if (!url) return undefined;
   try {
-    const u = new URL(url)
-    return u.protocol === 'https:' || u.protocol === 'http:' ? url : undefined
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:" ? url : undefined;
   } catch {
-    return undefined
+    return undefined;
   }
 }

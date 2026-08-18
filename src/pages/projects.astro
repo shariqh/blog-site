@@ -3,7 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
 import { active, built, talks, host, safeHref } from "../lib/projects";
 
-const spotlight = active.find((p) => p.name === "lognote") ?? active[0];
+const spotlight = active.find((p) => p.name === "Oris") ?? active[0];
 const shipping = active.filter((p) => p !== spotlight);
 const shippingCount = String(shipping.length).padStart(2, "0");
 const builtCount = String(built.length).padStart(2, "0");
@@ -23,9 +23,11 @@ const talksCount = String(talks.length).padStart(2, "0");
       <span class="ey">Currently building</span>
       <h2>{spotlight.name}</h2>
       <p>{spotlight.description}</p>
-      <div class="chips">
-        <span>Swift</span><span>MLX-Whisper</span><span>macOS</span><span>local-first</span>
-      </div>
+      {spotlight.stack && (
+        <div class="chips">
+          {spotlight.stack.map((item) => <span>{item}</span>)}
+        </div>
+      )}
       <span class="cta">
         <span class="dot">↗</span> Visit {spotlight.name}
       </span>
@@ -46,7 +48,7 @@ const talksCount = String(talks.length).padStart(2, "0");
 
   <!-- SHIPPING -->
   <div class="sec-h rise d2">
-    <span class="mono-label">Shipping</span>
+    <span class="mono-label">Also building</span>
     <span class="rule"></span>
     <span class="count">{shippingCount}</span>
   </div>
@@ -60,12 +62,20 @@ const talksCount = String(talks.length).padStart(2, "0");
           <span class="kind">{p.kind}</span>
           {p.status && <span class="status">● {p.status}</span>}
         </div>
-        <h3><a class="card-name-link" href={safeHref(p.site ?? p.repo)} target="_blank" rel="noopener">{p.name}</a></h3>
+        <h3>
+          {safeHref(p.site ?? p.repo) ? (
+            <a class="card-name-link" href={safeHref(p.site ?? p.repo)} target="_blank" rel="noopener">{p.name}</a>
+          ) : (
+            <span class="card-name-link card-name-static">{p.name}</span>
+          )}
+        </h3>
         <p class="desc">{p.blurb ?? p.description}</p>
-        <div class="links">
-          {p.site && <a href={safeHref(p.site)} target="_blank" rel="noopener">{host(p.site)} ↗</a>}
-          {p.repo && <a href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>}
-        </div>
+        {(p.site || p.repo) && (
+          <div class="links">
+            {p.site && <a href={safeHref(p.site)} target="_blank" rel="noopener">{host(p.site)} ↗</a>}
+            {p.repo && <a href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>}
+          </div>
+        )}
         <span class="card-arrow" aria-hidden="true">↗</span>
       </div>
     ))}
@@ -108,9 +118,6 @@ const talksCount = String(talks.length).padStart(2, "0");
     ))}
   </div>
 
-  <p class="mono-label footer-note">
-    Prune the list in <code>src/lib/projects.ts</code>.
-  </p>
 </BaseLayout>
 
 <style>
@@ -322,6 +329,9 @@ const talksCount = String(talks.length).padStart(2, "0");
   .card:hover .card-name-link {
     color: var(--accent, var(--color-terracotta));
   }
+  .card:hover .card-name-static {
+    color: inherit;
+  }
   .card .desc {
     font-size: 14px;
     line-height: 1.55;
@@ -428,14 +438,6 @@ const talksCount = String(talks.length).padStart(2, "0");
     color: var(--color-terracotta);
   }
 
-  .footer-note {
-    margin-top: 48px;
-    padding-bottom: 48px;
-  }
-  .footer-note code {
-    font-family: var(--font-mono);
-    font-size: 11px;
-  }
 
   /* staggered load-in — mirrors About page .rise approach */
   .rise {

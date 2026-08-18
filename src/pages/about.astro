@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
+import { active, safeHref } from "../lib/projects";
 import { SITE } from "../lib/site";
 
 // "Off the clock" photo wall — auto-scrolls horizontally and loops seamlessly.
@@ -15,19 +16,22 @@ const offClock = [
 
 // Tools I actually use day-to-day. icon = a slug in /public/static/icons/ (or null).
 const tools = [
-  { name: "Docker", icon: "docker" },
-  { name: "Notion", icon: "notion" },
-  { name: "1Password", icon: "1password" },
   { name: "GitHub", icon: "github" },
   { name: "GitHub Copilot", icon: "githubcopilot" },
   { name: "Claude", icon: "claude" },
+  { name: "Notion", icon: "notion" },
+  { name: "1Password", icon: "1password" },
   { name: "iTerm2", icon: "iterm2" },
-  { name: "Soloterm", icon: null },
   { name: "Obsidian", icon: "obsidian" },
-  { name: "Spotify", icon: "spotify" },
-  { name: "Apple Music", icon: "applemusic" },
-  { name: "Sublime Text", icon: "sublimetext" },
+  { name: "Docker", icon: "docker" },
+  { name: "Swift", icon: null },
+  { name: "TypeScript", icon: null },
+  { name: "Astro", icon: null },
+  { name: "Cloudflare", icon: null },
+  { name: "SQLite", icon: null },
 ];
+const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
+const focusProjects = active.filter((project) => focusNames.has(project.name));
 ---
 <BaseLayout title="About" width="wide">
   <PageHeader eyebrow="Shariq Hirani" title="About" />
@@ -41,9 +45,10 @@ const tools = [
     <aside class="facts rise d2">
       <dl>
         <div><dt>Role</dt><dd>Senior Solutions Engineer, GitHub</dd></div>
-        <div><dt>Building</dt><dd><span class="live">lognote — local transcription for meetings</span></dd></div>
-        <div><dt>Also shipped</dt><dd>unrivaledpro · portalrewards</dd></div>
-        <div><dt>Writes about</dt><dd>Engineering, teams, the AI shift</dd></div>
+        <div><dt>Building</dt><dd><span class="live">Oris · Agent Inbox · AskDocs</span></dd></div>
+        <div><dt>Also active</dt><dd>GitHub Enterprise Settings Configurator</dd></div>
+        <div><dt>Also shipped</dt><dd>shariq.dev · portalrewards</dd></div>
+        <div><dt>Writes about</dt><dd>AI systems, engineering, technical leadership</dd></div>
         <div><dt>Off the clock</dt><dd>DJ sets, hiking, cooking, an over-built home server</dd></div>
         <div><dt>Experience</dt><dd>10+ yrs — architecture, distributed systems, infra, platform</dd></div>
       </dl>
@@ -87,7 +92,18 @@ const tools = [
     <div class="now-grid">
       <div class="now">
         <h3>Currently building</h3>
-        <p><a href="https://lognote.dev" target="_blank" rel="noopener">lognote</a> — a local-first Mac app that records your meetings, transcribes them on-device with MLX-Whisper, and drops a clean Markdown summary into your notes. Private by default.</p>
+        <div class="current-builds">
+          {focusProjects.map((project) => (
+            <p>
+              {safeHref(project.site ?? project.repo) ? (
+                <a href={safeHref(project.site ?? project.repo)} target="_blank" rel="noopener">{project.name}</a>
+              ) : (
+                <strong>{project.name}</strong>
+              )}
+              : {project.blurb}
+            </p>
+          ))}
+        </div>
       </div>
       <div class="now">
         <h3>Tools I reach for</h3>
@@ -362,12 +378,14 @@ const tools = [
     color: var(--fg-soft);
     max-width: 42ch;
   }
+  .current-builds { display: grid; gap: 12px; }
   .now a {
     color: var(--color-terracotta);
     text-decoration: underline;
     text-decoration-color: var(--color-ochre);
     text-underline-offset: 3px;
   }
+  .now strong { color: var(--color-terracotta); font-weight: 500; }
   .stack {
     display: flex;
     flex-wrap: wrap;

@@ -24,7 +24,7 @@ export const CONFIG = {
   agentGhToken: required('AGENT_GH_TOKEN'),
 
   scanRepoOrg: optional('SCAN_REPO_ORG', 'shariqh'),
-  scanRepoInclude: optional('SCAN_REPO_INCLUDE', 'blog-site,lognote').split(','),
+  scanRepoInclude: optional('SCAN_REPO_INCLUDE', 'blog-site,oris').split(','),
   scanRepoActiveDays: parseInt(optional('SCAN_REPO_ACTIVE_DAYS', '30'), 10),
 } as const
 
