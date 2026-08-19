@@ -15,7 +15,6 @@ const fb = featured ? resolveBucket(featured.data.tags) : null;
 const m = HOME.manifesto;
 const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
 const focusProjects = active.filter((project) => focusNames.has(project.name));
-const dayJobNumber = String(focusProjects.length + 1).padStart(2, "0");
 const homeLd = [
   {
     "@context": "https://schema.org",
@@ -46,7 +45,6 @@ const homeLd = [
       <h1>Hi, I'm <span class="i">Shariq.</span></h1>
       <p class="kicker">{HOME.tagline}</p>
       <div class="tags">
-        <span class="live">Building {HOME.currently}</span>
         {HOME.tags.map((t) => <span>{t}</span>)}
       </div>
     </div>
@@ -60,24 +58,18 @@ const homeLd = [
   <section class="right-now">
     <h2 class="h">Right now</h2>
     <ul>
-      {focusProjects.map((project, index) => (
+      {focusProjects.map((project) => (
         <li>
-          <span class="n">{String(index + 1).padStart(2, "0")}</span>
-          <span class="rn-text">
-            {index === 0 ? "Shipping" : "Building"}{" "}
-            {safeHref(project.site ?? project.repo) ? (
-              <a class="rn-link" href={safeHref(project.site ?? project.repo)} target="_blank" rel="noopener">{project.name}</a>
-            ) : (
-              <span class="rn-link rn-link-static">{project.name}</span>
-            )}{" "}— {project.blurb}
-          </span>
+          {safeHref(project.site ?? project.repo) ? (
+            <a class="rn-link" href={safeHref(project.site ?? project.repo)} target="_blank" rel="noopener">{project.name}</a>
+          ) : (
+            <span class="rn-link rn-link-static">{project.name}</span>
+          )}
+          {project.blurb && <span class="rn-detail"> — {project.blurb}</span>}
         </li>
       ))}
-      <li>
-        <span class="n">{dayJobNumber}</span>
-        <span class="rn-text">Senior Solutions Engineer, <span class="rn-org"><svg class="gh" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</span></span>
-      </li>
     </ul>
+    <a class="more-now" href="/now">More on what I'm doing now <span aria-hidden="true">→</span></a>
   </section>
 
   {featured && fb && (
@@ -90,21 +82,6 @@ const homeLd = [
     />
   )}
 
-  <section class="built-wrap">
-    <h2 class="h">Lately I've built</h2>
-    <ul class="built">
-      {active.map((p) => (
-        <li>
-          {safeHref(p.site ?? p.repo) ? (
-            <a class="built-name" href={safeHref(p.site ?? p.repo)} target="_blank" rel="noopener">{p.name}</a>
-          ) : (
-            <span class="built-name built-name-static">{p.name}</span>
-          )}
-          <p class="built-desc">{p.blurb ?? p.description}</p>
-        </li>
-      ))}
-    </ul>
-  </section>
 </BaseLayout>
 
 <style>
@@ -119,13 +96,6 @@ const homeLd = [
   /* tag row — pinned to the bottom of the hero text column */
   .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 40px; }
   .tags span { font-family: var(--font-mono); font-size: 12px; padding: 7px 14px; border-radius: 999px; background: color-mix(in oklab, var(--fg) 6%, transparent); }
-  .tags span.live { display: inline-flex; align-items: center; gap: 8px; background: var(--color-ochre); color: var(--color-ink); }
-  .tags span.live::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--color-terracotta); box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 60%, transparent); animation: pulse 2s infinite; }
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 55%, transparent); }
-    70% { box-shadow: 0 0 0 9px color-mix(in oklab, var(--color-terracotta) 0%, transparent); }
-    100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 0%, transparent); }
-  }
 
   /* MANIFESTO */
   .manifesto { font-family: var(--font-display); font-weight: 400; font-size: 46px; line-height: 1.16; letter-spacing: -.02em; max-width: 26ch; text-wrap: balance; margin: 110px 0; position: relative; }
@@ -136,25 +106,14 @@ const homeLd = [
   .right-now { margin: 0 0 110px; }
   .right-now .h { font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .5; margin-bottom: 28px; }
   .right-now ul { list-style: none; display: flex; flex-direction: column; gap: 4px; padding: 0; }
-  .right-now li { font-family: var(--font-display); font-size: 38px; line-height: 1.2; letter-spacing: -.015em; display: flex; align-items: baseline; gap: 16px; }
-  .right-now li .n { font-family: var(--font-mono); font-size: 12px; opacity: .4; width: 28px; flex: none; }
+  .right-now li { font-family: var(--font-display); font-size: 38px; line-height: 1.2; letter-spacing: -.015em; }
   .right-now .rn-link { color: var(--color-terracotta); text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
   .right-now .rn-link-static { text-decoration: none; }
-  .right-now .gh { width: 0.78em; height: 0.78em; vertical-align: -0.14em; }
-  .right-now .rn-org { display: inline-flex; align-items: center; gap: 8px; }
+  .right-now .more-now { display: inline-block; margin-top: 24px; font-family: var(--font-mono); font-size: 12px; color: inherit; text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
+  .right-now .more-now:hover { color: var(--color-terracotta); }
 
   /* FEATURED spacing (component handles its own inner layout) */
   :global(.featured) { margin-bottom: 110px; }
-
-  /* BUILT */
-  .built-wrap { margin-bottom: 110px; }
-  .built-wrap .h { font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .5; margin-bottom: 8px; }
-  .built { list-style: none; padding: 0; }
-  .built li { padding: 18px 0; border-bottom: 1px dashed color-mix(in oklab, var(--fg) 22%, transparent); }
-  .built-name { display: inline-block; font-family: var(--font-display); font-style: italic; font-size: 26px; color: inherit; text-decoration: none; }
-  .built-name:hover { color: var(--color-terracotta); }
-  .built-name-static:hover { color: inherit; }
-  .built-desc { margin-top: 6px; font-size: 15px; opacity: .7; max-width: 60ch; line-height: 1.5; }
 
   @media (max-width: 880px) {
     .hero { grid-template-columns: 1fr; }
@@ -165,5 +124,4 @@ const homeLd = [
     .manifesto { font-size: 34px; }
     .right-now li { font-size: 28px; }
   }
-  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 </style>

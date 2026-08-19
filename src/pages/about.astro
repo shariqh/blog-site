@@ -1,7 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
-import { active, safeHref } from "../lib/projects";
 import { SITE } from "../lib/site";
 
 // "Off the clock" photo wall — auto-scrolls horizontally and loops seamlessly.
@@ -14,24 +13,6 @@ const offClock = [
   { src: "/static/images/home/portrait-1.jpg", alt: "Shariq on stage", cap: "On stage, now and then." },
 ];
 
-// Tools I actually use day-to-day. icon = a slug in /public/static/icons/ (or null).
-const tools = [
-  { name: "GitHub", icon: "github" },
-  { name: "GitHub Copilot", icon: "githubcopilot" },
-  { name: "Claude", icon: "claude" },
-  { name: "Notion", icon: "notion" },
-  { name: "1Password", icon: "1password" },
-  { name: "iTerm2", icon: "iterm2" },
-  { name: "Obsidian", icon: "obsidian" },
-  { name: "Docker", icon: "docker" },
-  { name: "Swift", icon: null },
-  { name: "TypeScript", icon: null },
-  { name: "Astro", icon: null },
-  { name: "Cloudflare", icon: null },
-  { name: "SQLite", icon: null },
-];
-const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
-const focusProjects = active.filter((project) => focusNames.has(project.name));
 ---
 <BaseLayout title="About" width="wide">
   <PageHeader eyebrow="Shariq Hirani" title="About" />
@@ -40,15 +21,11 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
   <section class="intro">
     <div class="rise d1">
       <p class="statement">I build software for a living, and <span class="u">a few too many things</span> on the side.</p>
-      <p class="lede">Senior Solutions Engineer at GitHub, founder, and habitual builder. I write here about the work and the in-between — shipping products, the teams that build them, and the AI shift happening in real time. Mostly I'm just curious, and bad at leaving things alone. Find the output on <a href="/projects">projects</a>.</p>
+      <p class="lede">I'm a founder and habitual builder. This site is where I think through shipping products, the teams behind them, and the AI shift happening in real time. Mostly I'm curious, and bad at leaving things alone. See what I'm focused on <a href="/now">now</a> and the <a href="/projects">work I've shipped</a>.</p>
     </div>
     <aside class="facts rise d2">
       <dl>
         <div><dt>Role</dt><dd>Senior Solutions Engineer, GitHub</dd></div>
-        <div><dt>Building</dt><dd><span class="live">Oris · Agent Inbox · AskDocs</span></dd></div>
-        <div><dt>Also active</dt><dd>GitHub Enterprise Settings Configurator</dd></div>
-        <div><dt>Also shipped</dt><dd>shariq.dev · portalrewards</dd></div>
-        <div><dt>Writes about</dt><dd>AI systems, engineering, technical leadership</dd></div>
         <div><dt>Off the clock</dt><dd>DJ sets, hiking, cooking, an over-built home server</dd></div>
         <div><dt>Experience</dt><dd>10+ yrs — architecture, distributed systems, infra, platform</dd></div>
       </dl>
@@ -87,38 +64,6 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
     </div>
   </section>
 
-  <!-- CURRENTLY + STACK -->
-  <section class="sec">
-    <div class="now-grid">
-      <div class="now">
-        <h3>Currently building</h3>
-        <div class="current-builds">
-          {focusProjects.map((project) => (
-            <p>
-              {safeHref(project.site ?? project.repo) ? (
-                <a href={safeHref(project.site ?? project.repo)} target="_blank" rel="noopener">{project.name}</a>
-              ) : (
-                <strong>{project.name}</strong>
-              )}
-              : {project.blurb}
-            </p>
-          ))}
-        </div>
-      </div>
-      <div class="now">
-        <h3>Tools I reach for</h3>
-        <div class="stack">
-          {tools.map((t) => (
-            <span class="tool">
-              {t.icon && <i class="tool-ic" style={`--ic: url(/static/icons/${t.icon}.svg)`} aria-hidden="true" />}
-              {t.name}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- WORK WITH ME -->
   <section class="sec work-cta" style="border-bottom:none;">
     <span class="mono-label">Work with me</span>
@@ -128,11 +73,10 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
         or a team that needs to ship faster?
       </h2>
       <p class="cta-body">
-        I'm a Senior Solutions Engineer at GitHub with 10+ years across distributed systems,
-        platform architecture, and technical leadership. I work with teams on the AI shift —
-        building agentic tooling that actually holds up in production, not just in demos.
-        If you're looking for a technical collaborator, advisor, or just want to talk through
-        a hard problem, I'm open to the conversation.
+        I help teams turn hard platform and AI problems into systems they can ship and operate.
+        That might mean pressure-testing an architecture, untangling delivery risk, or building
+        agent workflows that hold up in production. If you need a technical collaborator or
+        advisor, send me the problem.
       </p>
       <div class="cta-actions">
         <a href={`mailto:${SITE.email}`} class="cta-primary">
@@ -232,26 +176,6 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
     font-size: 15px;
     line-height: 1.4;
   }
-  .facts dd .live {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-  }
-  .facts dd .live::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-radius: 999px;
-    background: var(--color-terracotta);
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 60%, transparent);
-    animation: pulse 2s infinite;
-  }
-  @keyframes pulse {
-    0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-terracotta) 55%, transparent); }
-    70%  { box-shadow: 0 0 0 8px transparent; }
-    100% { box-shadow: 0 0 0 0 transparent; }
-  }
-
   /* beliefs */
   .sec {
     padding: 72px 0;
@@ -359,58 +283,6 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
   .otc .photo.is-active { transform: rotate(0) scale(1.05); z-index: 2; }
   .otc .photo.is-active .cap { opacity: 1; }
 
-  /* currently + stack */
-  .now-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 48px;
-  }
-  .now h3 {
-    font-family: var(--font-display);
-    font-style: italic;
-    font-weight: 400;
-    font-size: 26px;
-    margin-bottom: 14px;
-  }
-  .now p {
-    font-size: 16px;
-    line-height: 1.6;
-    color: var(--fg-soft);
-    max-width: 42ch;
-  }
-  .current-builds { display: grid; gap: 12px; }
-  .now a {
-    color: var(--color-terracotta);
-    text-decoration: underline;
-    text-decoration-color: var(--color-ochre);
-    text-underline-offset: 3px;
-  }
-  .now strong { color: var(--color-terracotta); font-weight: 500; }
-  .stack {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 18px;
-  }
-  .stack .tool {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent);
-  }
-  .tool-ic {
-    width: 13px;
-    height: 13px;
-    flex: none;
-    background: var(--fg);
-    -webkit-mask: var(--ic) center / contain no-repeat;
-    mask: var(--ic) center / contain no-repeat;
-  }
-
   /* staggered load */
   .rise {
     opacity: 0;
@@ -426,8 +298,7 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
   /* responsive */
   @media (max-width: 860px) {
     .intro,
-    .beliefs,
-    .now-grid {
+    .beliefs {
       grid-template-columns: 1fr;
       gap: 32px;
     }
