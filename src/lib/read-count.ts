@@ -3,6 +3,8 @@ export const GOATCOUNTER_COUNTER_BASE_URL =
 
 export const DEFAULT_READ_COUNT_TIMEOUT_MS = 4_000
 
+const MAX_TIMER_DELAY_MS = 2_147_483_647
+
 export type ReadCountResult =
   | { ok: true; count: number }
   | {
@@ -94,8 +96,14 @@ export async function fetchReadCount(
 ): Promise<ReadCountResult> {
   const url = buildReadCountUrl(path)
   const timeoutMs = options.timeoutMs ?? DEFAULT_READ_COUNT_TIMEOUT_MS
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    throw new RangeError('Read count timeouts must be positive finite numbers')
+  if (
+    !Number.isInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > MAX_TIMER_DELAY_MS
+  ) {
+    throw new RangeError(
+      `Read count timeouts must be integers from 1 to ${MAX_TIMER_DELAY_MS}`,
+    )
   }
 
   if (options.signal?.aborted) {

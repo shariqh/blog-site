@@ -170,6 +170,18 @@ describe('fetchReadCount', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it.each([0, -1, 1.5, 2_147_483_648, Number.POSITIVE_INFINITY])(
+    'rejects unsupported timeout %s',
+    async (timeoutMs) => {
+      const fetchMock = vi.fn<typeof fetch>()
+
+      await expect(
+        fetchReadCount('/blog/post', { fetch: fetchMock, timeoutMs }),
+      ).rejects.toThrow(RangeError)
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
+
   it('does not swallow unexpected programming errors', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
