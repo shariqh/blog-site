@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import { buildReadCountUrl } from './read-count'
 import {
   POPULAR_ARTICLE_FETCH_CONCURRENCY,
+  buildArticlePath,
   fetchPopularArticleCounts,
   rankPopularArticles,
   type CountedPopularArticle,
@@ -13,7 +15,7 @@ function candidate(
 ): PopularArticleCandidate {
   return {
     id,
-    path: `/blog/${id}/`,
+    path: buildArticlePath(id),
     title: `Article ${id}`,
     bucket: 'Engineering',
     publishedAt,
@@ -30,6 +32,27 @@ function counted(
     readCount: { ok: true, count },
   }
 }
+
+describe('buildArticlePath', () => {
+  it.each([
+    ['nested/article.mdx', '/blog/nested/article/'],
+    ['an article.mdx', '/blog/an%20article/'],
+    ['what?.mdx', '/blog/what%3F/'],
+    ['hash#.mdx', '/blog/hash%23/'],
+    ['percent%.mdx', '/blog/percent%25/'],
+    ['café/日本語.mdx', '/blog/caf%C3%A9/%E6%97%A5%E6%9C%AC%E8%AA%9E/'],
+  ])('builds a canonical path for %s', (id, expected) => {
+    expect(buildArticlePath(id)).toBe(expected)
+  })
+
+  it('preserves encoded pathnames through GoatCounter route encoding', () => {
+    const articlePath = buildArticlePath('nested/an article?#%.mdx')
+
+    expect(buildReadCountUrl(articlePath)).toBe(
+      'https://shariq-blog.goatcounter.com/counter/%2Fblog%2Fnested%2Fan%2520article%253F%2523%2525%2F.json',
+    )
+  })
+})
 
 describe('rankPopularArticles', () => {
   it('ranks valid counts from highest to lowest', () => {

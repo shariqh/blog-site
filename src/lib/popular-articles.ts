@@ -34,6 +34,11 @@ function compareIds(left: string, right: string): number {
   return 0
 }
 
+export function buildArticlePath(id: string): string {
+  const slug = id.replace(/\.mdx$/, '')
+  return `/blog/${slug.split('/').map(encodeURIComponent).join('/')}/`
+}
+
 function hasValidReadCount(
   candidate: CountedPopularArticle,
 ): candidate is AvailablePopularArticle {

@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import matter from 'gray-matter'
 import { active, built } from '../src/lib/projects'
+import { buildArticlePath } from '../src/lib/popular-articles'
 import { buildReadCountUrl } from '../src/lib/read-count'
 import { SITE } from '../src/lib/site'
 
@@ -125,10 +126,10 @@ test('homepage ranks popular articles without duplication or overflow', async ({
   })
   page.on('pageerror', (error) => errors.push(error.message))
   const countByUrl = new Map<string, string>([
-    [buildReadCountUrl(`/blog/${HOME_FEATURED.slug}/`), '9,999'],
+      [buildReadCountUrl(buildArticlePath(HOME_FEATURED.slug)), '9,999'],
     ...POPULAR_FIXTURES.map(
       ({ article, count }) =>
-        [buildReadCountUrl(`/blog/${article.slug}/`), count] as const,
+          [buildReadCountUrl(buildArticlePath(article.slug)), count] as const,
     ),
   ])
   await page.unroute(READ_COUNT_ROUTE)
@@ -195,7 +196,7 @@ test('homepage shows partial popularity and hides total failure cleanly', async 
     if (message.type() === 'error') errors.push(message.text())
   })
   page.on('pageerror', (error) => errors.push(error.message))
-  const validUrl = buildReadCountUrl(`/blog/${POPULAR_THIRD.slug}/`)
+  const validUrl = buildReadCountUrl(buildArticlePath(POPULAR_THIRD.slug))
   await page.unroute(READ_COUNT_ROUTE)
   await page.route(READ_COUNT_ROUTE, (route) =>
     route.request().url() === validUrl

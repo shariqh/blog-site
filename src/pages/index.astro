@@ -8,7 +8,10 @@ import { HOME } from "../lib/home";
 import { active, safeHref } from "../lib/projects";
 import { pickFeatured } from "../lib/featured";
 import { resolveBucket } from "../lib/buckets";
-import type { PopularArticleCandidate } from "../lib/popular-articles";
+import {
+  buildArticlePath,
+  type PopularArticleCandidate,
+} from "../lib/popular-articles";
 import { SITE } from "../lib/site";
 
 const all = await getCollection("writing", ({ data }) => !data.draft);
@@ -19,7 +22,7 @@ const popularCandidates: PopularArticleCandidate[] = all.map((post) => {
   const id = post.id.replace(/\.mdx$/, "");
   return {
     id,
-    path: `/blog/${id}/`,
+    path: buildArticlePath(post.id),
     title: post.data.title,
     bucket: resolveBucket(post.data.tags).label,
     publishedAt: post.data.date.getTime(),
@@ -87,7 +90,7 @@ const homeLd = [
 
   {featured && fb && (
     <FeaturedCard
-      href={`/blog/${featured.id.replace(/\.mdx$/, "")}`}
+      href={buildArticlePath(featured.id)}
       category={`${fb.label} · Latest`}
       title={featured.data.title}
       hook={featured.data.summary}
