@@ -139,20 +139,29 @@ test('now owns the changing snapshot', async ({ page }) => {
   )
 
   for (const project of focusProjects) {
+    const projectEntry = page.locator('.building').filter({
+      has: page.getByRole('heading', { name: project.name }),
+    })
     await expect(
       page.getByRole('heading', { name: project.name }),
     ).toBeVisible()
-    await expect(
-      page.getByText(project.blurb ?? '', { exact: true }),
-    ).toBeVisible()
+    if (project.blurb) {
+      await expect(
+        projectEntry.getByText(project.blurb, { exact: true }),
+      ).toBeVisible()
+    } else {
+      await expect(projectEntry.locator('.project-blurb')).toHaveCount(0)
+    }
     await expect(
       page.getByText(project.description, { exact: true }),
     ).toHaveCount(0)
-    await expect(
-      page.locator('.project-status').getByText(project.status ?? '', {
-        exact: true,
-      }),
-    ).toBeVisible()
+    if (project.status) {
+      await expect(
+        projectEntry.getByText(project.status, { exact: true }),
+      ).toBeVisible()
+    } else {
+      await expect(projectEntry.locator('.project-status')).toHaveCount(0)
+    }
   }
 
   await expect(page.getByText('Day job', { exact: true })).toHaveCount(0)
