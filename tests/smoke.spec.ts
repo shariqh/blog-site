@@ -47,6 +47,20 @@ test('RSS feed serves', async ({ request }) => {
   expect(res.headers()['content-type']).toMatch(/xml/)
 })
 
+test('custom site icons serve', async ({ request }) => {
+  const svg = await request.get('/favicon.svg')
+  expect(svg.status()).toBe(200)
+  expect(svg.headers()['content-type']).toMatch(/svg/)
+  const source = await svg.text()
+  expect(source).toContain('#b04a3a')
+  expect(source).toContain('#15233a')
+  expect(source).not.toContain('M48 58h6v12h-6Z')
+
+  const touchIcon = await request.get('/static/favicons/apple-touch-icon.png')
+  expect(touchIcon.status()).toBe(200)
+  expect(touchIcon.headers()['content-type']).toMatch(/png/)
+})
+
 test('blog listing renders + filters', async ({ page }) => {
   await page.goto('/blog')
   await expect(page.locator('h1')).toContainText(['Blog'])
