@@ -19,6 +19,8 @@ export interface ReadCountFetchOptions {
   timeoutMs?: number
 }
 
+// `path` is the exact URL pathname; GoatCounter's route encoding also escapes
+// any percent escapes already present in that pathname.
 export function buildReadCountUrl(path: string): string {
   if (!path.startsWith('/') || path.includes('?') || path.includes('#')) {
     throw new TypeError(

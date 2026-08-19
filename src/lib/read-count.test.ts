@@ -7,9 +7,9 @@ import {
 } from './read-count'
 
 describe('buildReadCountUrl', () => {
-  it('encodes the exact canonical path for GoatCounter', () => {
-    expect(buildReadCountUrl('/blog/nested/an article')).toBe(
-      'https://shariq-blog.goatcounter.com/counter/%2Fblog%2Fnested%2Fan%20article.json',
+  it('encodes the exact URL pathname for GoatCounter', () => {
+    expect(buildReadCountUrl('/blog/nested/an%20article')).toBe(
+      'https://shariq-blog.goatcounter.com/counter/%2Fblog%2Fnested%2Fan%2520article.json',
     )
   })
 

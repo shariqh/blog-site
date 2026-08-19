@@ -32,7 +32,13 @@ const { path } = Astro.props;
     }
 
     element.dataset.readCountState = "loading";
-    const result = await fetchReadCount(path);
+    let result;
+    try {
+      result = await fetchReadCount(path);
+    } catch {
+      element.dataset.readCountState = "unavailable";
+      return;
+    }
     if (!result.ok) {
       element.dataset.readCountState = "unavailable";
       return;
