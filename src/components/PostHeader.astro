@@ -1,6 +1,7 @@
 ---
 import { formatDate } from "../lib/formatDate";
 import { EYEBROW_PREFIX, type BucketKey } from "../lib/buckets";
+import ReadCount from "./ReadCount.astro";
 
 interface Props {
   title: string;
@@ -9,9 +10,10 @@ interface Props {
   bucketLabel: string;
   summary?: string;
   readingMinutes?: number;
+  articlePath: string;
 }
 
-const { title, date, bucket, bucketLabel, summary, readingMinutes } = Astro.props;
+const { title, date, bucket, bucketLabel, summary, readingMinutes, articlePath } = Astro.props;
 ---
 <header class="py-12">
   <p class="font-mono text-xs uppercase tracking-[0.22em] text-[var(--fg-soft)]">
@@ -19,6 +21,7 @@ const { title, date, bucket, bucketLabel, summary, readingMinutes } = Astro.prop
     <span class="mx-2">·</span>
     {formatDate(date)}
     {readingMinutes ? <><span class="mx-2">·</span>{readingMinutes} min read</> : null}
+    <ReadCount path={articlePath} />
   </p>
 
   <h1 class="mt-4 font-display text-4xl italic leading-[1.05] tracking-tight sm:text-5xl">{title}</h1>
@@ -26,5 +29,4 @@ const { title, date, bucket, bucketLabel, summary, readingMinutes } = Astro.prop
   {summary && (
     <p class="mt-5 max-w-prose font-sans text-lg text-[var(--fg-soft)]">{summary}</p>
   )}
-
 </header>

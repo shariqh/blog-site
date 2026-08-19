@@ -113,6 +113,15 @@ npm run dev    # http://localhost:4321
 - `npm run gen:cover <slug> [--style line-art|conceptual] [--concept "..."] [--force]` — generate a post's AI cover (via the image-gateway)
 - `npm run gen:cover:all [--force]` — backfill AI covers across all posts
 
+### GoatCounter article view counts
+
+Article metadata reads public pageview totals from GoatCounter's JSON counter
+endpoint. No admin API, token, cookies, or additional tracking is involved. In
+GoatCounter, enable **Settings → Allow adding visitor counts on your website**;
+the setting is off by default. When it is disabled or the endpoint is
+unavailable, the count stays hidden. GoatCounter caches counter responses for
+up to four hours.
+
 ## Authoring posts
 
 Posts live in `src/content/writing/`. Frontmatter is Zod-validated at build

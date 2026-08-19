@@ -22,6 +22,23 @@ function walkMdx(dir: string, prefix = ''): string[] {
 }
 
 const SLUGS = walkMdx('src/content/writing')
+const READ_COUNT_SLUG =
+  'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
+const READ_COUNT_PATH = `/blog/${READ_COUNT_SLUG}/`
+const READ_COUNT_ROUTE = 'https://shariq-blog.goatcounter.com/counter/**'
+const READ_COUNT_URL = `https://shariq-blog.goatcounter.com/counter/${encodeURIComponent(READ_COUNT_PATH)}.json`
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/gc.zgo.at/count.js', (route) =>
+    route.fulfill({ contentType: 'application/javascript', body: '' }),
+  )
+  await page.route(READ_COUNT_ROUTE, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({}),
+    }),
+  )
+})
 
 test('homepage renders the zine hero', async ({ page }) => {
   await page.goto('/')
@@ -252,6 +269,97 @@ for (const slug of SLUGS) {
     await expect(page.locator('h1').first()).toBeVisible()
   })
 }
+
+test('blog post reveals GoatCounter views without responsive or console regressions', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  const requests: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.unroute(READ_COUNT_ROUTE)
+  await page.route(READ_COUNT_ROUTE, (route) => {
+    requests.push(route.request().url())
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ count: '1,234' }),
+    })
+  })
+
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto(READ_COUNT_PATH)
+
+    const readCount = page.locator('[data-read-count]')
+    await expect(readCount).toHaveAttribute('data-path', READ_COUNT_PATH)
+    await expect(readCount).toHaveAttribute('data-read-count-state', 'loaded')
+    await expect(readCount).toBeVisible()
+    await expect(readCount).toContainText('1,234 views')
+
+    const widths = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+    }))
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport)
+  }
+
+  expect(requests).toEqual([READ_COUNT_URL, READ_COUNT_URL])
+  expect(errors).toEqual([])
+})
+
+test('blog post keeps unavailable views hidden and non-blog pages omit them', async ({
+  page,
+}) => {
+  const pageErrors: string[] = []
+  await page.addInitScript(() => {
+    const consoleErrors: string[] = []
+    Object.defineProperty(window, '__readCountConsoleErrors', {
+      value: consoleErrors,
+      configurable: true,
+    })
+    const originalConsoleError = console.error
+    console.error = (...args) => {
+      consoleErrors.push(args.map(String).join(' '))
+      originalConsoleError(...args)
+    }
+  })
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.unroute(READ_COUNT_ROUTE)
+  await page.route(READ_COUNT_ROUTE, (route) =>
+    route.fulfill({ status: 403 }),
+  )
+
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto(READ_COUNT_PATH)
+    const readCount = page.locator('[data-read-count]')
+    await expect(readCount).toHaveAttribute(
+      'data-read-count-state',
+      'unavailable',
+    )
+    await expect(readCount).toBeHidden()
+    const consoleErrors = await page.evaluate(
+      () =>
+        (
+          window as Window &
+            typeof globalThis & { __readCountConsoleErrors: string[] }
+        ).__readCountConsoleErrors,
+    )
+    expect(consoleErrors).toEqual([])
+  }
+
+  await page.goto('/')
+  await expect(page.locator('[data-read-count]')).toHaveCount(0)
+  expect(pageErrors).toEqual([])
+})
 
 test('blog post exposes OG image meta and the PNG is built', async ({
   page,
