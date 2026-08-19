@@ -4,6 +4,7 @@ export const GOATCOUNTER_COUNTER_BASE_URL =
 export const READ_COUNT_API_PATH = '/api/read-count'
 export const DEFAULT_READ_COUNT_TIMEOUT_MS = 4_000
 export const MAX_ARTICLE_PATH_LENGTH = 512
+export const MAX_READ_COUNT_RESPONSE_BYTES = 4_096
 
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 
@@ -133,6 +134,65 @@ function classifyRequestFailure(
   return null
 }
 
+class InvalidReadCountResponseError extends Error {}
+
+async function readLimitedJson(response: Response): Promise<unknown> {
+  const contentLength = response.headers.get('content-length')
+  if (contentLength !== null) {
+    const declaredBytes = Number(contentLength)
+    if (
+      !Number.isSafeInteger(declaredBytes) ||
+      declaredBytes < 0 ||
+      declaredBytes > MAX_READ_COUNT_RESPONSE_BYTES
+    ) {
+      await response.body?.cancel().catch(() => undefined)
+      throw new InvalidReadCountResponseError()
+    }
+  }
+
+  if (!response.body) {
+    throw new InvalidReadCountResponseError()
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder('utf-8', { fatal: true })
+  let body = ''
+  let receivedBytes = 0
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      receivedBytes += value.byteLength
+      if (receivedBytes > MAX_READ_COUNT_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined)
+        throw new InvalidReadCountResponseError()
+      }
+
+      try {
+        body += decoder.decode(value, { stream: true })
+      } catch {
+        await reader.cancel().catch(() => undefined)
+        throw new InvalidReadCountResponseError()
+      }
+    }
+    try {
+      body += decoder.decode()
+    } catch {
+      throw new InvalidReadCountResponseError()
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  try {
+    return JSON.parse(body) as unknown
+  } catch {
+    throw new InvalidReadCountResponseError()
+  }
+}
+
 async function fetchReadCountFromUrl(
   url: string,
   options: ReadCountFetchOptions = {},
@@ -188,9 +248,9 @@ async function fetchReadCountFromUrl(
 
     let payload: unknown
     try {
-      payload = await response.json()
+      payload = await readLimitedJson(response)
     } catch (error) {
-      if (error instanceof SyntaxError) {
+      if (error instanceof InvalidReadCountResponseError) {
         return { ok: false, reason: 'invalid-response' }
       }
       const failure = classifyRequestFailure(

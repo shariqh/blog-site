@@ -5,6 +5,7 @@ import {
   fetchReadCount,
   formatReadCount,
   isCanonicalArticlePath,
+  MAX_READ_COUNT_RESPONSE_BYTES,
   parseReadCount,
 } from './read-count'
 
@@ -165,6 +166,24 @@ describe('fetchReadCount', () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response(JSON.stringify({ count: 'many' })))
+
+    await expect(
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
+    ).resolves.toEqual({ ok: false, reason: 'invalid-response' })
+  })
+
+  it.each([
+    new Response(
+      JSON.stringify({ count: '1' }) +
+        ' '.repeat(MAX_READ_COUNT_RESPONSE_BYTES),
+    ),
+    new Response(JSON.stringify({ count: '1' }), {
+      headers: {
+        'content-length': String(MAX_READ_COUNT_RESPONSE_BYTES + 1),
+      },
+    }),
+  ])('rejects oversized responses', async (response) => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response)
 
     await expect(
       fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
