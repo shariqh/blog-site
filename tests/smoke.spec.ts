@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { active, built } from '../src/lib/projects'
 import { SITE } from '../src/lib/site'
 
 function walkMdx(dir: string, prefix = ''): string[] {
@@ -30,6 +31,15 @@ test('homepage renders the zine hero', async ({ page }) => {
   await expect(
     page.getByText('I build a few things, and break a lot of things'),
   ).toBeVisible()
+  await expect(page.getByText('Engineer', { exact: true })).toBeVisible()
+  await expect(page.getByText('Founder', { exact: true })).toBeVisible()
+  await expect(page.getByText("Lately I've built", { exact: true })).toHaveCount(
+    0,
+  )
+  await expect(page.getByText('Senior Solutions Engineer')).toHaveCount(0)
+  await expect(
+    page.getByRole('link', { name: "More on what I'm doing now" }),
+  ).toHaveAttribute('href', '/now')
 })
 
 test('header nav + footer socials', async ({ page }) => {
@@ -107,7 +117,7 @@ test('blog listing renders + filters', async ({ page }) => {
   }
 })
 
-test('current projects stay in sync across key pages', async ({ page }) => {
+test('home keeps current work compact', async ({ page }) => {
   await page.goto('/')
   await expect(
     page.getByRole('link', { name: 'Oris', exact: true }).first(),
@@ -118,14 +128,90 @@ test('current projects stay in sync across key pages', async ({ page }) => {
   await expect(
     page.locator('.right-now').getByText('AskDocs', { exact: true }),
   ).toBeVisible()
+  await expect(page.locator('.right-now li')).toHaveCount(3)
+  await expect(page.getByText('Building Oris + agent tools')).toHaveCount(0)
+})
 
+test('now owns the changing snapshot', async ({ page }) => {
   await page.goto('/now')
-  await expect(page.getByRole('heading', { name: 'Oris' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Agent Inbox' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'AskDocs' })).toBeVisible()
+  const focusProjects = active.filter((project) =>
+    ['Oris', 'Agent Inbox', 'AskDocs'].includes(project.name),
+  )
 
+  for (const project of focusProjects) {
+    const projectEntry = page.locator('.building').filter({
+      has: page.getByRole('heading', { name: project.name }),
+    })
+    await expect(
+      page.getByRole('heading', { name: project.name }),
+    ).toBeVisible()
+    if (project.blurb) {
+      await expect(
+        projectEntry.getByText(project.blurb, { exact: true }),
+      ).toBeVisible()
+    } else {
+      await expect(projectEntry.locator('.project-blurb')).toHaveCount(0)
+    }
+    await expect(
+      page.getByText(project.description, { exact: true }),
+    ).toHaveCount(0)
+    if (project.status) {
+      await expect(
+        projectEntry.getByText(project.status, { exact: true }),
+      ).toBeVisible()
+    } else {
+      await expect(projectEntry.locator('.project-status')).toHaveCount(0)
+    }
+  }
+
+  await expect(page.getByText('Day job', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Senior Solutions Engineer')).toHaveCount(0)
+
+  const expectedTools = [
+    { name: 'GitHub', icon: 'github' },
+    { name: 'GitHub Copilot', icon: 'githubcopilot' },
+    { name: 'Claude', icon: 'claude' },
+    { name: 'Notion', icon: 'notion' },
+    { name: '1Password', icon: '1password' },
+    { name: 'iTerm2', icon: 'iterm2' },
+    { name: 'Obsidian', icon: 'obsidian' },
+    { name: 'Docker', icon: 'docker' },
+    { name: 'Swift', icon: 'swift' },
+    { name: 'TypeScript', icon: 'typescript' },
+    { name: 'Astro', icon: 'astro' },
+    { name: 'Cloudflare', icon: 'cloudflare' },
+  ]
+  const toolChips = page.locator('.stack .tool')
+  await expect(toolChips).toHaveCount(expectedTools.length)
+  await expect(toolChips).toHaveText(expectedTools.map(({ name }) => name))
+  for (const [index, tool] of expectedTools.entries()) {
+    const chip = toolChips.nth(index)
+    const icon = chip.locator('.tool-ic')
+    await expect(chip).toHaveText(tool.name)
+    await expect(icon).toHaveAttribute(
+      'style',
+      `--ic: url(/static/icons/${tool.icon}.svg)`,
+    )
+    await expect(icon).toHaveCSS(
+      'mask-image',
+      new RegExp(`/static/icons/${tool.icon}\\.svg`),
+    )
+  }
+  await expect(page.getByText('SQLite', { exact: true })).toHaveCount(0)
+  for (const oldTool of ['Soloterm', 'Spotify', 'Apple Music', 'Sublime Text']) {
+    await expect(page.getByText(oldTool, { exact: true })).toHaveCount(0)
+  }
+})
+
+test('projects remains the detailed project inventory', async ({ page }) => {
   await page.goto('/projects')
   await expect(page.getByRole('heading', { name: 'Oris' })).toBeVisible()
+  await expect(
+    page.getByText(active[0].description, { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByText(built[0].description, { exact: true }),
+  ).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'AskDocs', exact: true }),
   ).toHaveCount(0)
@@ -135,12 +221,28 @@ test('current projects stay in sync across key pages', async ({ page }) => {
   for (const retired of ['coffee-ui', 'unrivaledpro', 'myspace']) {
     await expect(page.getByText(retired, { exact: true })).toHaveCount(0)
   }
+})
 
+test('about owns stable identity and points to current work', async ({ page }) => {
   await page.goto('/about')
-  await expect(page.getByText('shariq.dev · portalrewards', { exact: true })).toBeVisible()
-  await expect(page.getByText('Swift', { exact: true })).toBeVisible()
-  await expect(page.getByText('TypeScript', { exact: true })).toBeVisible()
-  await expect(page.getByText('unrivaledpro', { exact: true })).toHaveCount(0)
+  await expect(
+    page.getByText('Senior Solutions Engineer, GitHub', { exact: true }),
+  ).toBeVisible()
+  await expect(page.getByText('Currently building', { exact: true })).toHaveCount(
+    0,
+  )
+  await expect(page.getByText('Tools I reach for', { exact: true })).toHaveCount(
+    0,
+  )
+  await expect(page.locator('.tool')).toHaveCount(0)
+
+  const intro = page.locator('.lede')
+  await expect(
+    intro.getByRole('link', { name: 'now', exact: true }),
+  ).toHaveAttribute('href', '/now')
+  await expect(
+    intro.getByRole('link', { name: "work I've shipped", exact: true }),
+  ).toHaveAttribute('href', '/projects')
 })
 
 for (const slug of SLUGS) {

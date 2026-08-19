@@ -3,7 +3,7 @@ export type ProjectKind = "product" | "tool" | "site" | "learn" | "talk";
 export interface Project {
   name: string;
   description: string;
-  /** Short one-line blurb for compact contexts (e.g. the homepage "built" list). */
+  /** Short one-line blurb for compact Home and Now contexts. */
   blurb?: string;
   kind: ProjectKind;
   /** Public-facing site, if any. */
