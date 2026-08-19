@@ -21,11 +21,10 @@ const tools = [
   { name: "iTerm2", icon: "iterm2" },
   { name: "Obsidian", icon: "obsidian" },
   { name: "Docker", icon: "docker" },
-  { name: "Swift", icon: null },
-  { name: "TypeScript", icon: null },
-  { name: "Astro", icon: null },
-  { name: "Cloudflare", icon: null },
-  { name: "SQLite", icon: null },
+  { name: "Swift", icon: "swift" },
+  { name: "TypeScript", icon: "typescript" },
+  { name: "Astro", icon: "astro" },
+  { name: "Cloudflare", icon: "cloudflare" },
 ];
 const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
 const focusProjects = active.filter((project) => focusNames.has(project.name));
@@ -68,7 +67,7 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
     <div class="stack">
       {tools.map((t) => (
         <span class="tool">
-          {t.icon && <i class="tool-ic" style={`--ic: url(/static/icons/${t.icon}.svg)`} aria-hidden="true" />}
+          <i class="tool-ic" style={`--ic: url(/static/icons/${t.icon}.svg)`} aria-hidden="true" />
           {t.name}
         </span>
       ))}

@@ -168,26 +168,36 @@ test('now owns the changing snapshot', async ({ page }) => {
   await expect(page.getByText('Senior Solutions Engineer')).toHaveCount(0)
 
   const expectedTools = [
-    'GitHub',
-    'GitHub Copilot',
-    'Claude',
-    'Notion',
-    '1Password',
-    'iTerm2',
-    'Obsidian',
-    'Docker',
-    'Swift',
-    'TypeScript',
-    'Astro',
-    'Cloudflare',
-    'SQLite',
+    { name: 'GitHub', icon: 'github' },
+    { name: 'GitHub Copilot', icon: 'githubcopilot' },
+    { name: 'Claude', icon: 'claude' },
+    { name: 'Notion', icon: 'notion' },
+    { name: '1Password', icon: '1password' },
+    { name: 'iTerm2', icon: 'iterm2' },
+    { name: 'Obsidian', icon: 'obsidian' },
+    { name: 'Docker', icon: 'docker' },
+    { name: 'Swift', icon: 'swift' },
+    { name: 'TypeScript', icon: 'typescript' },
+    { name: 'Astro', icon: 'astro' },
+    { name: 'Cloudflare', icon: 'cloudflare' },
   ]
-  await expect(page.locator('.stack .tool')).toHaveCount(expectedTools.length)
-  for (const tool of expectedTools) {
-    await expect(
-      page.locator('.stack').getByText(tool, { exact: true }),
-    ).toBeVisible()
+  const toolChips = page.locator('.stack .tool')
+  await expect(toolChips).toHaveCount(expectedTools.length)
+  await expect(toolChips).toHaveText(expectedTools.map(({ name }) => name))
+  for (const [index, tool] of expectedTools.entries()) {
+    const chip = toolChips.nth(index)
+    const icon = chip.locator('.tool-ic')
+    await expect(chip).toHaveText(tool.name)
+    await expect(icon).toHaveAttribute(
+      'style',
+      `--ic: url(/static/icons/${tool.icon}.svg)`,
+    )
+    await expect(icon).toHaveCSS(
+      'mask-image',
+      new RegExp(`/static/icons/${tool.icon}\\.svg`),
+    )
   }
+  await expect(page.getByText('SQLite', { exact: true })).toHaveCount(0)
   for (const oldTool of ['Soloterm', 'Spotify', 'Apple Music', 'Sublime Text']) {
     await expect(page.getByText(oldTool, { exact: true })).toHaveCount(0)
   }
