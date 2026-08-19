@@ -7,15 +7,19 @@ const TERRACOTTA = '#b04a3a'
 const PAPER = '#f3e8d2'
 const WHITE = '#ffffff'
 
-// The mark: "◆ shariq.dev" — the diamond is a rotated square div (a font glyph
-// would be a missing-glyph box, since the vendored fonts lack U+25C6).
+const SH_S_PATH = 'M10 2h32l6 6v8H18v14h30v36l-6 6H10l-6-6v-8h30V44H4V8Z'
+const SH_H_PATH = 'M60 28h8v28h16V28h8l6 6v58l-6 6h-8V70H68v28h-8l-6-6V34Z'
+
 function mark(): OgNode {
   return h(
     'div',
     { style: { display: 'flex', alignItems: 'center', fontFamily: 'JetBrains Mono', fontSize: 24, color: WHITE } },
-    h('div', {
-      style: { display: 'flex', width: 13, height: 13, marginRight: 13, background: OCHRE, transform: 'rotate(45deg)' },
-    }),
+    h(
+      'svg',
+      { viewBox: '0 0 100 100', width: 30, height: 30, style: { marginRight: 13 } },
+      h('path', { d: SH_S_PATH, fill: TERRACOTTA }),
+      h('path', { d: SH_H_PATH, fill: PAPER })
+    ),
     h('div', { style: { display: 'flex' } }, 'shariq.dev')
   )
 }
