@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { SITE } from '../src/lib/site'
 
 function walkMdx(dir: string, prefix = ''): string[] {
   const out: string[] = []
@@ -36,11 +37,13 @@ test('header nav + footer socials', async ({ page }) => {
   await page.goto('/')
 
   const homeLink = page.getByRole('link', {
-    name: 'Shariq Hirani',
+    name: SITE.title,
     exact: true,
   })
   await expect(homeLink).toHaveCount(1)
+  await expect(homeLink).toHaveText('')
   const headerMark = homeLink.locator('img[src="/favicon.svg"]')
+  await expect(headerMark).toHaveCount(1)
   await expect(headerMark).toHaveAttribute('alt', '')
   await expect(headerMark).toHaveAttribute('aria-hidden', 'true')
 

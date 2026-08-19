@@ -1,14 +1,20 @@
 ---
 import { SITE } from "../lib/site";
-
-const shortTitle = SITE.title.split(" ", 1)[0] ?? SITE.title;
-const titleRemainder = SITE.title.slice(shortTitle.length);
 ---
-<header class="w-full border-b border-[color-mix(in_oklab,var(--fg)_15%,transparent)]">
-  <div class="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-5 py-5">
-    <a href="/" class="flex shrink-0 items-center gap-2 font-display text-lg italic tracking-tight">
-      <img src="/favicon.svg" alt="" aria-hidden="true" class="h-5 w-5 shrink-0" />
-      <span>{shortTitle}<span class="hidden sm:inline">{titleRemainder}</span><span class="visually-hidden sm:hidden">{titleRemainder}</span></span>
+
+<header
+  class="w-full border-b border-[color-mix(in_oklab,var(--fg)_15%,transparent)]"
+>
+  <div
+    class="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-5 py-5"
+  >
+    <a href="/" aria-label={SITE.title} class="flex shrink-0 items-center">
+      <img
+        src="/favicon.svg"
+        alt=""
+        aria-hidden="true"
+        class="h-5 w-5 shrink-0"
+      />
     </a>
     <nav class="flex items-center gap-3 text-sm sm:gap-6">
       <a href="/blog" class="hover:text-[var(--accent)]">Blog</a>
