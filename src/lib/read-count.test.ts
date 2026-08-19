@@ -175,6 +175,26 @@ describe('fetchReadCount', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('aborts an in-flight fetch when the caller signal aborts', async () => {
+    const controller = new AbortController()
+    const fetchMock: typeof fetch = async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true },
+        )
+      })
+
+    const result = fetchReadCount('/blog/post', {
+      fetch: fetchMock,
+      signal: controller.signal,
+    })
+    controller.abort()
+
+    await expect(result).resolves.toEqual({ ok: false, reason: 'aborted' })
+  })
+
   it.each([0, -1, 1.5, 2_147_483_648, Number.POSITIVE_INFINITY])(
     'rejects unsupported timeout %s',
     async (timeoutMs) => {

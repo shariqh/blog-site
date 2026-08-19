@@ -106,14 +106,14 @@ export async function fetchReadCount(
     )
   }
 
-  if (options.signal?.aborted) {
-    return { ok: false, reason: 'aborted' }
-  }
-
   const controller = new AbortController()
   let timedOut = false
   const abortFromCaller = () => controller.abort(options.signal?.reason)
   options.signal?.addEventListener('abort', abortFromCaller, { once: true })
+  if (options.signal?.aborted) {
+    options.signal.removeEventListener('abort', abortFromCaller)
+    return { ok: false, reason: 'aborted' }
+  }
 
   const timeout = setTimeout(() => {
     timedOut = true
