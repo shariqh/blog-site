@@ -52,6 +52,7 @@ const { candidates, featuredId } = Astro.props;
 <script>
   import { formatReadCount } from "../lib/read-count";
   import {
+    hasUniquePopularArticleIds,
     resolvePopularArticles,
     type PopularArticleCandidate,
   } from "../lib/popular-articles";
@@ -93,7 +94,13 @@ const { candidates, featuredId } = Astro.props;
     const availableCandidates = candidates.filter(
       (candidate): candidate is CandidateElement => candidate !== null,
     );
-    if (!list || availableCandidates.length !== candidateElements.length) {
+    if (
+      !list ||
+      availableCandidates.length !== candidateElements.length ||
+      !hasUniquePopularArticleIds(
+        availableCandidates.map((candidate) => candidate.article),
+      )
+    ) {
       section.dataset.popularArticlesState = "unavailable";
       return;
     }

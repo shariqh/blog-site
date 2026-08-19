@@ -36,7 +36,28 @@ function compareIds(left: string, right: string): number {
 
 export function buildArticlePath(id: string): string {
   const slug = id.replace(/\.mdx$/, '')
-  return `/blog/${slug.split('/').map(encodeURIComponent).join('/')}/`
+  const segments = slug.split('/')
+  if (
+    segments.some(
+      (segment) => segment.length === 0 || segment === '.' || segment === '..',
+    )
+  ) {
+    throw new TypeError(
+      'Article IDs must contain safe, non-empty path segments',
+    )
+  }
+  return `/blog/${segments.map(encodeURIComponent).join('/')}/`
+}
+
+export function hasUniquePopularArticleIds(
+  candidates: readonly { id: string }[],
+): boolean {
+  const ids = new Set<string>()
+  for (const candidate of candidates) {
+    if (ids.has(candidate.id)) return false
+    ids.add(candidate.id)
+  }
+  return true
 }
 
 function hasValidReadCount(

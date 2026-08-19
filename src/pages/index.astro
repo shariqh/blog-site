@@ -10,6 +10,7 @@ import { pickFeatured } from "../lib/featured";
 import { resolveBucket } from "../lib/buckets";
 import {
   buildArticlePath,
+  hasUniquePopularArticleIds,
   type PopularArticleCandidate,
 } from "../lib/popular-articles";
 import { SITE } from "../lib/site";
@@ -28,6 +29,9 @@ const popularCandidates: PopularArticleCandidate[] = all.map((post) => {
     publishedAt: post.data.date.getTime(),
   };
 });
+if (!hasUniquePopularArticleIds(popularCandidates)) {
+  throw new Error("Homepage popularity candidates must have unique article IDs");
+}
 const m = HOME.manifesto;
 const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
 const focusProjects = active.filter((project) => focusNames.has(project.name));

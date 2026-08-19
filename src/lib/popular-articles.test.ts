@@ -4,6 +4,7 @@ import {
   POPULAR_ARTICLE_FETCH_CONCURRENCY,
   buildArticlePath,
   fetchPopularArticleCounts,
+  hasUniquePopularArticleIds,
   rankPopularArticles,
   type CountedPopularArticle,
   type PopularArticleCandidate,
@@ -50,6 +51,29 @@ describe('buildArticlePath', () => {
 
     expect(buildReadCountUrl(articlePath)).toBe(
       'https://shariq-blog.goatcounter.com/counter/%2Fblog%2Fnested%2Fan%2520article%253F%2523%2525%2F.json',
+    )
+  })
+
+  it.each([
+    '',
+    '.mdx',
+    '/article.mdx',
+    'nested/article/',
+    'nested//article.mdx',
+    './article.mdx',
+    'nested/../article.mdx',
+  ])('rejects unsafe path segments in %j', (id) => {
+    expect(() => buildArticlePath(id)).toThrow(TypeError)
+  })
+})
+
+describe('hasUniquePopularArticleIds', () => {
+  it('accepts unique article IDs and rejects duplicates', () => {
+    expect(hasUniquePopularArticleIds([{ id: 'one' }, { id: 'two' }])).toBe(
+      true,
+    )
+    expect(hasUniquePopularArticleIds([{ id: 'same' }, { id: 'same' }])).toBe(
+      false,
     )
   })
 })
