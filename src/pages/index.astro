@@ -3,15 +3,28 @@ import { getCollection } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PortraitDeck from "../components/PortraitDeck.astro";
 import FeaturedCard from "../components/FeaturedCard.astro";
+import PopularArticles from "../components/PopularArticles.astro";
 import { HOME } from "../lib/home";
 import { active, safeHref } from "../lib/projects";
 import { pickFeatured } from "../lib/featured";
 import { resolveBucket } from "../lib/buckets";
+import type { PopularArticleCandidate } from "../lib/popular-articles";
 import { SITE } from "../lib/site";
 
 const all = await getCollection("writing", ({ data }) => !data.draft);
 const featured = pickFeatured(all);
 const fb = featured ? resolveBucket(featured.data.tags) : null;
+const featuredId = featured?.id.replace(/\.mdx$/, "");
+const popularCandidates: PopularArticleCandidate[] = all.map((post) => {
+  const id = post.id.replace(/\.mdx$/, "");
+  return {
+    id,
+    path: `/blog/${id}/`,
+    title: post.data.title,
+    bucket: resolveBucket(post.data.tags).label,
+    publishedAt: post.data.date.getTime(),
+  };
+});
 const m = HOME.manifesto;
 const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
 const focusProjects = active.filter((project) => focusNames.has(project.name));
@@ -81,6 +94,8 @@ const homeLd = [
       coverData={featured.data}
     />
   )}
+
+  <PopularArticles candidates={popularCandidates} featuredId={featuredId} />
 
 </BaseLayout>
 
