@@ -28,7 +28,8 @@ const { path } = Astro.props;
     const path = element.dataset.path;
     const value = element.querySelector<HTMLElement>("[data-read-count-value]");
     if (!path || !value) {
-      throw new Error("ReadCount requires a path and value element");
+      element.dataset.readCountState = "unavailable";
+      return;
     }
 
     element.dataset.readCountState = "loading";

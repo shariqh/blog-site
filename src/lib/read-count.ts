@@ -140,6 +140,7 @@ export async function fetchReadCount(
     }
 
     if (!response.ok) {
+      controller.abort()
       return { ok: false, reason: 'http', status: response.status }
     }
 

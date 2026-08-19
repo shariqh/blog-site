@@ -96,13 +96,18 @@ describe('fetchReadCount', () => {
   it.each([403, 404])(
     'returns an HTTP failure for status %s',
     async (status) => {
+      let requestSignal: AbortSignal | undefined
       const fetchMock = vi
         .fn<typeof fetch>()
-        .mockResolvedValue(new Response(null, { status }))
+        .mockImplementation(async (_input, init) => {
+          requestSignal = init?.signal ?? undefined
+          return new Response(null, { status })
+        })
 
       await expect(
         fetchReadCount('/blog/post', { fetch: fetchMock }),
       ).resolves.toEqual({ ok: false, reason: 'http', status })
+      expect(requestSignal?.aborted).toBe(true)
     },
   )
 

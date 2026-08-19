@@ -29,7 +29,9 @@ const readingMinutes = remarkPluginFrontmatter?.readingTime
   ? Math.ceil(remarkPluginFrontmatter.readingTime / 60)
   : undefined;
 const slug = post.id.replace(/\.mdx$/, "");
-const articlePath = Astro.url.pathname;
+const articlePath = Astro.url.pathname.endsWith("/")
+  ? Astro.url.pathname
+  : `${Astro.url.pathname}/`;
 const ogImage = new URL(`/og/${slug}.png`, SITE.url).toString();
 const postUrl = new URL(articlePath, SITE.url).toString();
 const jsonLd = [
