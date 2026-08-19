@@ -46,6 +46,8 @@ test('header nav + footer socials', async ({ page }) => {
   await expect(headerMark).toHaveCount(1)
   await expect(headerMark).toHaveAttribute('alt', '')
   await expect(headerMark).toHaveAttribute('aria-hidden', 'true')
+  await expect(headerMark).toHaveCSS('width', '28px')
+  await expect(headerMark).toHaveCSS('height', '28px')
 
   await expect(page.locator('header nav')).toContainText(['Blog'])
   await expect(page.locator('header nav')).toContainText(['Projects'])
