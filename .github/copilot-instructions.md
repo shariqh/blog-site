@@ -62,7 +62,7 @@ The scheduled `agent-discover`, `agent-draft`, and `agent-promote` workflows use
 ## Repository-specific conventions
 
 - Tailwind 4 is configured through `@tailwindcss/vite`. Brand tokens and fonts live in the `@theme` block in `src/styles/global.css`; do not introduce a Tailwind 3 `tailwind.config.js`.
-- The current site is intentionally light-only. Do not add `.dark` or `prefers-color-scheme` behavior unless the product direction changes.
+- The page UI is intentionally light-only; do not add `.dark` or `prefers-color-scheme` behavior to page styling unless the product direction changes. Browser and platform assets such as `public/favicon.svg` may provide explicit dark-chrome variants.
 - OG templates cannot consume CSS custom properties. When changing the brand palette, keep `src/styles/global.css`, the constants in `src/lib/og/templates.ts`, and the browser theme color in `BaseLayout.astro` aligned.
 - Treat agent-authored frontmatter as untrusted. Reuse `resolveCover()` / `safeLocalImage()` for local hero paths instead of rendering or reading raw values. Canonical URLs are HTTPS-only and restricted by `CANONICAL_ALLOWED_HOSTS` in `src/lib/schemas.ts`; adding a host is a deliberate security-sensitive change.
 - Post frontmatter requires `title`, ISO `date`, `summary` of at most 280 characters, and lowercase free-form `tags`. A `hero`, `canonical`, `updatedAt`, and `draft` are optional; `hero.style` is only `line-art` or `conceptual`.
