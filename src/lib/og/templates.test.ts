@@ -18,6 +18,38 @@ function texts(node: any, out: string[] = []): string[] {
   return out
 }
 
+function nodesByType(node: any, type: string, out: any[] = []): any[] {
+  if (node && node.type === type) out.push(node)
+  if (node && node.props) {
+    ;[]
+      .concat(node.props.children ?? [])
+      .forEach((child) => nodesByType(child, type, out))
+  }
+  return out
+}
+
+function expectSeparatedMark(node: any) {
+  const marks = nodesByType(node, 'svg')
+  expect(marks).toHaveLength(1)
+  expect(marks[0].props.viewBox).toBe('0 0 100 100')
+  expect(
+    nodesByType(marks[0], 'path').map(({ props }) => ({
+      d: props.d,
+      fill: props.fill,
+    })),
+  ).toEqual([
+    {
+      d: 'M10 2h32l6 6v8H18v14h30v36l-6 6H10l-6-6v-8h30V44H4V8Z',
+      fill: '#b04a3a',
+    },
+    {
+      d: 'M60 28h8v28h16V28h8l6 6v58l-6 6h-8V70H68v28h-8l-6-6V34Z',
+      fill: '#f3e8d2',
+    },
+  ])
+  expect(JSON.stringify(node)).not.toContain('rotate(45deg)')
+}
+
 describe('h', () => {
   it('builds a {type, props:{children}} node', () => {
     const n = h('div', { style: { color: 'red' } }, 'hi')
@@ -46,6 +78,9 @@ describe('hybridTemplate', () => {
     walk(node)
     expect(imgs).toContain(data.cover)
   })
+  it('renders the separated SH mark in the site signature', () => {
+    expectSeparatedMark(hybridTemplate(data))
+  })
 })
 
 describe('fallbackTemplate', () => {
@@ -61,5 +96,8 @@ describe('fallbackTemplate', () => {
     }
     walk(node)
     expect(hasImg).toBe(false)
+  })
+  it('renders the separated SH mark in the site signature', () => {
+    expectSeparatedMark(fallbackTemplate({ ...data, cover: null }))
   })
 })

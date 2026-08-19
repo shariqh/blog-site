@@ -32,13 +32,36 @@ test('homepage renders the zine hero', async ({ page }) => {
 })
 
 test('header nav + footer socials', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
+
+  const homeLink = page.getByRole('link', {
+    name: 'Shariq Hirani',
+    exact: true,
+  })
+  await expect(homeLink).toHaveCount(1)
+  const headerMark = homeLink.locator('img[src="/favicon.svg"]')
+  await expect(headerMark).toHaveAttribute('alt', '')
+  await expect(headerMark).toHaveAttribute('aria-hidden', 'true')
+
   await expect(page.locator('header nav')).toContainText(['Blog'])
   await expect(page.locator('header nav')).toContainText(['Projects'])
+
   const footer = page.locator('footer')
+  const footerMark = footer.locator('img[src="/favicon.svg"]')
+  await expect(footerMark).toHaveAttribute('alt', '')
+  await expect(footerMark).toHaveAttribute('aria-hidden', 'true')
   await expect(footer).toContainText(['GitHub'])
   await expect(footer).toContainText(['YouTube'])
   await expect(footer).toContainText(['LinkedIn'])
+
+  const widths = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    document: document.documentElement.scrollWidth,
+    header: document.querySelector('header')?.scrollWidth ?? 0,
+  }))
+  expect(widths.document).toBeLessThanOrEqual(widths.viewport)
+  expect(widths.header).toBeLessThanOrEqual(widths.viewport)
 })
 
 test('RSS feed serves', async ({ request }) => {

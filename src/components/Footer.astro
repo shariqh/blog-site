@@ -2,8 +2,11 @@
 import { SITE } from "../lib/site";
 ---
 <footer class="mt-24 border-t border-[color-mix(in_oklab,var(--fg)_15%,transparent)]">
-  <div class="mx-auto flex max-w-[1100px] flex-col gap-3 px-5 py-8 text-sm sm:flex-row sm:justify-between">
-    <p>&copy; {new Date().getFullYear()} {SITE.author}</p>
+  <div class="mx-auto flex max-w-[1100px] flex-col gap-4 px-5 py-8 text-sm sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-2">
+      <img src="/favicon.svg" alt="" aria-hidden="true" class="h-6 w-6 shrink-0" />
+      <p>&copy; {new Date().getFullYear()} {SITE.author}</p>
+    </div>
     <p class="flex flex-wrap gap-4">
       <a href={SITE.social.twitter} class="hover:text-[var(--accent)]">X / Twitter</a>
       <a href={SITE.social.github} class="hover:text-[var(--accent)]">GitHub</a>
