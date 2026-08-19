@@ -1,7 +1,9 @@
 export const GOATCOUNTER_COUNTER_BASE_URL =
   'https://shariq-blog.goatcounter.com/counter'
 
+export const READ_COUNT_API_PATH = '/api/read-count'
 export const DEFAULT_READ_COUNT_TIMEOUT_MS = 4_000
+export const MAX_ARTICLE_PATH_LENGTH = 512
 
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 
@@ -21,15 +23,56 @@ export interface ReadCountFetchOptions {
   timeoutMs?: number
 }
 
-// `path` is the exact URL pathname; GoatCounter's route encoding also escapes
-// any percent escapes already present in that pathname.
-export function buildReadCountUrl(path: string): string {
-  if (!path.startsWith('/') || path.includes('?') || path.includes('#')) {
-    throw new TypeError(
-      'Read count paths must be absolute paths without a query or hash',
-    )
+const INVALID_RAW_PATH_CHARACTERS = /[\u0000-\u0020\u007f\\?#]/
+const INVALID_DECODED_SEGMENT_CHARACTERS = /[\u0000-\u001f\u007f\\/]/
+
+export function isCanonicalArticlePath(path: unknown): path is string {
+  if (
+    typeof path !== 'string' ||
+    path.length > MAX_ARTICLE_PATH_LENGTH ||
+    !path.startsWith('/blog/') ||
+    !path.endsWith('/') ||
+    INVALID_RAW_PATH_CHARACTERS.test(path)
+  ) {
+    return false
   }
 
+  const segments = path.slice(1, -1).split('/')
+  if (segments.length < 2 || segments.some((segment) => segment.length === 0)) {
+    return false
+  }
+
+  return segments.every((segment) => {
+    let decoded: string
+    try {
+      decoded = decodeURIComponent(segment)
+    } catch {
+      return false
+    }
+
+    return (
+      decoded !== '.' &&
+      decoded !== '..' &&
+      !INVALID_DECODED_SEGMENT_CHARACTERS.test(decoded)
+    )
+  })
+}
+
+function assertCanonicalArticlePath(path: string): void {
+  if (!isCanonicalArticlePath(path)) {
+    throw new TypeError('Read counts require a canonical article pathname')
+  }
+}
+
+export function buildReadCountUrl(path: string): string {
+  assertCanonicalArticlePath(path)
+  return `${READ_COUNT_API_PATH}?${new URLSearchParams({ path }).toString()}`
+}
+
+// `path` is the exact URL pathname; GoatCounter's route encoding also escapes
+// any percent escapes already present in that pathname.
+export function buildGoatCounterReadCountUrl(path: string): string {
+  assertCanonicalArticlePath(path)
   return `${GOATCOUNTER_COUNTER_BASE_URL}/${encodeURIComponent(path)}.json`
 }
 
@@ -90,11 +133,10 @@ function classifyRequestFailure(
   return null
 }
 
-export async function fetchReadCount(
-  path: string,
+async function fetchReadCountFromUrl(
+  url: string,
   options: ReadCountFetchOptions = {},
 ): Promise<ReadCountResult> {
-  const url = buildReadCountUrl(path)
   const timeoutMs = options.timeoutMs ?? DEFAULT_READ_COUNT_TIMEOUT_MS
   if (
     !Number.isInteger(timeoutMs) ||
@@ -169,4 +211,18 @@ export async function fetchReadCount(
     clearTimeout(timeout)
     options.signal?.removeEventListener('abort', abortFromCaller)
   }
+}
+
+export async function fetchReadCount(
+  path: string,
+  options: ReadCountFetchOptions = {},
+): Promise<ReadCountResult> {
+  return fetchReadCountFromUrl(buildReadCountUrl(path), options)
+}
+
+export async function fetchGoatCounterReadCount(
+  path: string,
+  options: ReadCountFetchOptions = {},
+): Promise<ReadCountResult> {
+  return fetchReadCountFromUrl(buildGoatCounterReadCountUrl(path), options)
 }

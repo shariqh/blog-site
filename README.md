@@ -115,12 +115,18 @@ npm run dev    # http://localhost:4321
 
 ### GoatCounter article view counts
 
-Article metadata reads public pageview totals from GoatCounter's JSON counter
-endpoint. No admin API, token, cookies, or additional tracking is involved. In
-GoatCounter, enable **Settings → Allow adding visitor counts on your website**;
-the setting is off by default. When it is disabled or the endpoint is
-unavailable, the count stays hidden. GoatCounter caches counter responses for
-up to four hours.
+Article metadata reads public pageview totals through the same-origin
+`/api/read-count` Pages Function. The function exists because Firefox Enhanced
+Tracking Protection and other content blockers can block direct browser
+requests to GoatCounter. It validates canonical `/blog/.../` paths and forwards
+only to the fixed public GoatCounter JSON endpoint; there is no admin API,
+token, cookie, user data storage, or additional tracking.
+
+In GoatCounter, keep **Settings → Allow adding visitor counts on your website**
+enabled. When it is disabled or the upstream is unavailable, the count stays
+hidden. Successful proxy responses use `max-age=300` for browsers and
+`s-maxage=14400` (four hours) for shared caches, matching GoatCounter's
+up-to-four-hour response cache.
 
 ## Authoring posts
 

@@ -25,8 +25,8 @@ const SLUGS = walkMdx('src/content/writing')
 const READ_COUNT_SLUG =
   'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
 const READ_COUNT_PATH = `/blog/${READ_COUNT_SLUG}/`
-const READ_COUNT_ROUTE = 'https://shariq-blog.goatcounter.com/counter/**'
-const READ_COUNT_URL = `https://shariq-blog.goatcounter.com/counter/${encodeURIComponent(READ_COUNT_PATH)}.json`
+const READ_COUNT_ROUTE = /\/api\/read-count(?:\?|$)/
+const READ_COUNT_URL = `http://localhost:4321/api/read-count?path=${encodeURIComponent(READ_COUNT_PATH)}`
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/gc.zgo.at/count.js', (route) =>
@@ -270,15 +270,21 @@ for (const slug of SLUGS) {
   })
 }
 
-test('blog post reveals GoatCounter views without responsive or console regressions', async ({
+test('blog post uses the same-origin view proxy without responsive or console regressions', async ({
   page,
 }) => {
   const errors: string[] = []
   const requests: string[] = []
+  const directGoatCounterRequests: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
   page.on('pageerror', (error) => errors.push(error.message))
+  page.on('request', (request) => {
+    if (new URL(request.url()).hostname.endsWith('goatcounter.com')) {
+      directGoatCounterRequests.push(request.url())
+    }
+  })
   await page.unroute(READ_COUNT_ROUTE)
   await page.route(READ_COUNT_ROUTE, (route) => {
     requests.push(route.request().url())
@@ -309,6 +315,7 @@ test('blog post reveals GoatCounter views without responsive or console regressi
   }
 
   expect(requests).toEqual([READ_COUNT_URL, READ_COUNT_URL])
+  expect(directGoatCounterRequests).toEqual([])
   expect(errors).toEqual([])
 })
 
@@ -331,7 +338,7 @@ test('blog post keeps unavailable views hidden and non-blog pages omit them', as
   page.on('pageerror', (error) => pageErrors.push(error.message))
   await page.unroute(READ_COUNT_ROUTE)
   await page.route(READ_COUNT_ROUTE, (route) =>
-    route.fulfill({ status: 403 }),
+    route.fulfill({ status: 502 }),
   )
 
   for (const viewport of [
