@@ -90,7 +90,7 @@ Treat lexical search as part of the answer experience, not as a degraded fallbac
 
 ## Infrastructure: one warm replica
 
-Cold container start can exceed model latency for interactive first hits. On Azure Container Apps, keeping one replica always warm eliminates the floor for that case. The configuration isn't complicated, but it's easy to skip in early development and then puzzle over why tail latency looks like a different product.
+Cold container start can exceed model latency for interactive first hits. On [Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/scale-app), keeping one replica always warm eliminates the floor for that case. The configuration isn't complicated, but it's easy to skip in early development and then puzzle over why tail latency looks like a different product.
 
 One warm replica doesn't remove every latency risk. Askdocs is capped at a single replica: there's no autoscaling to absorb a burst, so concurrent requests queue behind whatever is already in flight rather than spreading across new instances. But for the single-user first-interaction case (the one that shapes first impressions), the warm replica removes the dominant source of variance.
 
