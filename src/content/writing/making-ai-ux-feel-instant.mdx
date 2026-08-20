@@ -1,6 +1,6 @@
 ---
 title: Making AI product UX feel fast is a systems problem
-date: '2026-08-17'
+date: '2026-08-20'
 tags:
   - engineering
   - performance
@@ -23,13 +23,13 @@ hero:
     grain, no gradients, no 3D, no glossy realism.
 
 
-    Visual concept only: Generate a high-contrast 16:9 technical hero through
-    the image gateway in the shariq.dev palette: charcoal black, warm paper
-    white, clay/coral, and amber. The composition should be dominated by one
-    large horizontal latency waterfall with two lanes: Search and Ask. Show
-    interaction milestones as clean nodes—Open, Results, Submit, First token,
-    Cite, Follow-up—not fake numeric benchmarks. Surround. Do not depict or
-    quote any phrase from the article title or summary.
+    Visual concept only: Generate a high-contrast technical hero through the
+    image gateway in the shariq.dev palette: charcoal black, warm paper white,
+    clay/coral, and amber. The composition should be dominated by one large
+    horizontal latency waterfall with two lanes: Search and Ask. Show
+    interaction milestones as clean, unlabeled nodes only, not fake numeric
+    benchmarks and not named steps. Do not depict or quote any phrase from the
+    article title or summary.
 
 
     Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
@@ -48,7 +48,7 @@ Making AI product UX feel fast is mostly a systems engineering problem, not a mo
 
 Infrastructure, UI transitions, preserved state: all of it compounds. A 40ms model improvement disappears into a 500ms cold container start. A fast first-token disappears into a blank loading screen.
 
-Building [Oris](/blog/local-llms-bespoke-apps), the AI search layer in Askdocs, forced this view on us. Here's how the full budget breaks down, and what actually moves at each stage.
+Building Askdocs, the AI search layer embedded in Oris and other tenant sites, forced this view on us. Here's how the full budget breaks down, and what actually moves at each stage.
 
 ## The latency waterfall
 
@@ -76,11 +76,11 @@ Every AI product interaction has roughly the same skeleton. Most teams instrumen
 
 ## Lexical first, model second
 
-The most impactful latency technique in Oris has nothing to do with the model. The first thing a user sees after typing is lexical results (indexed, sub-100ms, no inference involved). The Ask row is pinned at the bottom; the AI is an explicit upgrade the user chooses, not the only response path.
+The most impactful latency technique in Askdocs has nothing to do with the model. The first thing a user sees after typing is lexical results (indexed, sub-100ms, no inference involved). The Ask row is pinned at the bottom; the AI is an explicit upgrade the user chooses, not the only response path.
 
 
 
-<Image src="/static/images/blog/making-ai-ux-feel-instant/img1.png" alt="Oris Askdocs command bar displaying immediate roadmap search results before the user chooses the AI Ask action" />
+<Image src="/static/images/blog/making-ai-ux-feel-instant/img1.png" alt="Askdocs command bar embedded on Oris's docs site, displaying immediate roadmap search results before the user chooses the AI Ask action" />
 
 
 
@@ -92,7 +92,7 @@ Treat lexical search as part of the answer experience, not as a degraded fallbac
 
 Cold container start can exceed model latency for interactive first hits. On Azure Container Apps, keeping one replica always warm eliminates the floor for that case. The configuration isn't complicated, but it's easy to skip in early development and then puzzle over why tail latency looks like a different product.
 
-One warm replica doesn't remove all cold paths. If concurrent load exceeds your minimum replica count, new instances spin up cold. But for the single-user first-interaction case (the one that shapes first impressions), it removes the dominant source of variance.
+One warm replica doesn't remove every latency risk. Askdocs is capped at a single replica: there's no autoscaling to absorb a burst, so concurrent requests queue behind whatever is already in flight rather than spreading across new instances. But for the single-user first-interaction case (the one that shapes first impressions), the warm replica removes the dominant source of variance.
 
 Verify after every deploy that the minimum replica configuration actually survived. Redeploy, then immediately test the first request. Production sometimes doesn't match what you configured.
 
@@ -128,10 +128,10 @@ Keep the session component mounted across follow-ups and update state in place. 
 
 ## What actually moved the needle
 
-The instinct when an AI product feels slow is to look at the model. In Oris, the model was rarely the bottleneck that mattered. Cold container start on Azure Container Apps routinely outran the model's own first-token time, and it was configuration, not inference, that erased that floor. One warm replica did more for perceived speed on first interaction than any model swap did.
+The instinct when an AI product feels slow is to look at the model. In Askdocs, the model was rarely the bottleneck that mattered. Cold container start on Azure Container Apps routinely outran the model's own first-token time, and it was configuration, not inference, that erased that floor. One warm replica did more for perceived speed on first interaction than any model swap did.
 
 The second-largest lever wasn't a latency fix at all. It was taking the model off the critical path for most queries. Lexical search returns ranked results before a user has decided to invoke the AI, so the product has already responded by the time anyone reaches for Ask. The model only has to be fast for the subset of queries that actually need it, which is a much smaller problem than making every query fast.
 
 The third was the dead zone between submission and streaming. A blank panel with a spinner reads as "this might not have worked." Reflecting the query immediately and rendering citation placeholders as tokens arrive closed that gap without touching the model at all.
 
-Stacked together, a warm replica, a non-AI first response, and an honestly acknowledged wait did more for how fast Oris feels than any amount of model tuning. That's the actual shape of the problem: eight of the nine stages sit outside the model, and most of the perceived speed lives in them, not in shaving milliseconds off inference.
+Stacked together, a warm replica, a non-AI first response, and an honestly acknowledged wait did more for how fast Askdocs feels than any amount of model tuning. That's the actual shape of the problem: eight of the nine stages sit outside the model, and most of the perceived speed lives in them, not in shaving milliseconds off inference.
