@@ -200,6 +200,22 @@ describe('fetchReadCount', () => {
     ).resolves.toEqual({ ok: false, reason: 'network' })
   })
 
+  it('returns a network failure when the response stream terminates', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new TypeError('terminated'))
+          },
+        }),
+      ),
+    )
+
+    await expect(
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
+    ).resolves.toEqual({ ok: false, reason: 'network' })
+  })
+
   it('aborts and returns a timeout failure', async () => {
     vi.useFakeTimers()
     const fetchMock: typeof fetch = async (_input, init) =>

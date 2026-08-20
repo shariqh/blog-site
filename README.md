@@ -123,10 +123,21 @@ only to the fixed public GoatCounter JSON endpoint; there is no admin API,
 token, cookie, user data storage, or additional tracking.
 
 In GoatCounter, keep **Settings → Allow adding visitor counts on your website**
-enabled. When it is disabled or the upstream is unavailable, the count stays
-hidden. Successful proxy responses use `max-age=300` for browsers and
-`s-maxage=14400` (four hours) for shared caches, matching GoatCounter's
-up-to-four-hour response cache.
+enabled. The function stores only validated `{count:string}` responses in
+Cloudflare's per-edge Cache API under an internal same-origin key. Counts are
+fresh for four hours and retained for up to seven days. After four hours the
+function refreshes synchronously; an upstream timeout, network failure, HTTP
+429, or HTTP 5xx serves the retained value with `x-read-count-cache: stale`.
+Those stale responses use at most `max-age=60` and `s-maxage=300`, capped by the
+entry's remaining retention time, so public caches retry soon instead of
+pinning the fallback.
+
+Fresh responses use at most `max-age=300` for browsers and `s-maxage=14400` for
+shared caches, capped by the remaining four-hour freshness window. Invalid
+paths, upstream 404s, malformed responses, and entries older than seven days
+still fail closed. A cold or evicted edge cache also fails closed while
+GoatCounter is unavailable, so the count remains hidden until that edge has
+observed a valid upstream response.
 
 ## Authoring posts
 
