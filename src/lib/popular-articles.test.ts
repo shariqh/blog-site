@@ -6,6 +6,7 @@ import {
   fetchPopularArticleCounts,
   hasUniquePopularArticleIds,
   rankPopularArticles,
+  resolvePopularArticles,
   type CountedPopularArticle,
   type PopularArticleCandidate,
 } from './popular-articles'
@@ -132,7 +133,7 @@ describe('rankPopularArticles', () => {
     ])
   })
 
-  it('keeps valid partial results and rejects invalid numeric successes', () => {
+  it('rejects an incomplete ranking when any eligible count is unavailable', () => {
     const ranked = rankPopularArticles([
       counted('valid', 1),
       {
@@ -143,7 +144,7 @@ describe('rankPopularArticles', () => {
       counted('unsafe', Number.MAX_SAFE_INTEGER + 1),
     ])
 
-    expect(ranked.map((article) => article.id)).toEqual(['valid'])
+    expect(ranked).toEqual([])
   })
 
   it('returns no articles when every count fails', () => {
@@ -184,5 +185,25 @@ describe('fetchPopularArticleCounts', () => {
     expect(results).toHaveLength(candidates.length)
     expect(fetchMock).toHaveBeenCalledTimes(candidates.length)
     expect(peak).toBe(POPULAR_ARTICLE_FETCH_CONCURRENCY)
+  })
+})
+
+describe('resolvePopularArticles', () => {
+  it('excludes the featured article before requesting counts', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify({ count: '5' })))
+
+    const ranked = await resolvePopularArticles(
+      [candidate('featured'), candidate('other')],
+      'featured',
+      { fetch: fetchMock },
+    )
+
+    expect(ranked.map((article) => article.id)).toEqual(['other'])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      encodeURIComponent('/blog/other/'),
+    )
   })
 })

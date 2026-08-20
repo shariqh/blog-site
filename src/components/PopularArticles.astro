@@ -54,6 +54,7 @@ const { candidates, featuredId } = Astro.props;
   import {
     hasUniquePopularArticleIds,
     resolvePopularArticles,
+    type PopularArticle,
     type PopularArticleCandidate,
   } from "../lib/popular-articles";
 
@@ -106,10 +107,16 @@ const { candidates, featuredId } = Astro.props;
     }
 
     section.dataset.popularArticlesState = "loading";
-    const ranked = await resolvePopularArticles(
-      availableCandidates.map((candidate) => candidate.article),
-      section.dataset.featuredId,
-    );
+    let ranked: PopularArticle[];
+    try {
+      ranked = await resolvePopularArticles(
+        availableCandidates.map((candidate) => candidate.article),
+        section.dataset.featuredId,
+      );
+    } catch {
+      section.dataset.popularArticlesState = "unavailable";
+      return;
+    }
     if (ranked.length === 0) {
       section.dataset.popularArticlesState = "unavailable";
       return;

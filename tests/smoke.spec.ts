@@ -128,6 +128,7 @@ test('homepage ranks popular articles without duplication or overflow', async ({
 }) => {
   const errors: string[] = []
   const directGoatCounterRequests: string[] = []
+  const proxyRequests: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
@@ -145,14 +146,16 @@ test('homepage ranks popular articles without duplication or overflow', async ({
     ),
   ])
   await page.unroute(READ_COUNT_ROUTE)
-  await page.route(READ_COUNT_ROUTE, (route) =>
-    route.fulfill({
+  await page.route(READ_COUNT_ROUTE, (route) => {
+    const requestUrl = relativeRequestUrl(route.request().url())
+    proxyRequests.push(requestUrl)
+    return route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
-        count: countByUrl.get(relativeRequestUrl(route.request().url())) ?? '0',
+        count: countByUrl.get(requestUrl) ?? '0',
       }),
-    }),
-  )
+    })
+  })
 
   for (const viewport of [
     { width: 1440, height: 1000 },
@@ -197,11 +200,14 @@ test('homepage ranks popular articles without duplication or overflow', async ({
     expect(widths.section).toBeLessThanOrEqual(widths.viewport)
   }
 
+  expect(proxyRequests).not.toContain(
+    buildReadCountUrl(buildArticlePath(HOME_FEATURED.slug)),
+  )
   expect(directGoatCounterRequests).toEqual([])
   expect(errors).toEqual([])
 })
 
-test('homepage shows partial popularity and hides total failure cleanly', async ({
+test('homepage hides incomplete and unexpected popularity failures cleanly', async ({
   page,
 }) => {
   const errors: string[] = []
@@ -225,13 +231,11 @@ test('homepage shows partial popularity and hides total failure cleanly', async 
 
   await page.goto('/')
   const popular = page.locator('[data-popular-articles]')
-  await expect(popular).toHaveAttribute('data-popular-articles-state', 'loaded')
-  await expect(popular).toBeVisible()
-  await expect(popular.locator('[data-popular-candidate]')).toHaveCount(1)
-  await expect(popular.locator('[data-popular-title]')).toHaveText([
-    POPULAR_THIRD.title,
-  ])
-  await expect(popular.locator('[data-popular-count]')).toHaveText(['1 view'])
+  await expect(popular).toHaveAttribute(
+    'data-popular-articles-state',
+    'unavailable',
+  )
+  await expect(popular).toBeHidden()
 
   await page.unroute(READ_COUNT_ROUTE)
   await page.route(READ_COUNT_ROUTE, (route) =>
@@ -240,6 +244,22 @@ test('homepage shows partial popularity and hides total failure cleanly', async 
       body: JSON.stringify({}),
     }),
   )
+  await page.goto('/')
+  await expect(popular).toHaveAttribute(
+    'data-popular-articles-state',
+    'unavailable',
+  )
+  await expect(popular).toBeHidden()
+
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = (input, init) => {
+      if (String(input).startsWith('/api/read-count')) {
+        return Promise.reject(new Error('unexpected read-count failure'))
+      }
+      return originalFetch(input, init)
+    }
+  })
   await page.goto('/')
   await expect(popular).toHaveAttribute(
     'data-popular-articles-state',

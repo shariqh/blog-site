@@ -74,9 +74,11 @@ export function rankPopularArticles(
   candidates: readonly CountedPopularArticle[],
   excludedId?: string,
 ): PopularArticle[] {
-  return candidates
-    .filter((candidate) => candidate.id !== excludedId)
-    .filter(hasValidReadCount)
+  const eligible = candidates.filter((candidate) => candidate.id !== excludedId)
+  const available = eligible.filter(hasValidReadCount)
+  if (available.length !== eligible.length) return []
+
+  return available
     .map((candidate) => {
       const { readCount, ...article } = candidate
       return { ...article, count: readCount.count }
@@ -126,6 +128,7 @@ export async function resolvePopularArticles(
   excludedId?: string,
   options: Pick<ReadCountFetchOptions, 'fetch' | 'signal'> = {},
 ): Promise<PopularArticle[]> {
-  const counted = await fetchPopularArticleCounts(candidates, options)
-  return rankPopularArticles(counted, excludedId)
+  const eligible = candidates.filter((candidate) => candidate.id !== excludedId)
+  const counted = await fetchPopularArticleCounts(eligible, options)
+  return rankPopularArticles(counted)
 }
