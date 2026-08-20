@@ -1,5 +1,5 @@
 ---
-title: Building a Coding Agent Inbox
+title: Terminal scroll is not a workflow
 date: '2026-08-07'
 tags:
   - agents
@@ -14,7 +14,7 @@ summary: >-
 draft: false
 hero:
   image: /static/images/blog/terminal-scroll-is-not-a-workflow/cover.png
-  alt: Cover illustration for "Building a Coding Agent Inbox".
+  alt: Cover illustration for "Terminal Scroll Is Not a Workflow".
   prompt: >-
     Style: flat abstract shapes combined with loose hand-drawn single-weight
     line-art (thin, confident strokes), minimal and geometric — a vintage
@@ -80,7 +80,7 @@ Every emitted item lands in a single SQLite database in WAL mode, stored in the 
 
 Project, branch, and client are inferred lazily from the environment when an agent emits. The inference has been reliable in practice; the emit payload accepts explicit overrides when it's not. The viewer is a Hono server on localhost, with the same plain JavaScript frontend wrapped in Electron for a desktop experience. No browser tab to manage, no port to remember. Live PR state, when you want it, is fetched at read time by the viewer and kept separate from the MCP process.
 
-## What agents can emit
+## What coding agents can emit
 
 The emit contract defines six types: `question`, `note`, `assumption`, `workaround`, `milestone`, and `debt`. Each maps to a different urgency level and a different treatment in the viewer.
 
@@ -98,7 +98,7 @@ Shipping the store was the easier part.
 
 The harder problem is teaching agents when to use it. An MCP tool is just a callable surface; the agent decides whether to call it and when. Emit too aggressively, and the inbox fills with noise. Emit too conservatively, and the inbox is empty and you're back to watching scroll. The filing discipline is what determines whether the queue is useful.
 
-The reporting contract I settled on lives in the agent's system prompt. It gives the agent a taxonomy of when each emit type is appropriate, with concrete examples. A `question` is warranted when the agent cannot proceed without a decision that changes the scope or direction of the task. An `assumption` should be logged any time the agent makes a choice the human didn't explicitly authorize. A `workaround` goes in when the agent takes a path it knows is suboptimal and wants a record of why. The agent exercises judgment about what's worth surfacing; the contract gives it the frame to reason within.
+The reporting contract I settled on lives in the agent's system prompt, the same fragile place [I've relied on before for behavioral rules](/blog/hooks-not-vibes-deterministic-guard-rails) and learned to distrust once context gets long. It gives the agent a taxonomy of when each emit type is appropriate, with concrete examples. A `question` is warranted when the agent cannot proceed without a decision that changes the scope or direction of the task. An `assumption` should be logged any time the agent makes a choice the human didn't explicitly authorize. A `workaround` goes in when the agent takes a path it knows is suboptimal and wants a record of why. The agent exercises judgment about what's worth surfacing; the contract gives it the frame to reason within.
 
 Getting this right took more iteration than any other part of the project. An early version of the prompt produced too many questions. Models are well-trained to ask before acting, and given latitude they'll surface things that genuinely don't require a human in the loop — whether to create a helper function or inline the logic, say. Tightening the definition of when a `question` is warranted, and being explicit that non-blocking types exist for everything that doesn't require a decision, changed the behavior significantly.
 
