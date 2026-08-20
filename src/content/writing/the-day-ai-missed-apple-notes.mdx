@@ -1,6 +1,6 @@
 ---
-title: 'Building Trustworthy AI Products: The Screenshot I Almost Deleted'
-date: '2026-08-18'
+title: 'Building Trustworthy AI Products from One Bad Answer'
+date: '2026-08-20'
 tags:
   - ai
   - ai-systems
@@ -14,8 +14,8 @@ draft: false
 hero:
   image: /static/images/blog/the-day-ai-missed-apple-notes/cover.png
   alt: >-
-    Cover illustration for "Building Trustworthy AI Products: The Screenshot I
-    Almost Deleted".
+    Cover illustration for "Building Trustworthy AI Products from One Bad
+    Answer".
   prompt: >-
     Style: flat abstract shapes combined with loose hand-drawn single-weight
     line-art (thin, confident strokes), minimal and geometric — a vintage
@@ -26,7 +26,7 @@ hero:
     Visual concept only: A single lit magnifying glass held over one narrow
     strip of text in a vast open book, the surrounding pages receding into
     darkness; the illuminated fragment is sharply in focus, the rest of the book
-    exists but is unreachable, suggesting knowledge present but not found.. Do
+    exists but is unreachable, suggesting knowledge present but not found. Do
     not depict or quote any phrase from the article title or summary.
 
 
@@ -42,9 +42,9 @@ hero:
   style: line-art
 ---
 
-A confidently wrong answer and a confident non-answer cost a product the same thing: the user's trust. Most evaluation effort goes into catching the first failure. The second is easy to miss entirely, because it looks like caution instead of a bug.
+Building trustworthy AI products means treating a confident non-answer like a wrong answer: both cost the user's trust. Most evaluation effort goes into catching the first failure. The second is easy to miss entirely, because it looks like caution instead of a bug.
 
-That screenshot sat in a folder I'd labeled "embarrassing" for weeks before I looked at it straight. A user had asked Oris's documentation assistant which apps and export destinations were supported, and the assistant answered *Not enough indexed evidence.* Seconds earlier, on the same session, a narrower question about Apple Notes permissions had answered correctly, with numbered citations and real source references.
+That screenshot sat in a folder I'd labeled "embarrassing" for weeks before I looked at it straight. A user had asked [Oris](https://orisnotes.com)'s documentation assistant which apps and export destinations were supported, and the assistant answered *Not enough indexed evidence.* Seconds earlier, on the same session, a narrower question about [Apple Notes permissions](https://orisnotes.com/handbook/apple-notes/) had answered correctly, with numbered citations and real source references.
 
 The corpus contained the answer to the broad question. The system just hadn't found it.
 
@@ -104,7 +104,7 @@ The deploy used the exact validated SHA, not a branch tip. After deployment, the
 
 Apple Notes permissions: grounded answer, numbered citations, sources provably used. The broad supported-apps question returned a correct, scoped response this time, with explicit acknowledgement that earlier sessions had returned insufficient evidence.
 
-## What this cost in trust
+## What trustworthy AI products must prove
 
 False abstentions don't feel safe from the outside. "Not enough evidence" sounds like responsible hedging, but if the user asked a reasonable question and the corpus had the answer, they got a wrong response, one that looked exactly like a right one. The trust cost is roughly equivalent to a hallucination. The user doesn't know which kind of failure they got; they just know the system didn't help.
 
