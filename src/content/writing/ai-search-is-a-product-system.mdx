@@ -23,13 +23,15 @@ hero:
     grain, no gradients, no 3D, no glossy realism.
 
 
-    Visual concept only: Generate a 16:9 editorial technical hero through the
+    Visual concept only: Generate an editorial technical hero through the
     image gateway for shariq.dev. Near-black charcoal background, warm
     clay/coral, amber, and warm off-white accents; match the modern shariq.dev
-    visual language, not Oris branding. Build a crisp bento architecture with
-    five labeled stages: Search, Retrieve, Ask, Stream, Cite. Add one large,
-    self-explanatory query-to-grounded-answer flow graph with. Do not depict or
-    quote any phrase from the article title or summary.
+    visual language, not Oris branding. Build a crisp bento architecture
+    suggesting five distinct stages — search, retrieve, ask, stream, cite — as
+    unlabeled abstract shapes and connecting lines only, with no text,
+    numerals, or icon-as-label substitutes. Add one large, wordless flow motif
+    tracing query to grounded answer. Do not depict or quote any phrase from
+    the article title or summary.
 
 
     Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
@@ -44,7 +46,7 @@ hero:
   style: line-art
 ---
 
-Most documentation search gets shipped as a text box that calls an LLM. Engineers write a prompt, wire a completion endpoint, and close the ticket. That handles synthesis. The other jobs never got a ticket.
+Most documentation search ships as a text box that calls an LLM. Engineers write a prompt, wire a completion endpoint, and close the ticket. That handles synthesis: one piece of an AI search architecture, not the whole thing. The other jobs never got a ticket.
 
 I've been building Askdocs and its Oris integration as an attempt to actually cover all of them. Each layer solves a distinct problem that no other layer can absorb. This post walks through what those layers are, why they each need to exist separately, and where the architectural line between them belongs.
 
@@ -68,15 +70,11 @@ The pinned row matters. Oris doesn't automatically fire a generation call when t
 
 Every Ask call runs retrieval and then generation. Making the transition deliberate means synthesis happens when the user actually needs it, not on every keystroke. It also gives users a chance to see whether lexical results already answered the question — often they do.
 
-Here's the complete path from keypress to follow-up state.
-
-
-
 ## Retrieval and grounding
 
 The retrieval step is where quality and hype diverge most visibly. Embedding similarity alone doesn't reliably surface the right chunks for narrow, precise queries. Askdocs runs a retrieval strategy over its indexed content; those chunks ground what the model produces. Without this step, the model answers from its training distribution rather than the actual documentation.
 
-Askdocs indexes and reads from public documentation content only. Private notes and unpublished drafts are out of scope. That's a tenant-safety boundary baked into the system, not a per-host configuration.
+What gets indexed is whatever a tenant's sitemap points to; Askdocs can't infer intent beyond that. What is enforced at the service level, for every tenant, is origin allow-listing and per-tenant index isolation. A host can't opt out of either.
 
 The model generates against the retrieved chunks and streams output back to the Oris component. Citations attach to spans in the answer as the stream resolves, so the reader can follow a claim back to its source section without hunting.
 
@@ -89,8 +87,6 @@ Follow-up state is the other piece most bolt-on tools drop. After an answer, con
 ## What Askdocs owns, what Oris owns
 
 This is the tradeoff worth reasoning about carefully.
-
-
 
 Askdocs owns everything that needs to be tenant-safe by default. Indexing, retrieval, generation, citation linking, grounding constraints, and rate limiting are all baked in at the service level. The host doesn't configure any of this.
 
@@ -108,4 +104,4 @@ Each layer in this stack answers a different question for a different user at a 
 
 ---
 
-The Askdocs repository is public. If you're building documentation search or thinking through what a complete search system looks like end-to-end, that's the right starting point.
+Askdocs isn't public, but the shape holds regardless of implementation. If you're building documentation search, treat lexical, retrieval, generation, and the host-brand boundary as four separate jobs, not one endpoint.
