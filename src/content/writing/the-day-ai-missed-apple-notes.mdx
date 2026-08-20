@@ -76,13 +76,13 @@ The reflex when a model-adjacent system fails is to swap in a bigger model. It's
 
 I kept the failure transcript instead, then split the problem into three separate workstreams — retrieval scope, citation truthfulness, and correction-aware UX. Fixing all three at once in a single branch would have made it impossible to attribute any improvement to any specific change.
 
-## Fixing retrieval, citations, and UX separately
+## Fixing retrieval, citation integrity, and UX separately
 
 The retrieval side needed a hybrid approach, combining dense-vector similarity for narrow factual lookups with sparse (BM25-style) term matching for broad aggregation queries. A re-ranker merges the candidates before they reach the evidence gate. The gate threshold stayed the same; the inputs to it changed.
 
 
 
-Citation truthfulness required logging which chunks actually entered the context window, then cross-referencing against every citation in the response. Anything cited but not provably used gets flagged. The system now only surfaces sources it can verify it drew from.
+Askdocs now verifies citation integrity: each displayed marker must resolve to a candidate chunk the model actually had in context, and unresolved markers get stripped. That ties the Sources panel to evidence the model received — it doesn't prove semantic support for every claim the citation sits next to.
 
 Correction-aware UX meant building an explicit acknowledgement flow. When a user pushes back on an answer, the system says it missed information rather than silently producing a corrected one. A system that says "I missed that" is one a user can calibrate. One that silently corrects itself reads as potentially silently wrong again.
 
@@ -102,7 +102,7 @@ The deploy used the exact validated SHA, not a branch tip. After deployment, the
 
 
 
-Apple Notes permissions: grounded answer, numbered citations, sources provably used. The broad supported-apps question returned a correct, scoped response this time, with explicit acknowledgement that earlier sessions had returned insufficient evidence.
+Apple Notes permissions: grounded answer, numbered citations, citation markers resolved to the actual context chunks and the source links were correct. The broad supported-apps question returned a correct, scoped response this time, with explicit acknowledgement that earlier sessions had returned insufficient evidence.
 
 ## What trustworthy AI products must prove
 
@@ -110,7 +110,7 @@ False abstentions don't feel safe from the outside. "Not enough evidence" sounds
 
 I'd been treating abstention as the conservative outcome. After this, it's a potential failure mode that needs its own evaluation coverage, the same way a hallucination would.
 
-The direct takeaway: a citation, an abstention, or any other signal of confidence is only trustworthy if the system can prove it, not just display it. That's the whole difference between building trustworthy AI products and building ones that only look that way.
+The direct takeaway: a citation, an abstention, or any other signal of confidence should reflect what the system can actually verify, not just what it can make look authoritative. That's the whole difference between building trustworthy AI products and building ones that only look that way.
 
 ## Save the embarrassing screenshots
 
