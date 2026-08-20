@@ -105,7 +105,7 @@ The recovery hatch is `full:true` on a context read, which fetches current state
 
 SQLite with WAL mode and `busy_timeout=5000` handles the many-small-writes pattern that agent systems generate better than you might expect. WAL lets readers and a writer proceed concurrently in the common case, but it does not eliminate `SQLITE_BUSY` or `SQLITE_BUSY_SNAPSHOT`. The timeout waits up to five seconds for eligible lock contention; callers still need to handle a busy error when SQLite cannot safely wait or advance the snapshot. In practice, contention has been rare, and the timeout absorbs most short bursts.
 
-What WAL does not help with is logical races. Two processes checking a condition before writing still race, because WAL is a durability primitive, not an application-level serialization primitive. The `WHERE answer IS NULL` pattern and the `board_advance` transaction are what prevent logical corruption. WAL makes durable writes fast; the schema makes concurrent writes safe.
+What WAL does not help with is logical races. Two processes checking a condition before writing still race, because WAL is a durability primitive, not an application-level serialization primitive. The conditioned `reply` guard described above and the `board_advance` transaction are what prevent logical corruption. WAL makes durable writes fast; the schema makes concurrent writes safe.
 
 
 
