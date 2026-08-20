@@ -120,7 +120,9 @@ Article metadata reads public pageview totals through the same-origin
 Tracking Protection and other content blockers can block direct browser
 requests to GoatCounter. It validates canonical `/blog/.../` paths and forwards
 only to the fixed public GoatCounter JSON endpoint; there is no admin API,
-token, cookie, user data storage, or additional tracking.
+token, cookie, user data storage, or additional tracking. Internal cache keys
+accept only the production, Cloudflare Pages preview, and local-development
+origins.
 
 In GoatCounter, keep **Settings → Allow adding visitor counts on your website**
 enabled. The function stores only validated `{count:string}` responses in

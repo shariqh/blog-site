@@ -26,6 +26,7 @@ export const READ_COUNT_BACKOFF_STATUS_HEADER = 'x-read-count-backoff'
 
 const READ_COUNT_CACHE_WRITE_HEADER = 'x-read-count-cache-write'
 const JSON_CONTENT_TYPE = 'application/json'
+const LOCAL_READ_COUNT_HOSTS = new Set(['127.0.0.1', '[::1]', 'localhost'])
 
 const JSON_HEADERS = {
   'content-type': `${JSON_CONTENT_TYPE}; charset=utf-8`,
@@ -357,6 +358,23 @@ export function buildReadCountBackoffKey(
     requestUrl,
     articlePath,
     READ_COUNT_INTERNAL_BACKOFF_PATH,
+  )
+}
+
+function isTrustedReadCountRequestOrigin(url: URL): boolean {
+  if (
+    url.protocol === 'https:' &&
+    (url.hostname === 'shariq.dev' ||
+      url.hostname === 'www.shariq.dev' ||
+      url.hostname === 'shariq-dev.pages.dev' ||
+      url.hostname.endsWith('.shariq-dev.pages.dev'))
+  ) {
+    return true
+  }
+
+  return (
+    (url.protocol === 'http:' || url.protocol === 'https:') &&
+    LOCAL_READ_COUNT_HOSTS.has(url.hostname)
   )
 }
 
@@ -809,6 +827,7 @@ export async function handleReadCountRequest(
   if (
     paths.length !== 1 ||
     hasUnexpectedParameter ||
+    !isTrustedReadCountRequestOrigin(url) ||
     !isCanonicalArticlePath(paths[0])
   ) {
     return errorResponse(400, 'invalid_path')

@@ -192,6 +192,7 @@ describe('handleReadCountRequest', () => {
     'https://shariq.dev/api/read-count',
     `https://shariq.dev/api/read-count?path=${encodeURIComponent(ARTICLE_PATH)}&path=${encodeURIComponent(ARTICLE_PATH)}`,
     `https://shariq.dev/api/read-count?path=${encodeURIComponent(ARTICLE_PATH)}&extra=1`,
+    `https://attacker.example/api/read-count?path=${encodeURIComponent(ARTICLE_PATH)}`,
     'https://shariq.dev/api/read-count?path=blog%2Fexample%2F',
     'https://shariq.dev/api/read-count?path=%2Fprojects%2F',
     'https://shariq.dev/api/read-count?path=%2Fblog%2Fexample',
