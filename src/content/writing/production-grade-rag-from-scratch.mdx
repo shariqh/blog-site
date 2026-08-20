@@ -1,6 +1,6 @@
 ---
 title: 'Production-Grade RAG: A Product System, Not Just Embeddings'
-date: '2026-08-18'
+date: '2026-08-20'
 tags:
   - ai
   - rag
@@ -27,7 +27,7 @@ hero:
     strata, each band a different texture and material density, with a single
     thin beam of amber light passing cleanly from the surface through every
     layer down to bedrock, suggesting methodical filtering and precision; no
-    text, labels, or human figures.. Do not depict or quote any phrase from the
+    text, labels, or human figures. Do not depict or quote any phrase from the
     article title or summary.
 
 
@@ -45,15 +45,15 @@ hero:
 
 Every "Sources" panel in a RAG product looks identical, whether the answer actually used those sources or not. That gap — between what got retrieved and what shaped the response — is the one that cost me a release cycle, right up until I stopped treating citation display as a formatting detail and started treating it as its own pipeline stage.
 
-Retrieval quality alone doesn't get a RAG system to production. Tenant isolation, bounded history, evidence gating before generation, citation parsing after generation, and evaluation discipline all have to hold at the same time, or the gaps between them surface as user-facing trust failures. Here's how I'd build the whole system from scratch, using Askdocs as the running case study.
+Retrieval quality alone doesn't make a production-grade RAG system. Tenant isolation, bounded history, evidence gating before generation, citation parsing after generation, and evaluation discipline all have to hold at the same time, or the gaps between them surface as user-facing trust failures. Here's how I'd build the whole system from scratch, using Askdocs as the running case study.
 
 
 
 ## Tenant isolation and ingestion
 
-Every query in Askdocs is scoped to a tenant. Isolation is enforced at index time, not by a filter added at query time. Each document is ingested with a tenant identifier baked into its vector namespace and into every BM25 shard.
+Every tenant in Askdocs gets its own index file — one JSON document per tenant, read from a tenant-specific path — rather than a shared vector namespace or a shared BM25 shard with a tenant column to filter on. The loader also checks the tenant identifier recorded inside the file against the ID it was asked for, and refuses to serve it on a mismatch. There's no query-time filter to forget, because there's nothing shared to filter in the first place.
 
-Two things follow from this. First, the same retrieval stack runs across tenants without cross-contamination. Second, alias coverage gets pushed into ingestion. A user asking about "Notes app", "Apple Notes", and "the notes integration" should hit the same document. Alias expansion built into the index means you don't pay for it in latency on every query.
+Aliases are a query-time concern, not an ingestion one. Each tenant's config declares a small set of trigger terms mapped to expansion terms — a query containing "apps" or "integrations" also searches for the vocabulary the docs actually use, like "destination" or "folder". It's reviewable, per-tenant configuration, not something the index bakes in permanently.
 
 The ingestion pipeline also produces a SHA-pinned snapshot. Exact-SHA deployment isn't just discipline — it's the only way to make retrieval reproducible for evaluation. If your index drifts between when you run holdout cases and when you deploy, your metrics are unreliable.
 
@@ -61,13 +61,13 @@ The ingestion pipeline also produces a SHA-pinned snapshot. Exact-SHA deployment
 
 Sparse lexical retrieval (BM25) and dense vector retrieval are complementary. BM25 excels on exact term matches: product names, error codes, CLI flags. Dense retrieval handles paraphrases and semantic variants. Running only one means systematically missing the other's wins.
 
-Askdocs runs both in parallel, then combines ranks. BM25 results are cached; the lexical index is expensive to build and rarely needs rebuilding per query. Vector retrieval runs against the current snapshot. Reciprocal rank fusion (RRF) combines them into a single ordered candidate list.
+Askdocs runs both in parallel, then combines ranks. BM25 results are cached; the lexical index is expensive to build and rarely needs rebuilding per query. Vector retrieval runs against the current snapshot. [Reciprocal rank fusion (RRF)](https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking) combines them into a single ordered candidate list.
 
 
 
 After ranking, two filters run before any candidates reach the prompt.
 
-**Deduplication by page, then by content.** A 512-token chunk and a 256-token chunk from the same page can both rank highly. Without dedup, the same paragraph appears twice in context, wasting tokens and diluting attention.
+**Deduplication by page, then by content.** Chunks overlap by design — a fixed character window with a running overlap between consecutive chunks — so two overlapping chunks from the same page section can both rank highly. Without dedup, the same paragraph appears twice in context, wasting tokens and diluting attention.
 
 **Per-page diversity cap.** After dedup, a single highly-relevant page shouldn't crowd out five others. Enforce a candidate limit per source page. This matters most on aggregation queries that span the whole corpus rather than one document — without a cap, the ranked list clusters on whichever page has the most chunks, and the answer only reflects that one source instead of the full breadth the question needed.
 
@@ -87,7 +87,7 @@ The most expensive call in a RAG pipeline is generation. The second-most expensi
 
 Before sending any candidates to the model, the pipeline checks:
 
-- **Exact phrase coverage**: does any candidate resolve to the queried entity's canonical identity — via the same alias index built at ingestion, not a fresh substring match — rather than just a semantically nearby chunk?
+- **Exact phrase coverage**: does any candidate contain the queried entity, matched against the corpus's known phrases and the same tenant-configured aliases used for retrieval — not just a semantically nearby chunk?
 - **Relation evidence**: if the query implies a relationship (A supports B, A connects to B), is there evidence of that specific relation in the candidates, or just co-occurrence?
 
 Co-occurrence is the subtle failure mode. A document mentioning "Obsidian" and "Apple Notes" in adjacent paragraphs will rank highly for "Apple Notes to Obsidian" even if it never asserts they're connected. Without a relation gate, you'll generate a confident answer about a workflow that doesn't exist.
@@ -100,11 +100,9 @@ If the evidence gates fail, the system returns `insufficient_evidence` without c
 
 "Sources" in a RAG UI typically shows what was retrieved. The model's answer draws on a subset of that. A user reading five source links expects all five to support what was said. If the model cited only sources 1 and 3, sources 2, 4, and 5 are noise at best.
 
-Askdocs separates retrieval candidates (what went in) from used citations (what came out). After generation, a safe parser extracts inline citation markers, validates each against the candidate list, and resolves them to authoritative URLs. Any marker that doesn't resolve gets stripped server-side rather than served broken.
+Askdocs separates retrieval candidates (what went in) from used citations (what came out). By the time candidates reach the model, they're already deduplicated by page section — the same collapse that keeps ranking clean (above) also guarantees no two numbered candidates point at the same section. Each candidate gets a stable ordinal, and the model is asked to cite using bracketed numbers like `[1]` or `[3]`.
 
-The "Sources" section in the UI shows only resolved, used citations. What you see corresponds to what was actually cited.
-
-Marker dedup runs after resolution, not before. Two different citation markers can resolve to the same canonical source URL, so deduplicating raw markers wouldn't catch that; collapsing by resolved URL means the sources list can't show the same link twice. Small, but trust erodes around exactly this kind of inconsistency.
+After generation, a scanner walks the streamed answer for those numbered markers and resolves each one against the candidate list by ordinal. A number the model never used doesn't make it into the sources list. The "Sources" panel shown to the user is built from that resolved set, not from the full list of what was retrieved.
 
 ## Response states
 
@@ -120,7 +118,7 @@ When a response needs correction, the supersession is non-destructive: original 
 
 ## Evaluation discipline
 
-Evaluation runs on two case sets. Twenty calibration queries tune retrieval parameters during development; ten holdout queries are only consulted before release. You cannot tune against your holdout. Once you start adjusting to pass holdout cases, the metric means nothing.
+Evaluation runs on two case sets. A small set of calibration queries tunes retrieval parameters during development; a larger holdout set is only consulted before release. You cannot tune against your holdout. Once you start adjusting to pass holdout cases, the metric means nothing.
 
 Metrics tracked across both sets:
 
@@ -130,12 +128,10 @@ Metrics tracked across both sets:
 - **Abstention rate**: fraction returning insufficient (too high signals over-conservative gating; too low signals under-gating)
 - **Calibration**: do confident responses correspond to correct ones?
 
-The Askdocs release shipped with 325 tests passing: retrieval unit tests, pipeline integration tests, citation parsing edge cases, SSE streaming compatibility. That count is a forcing function. When retrieval parameters change, 325 tests tell you exactly what broke.
+The Askdocs test suite covers retrieval ranking, citation parsing, tenant config validation, temporal-status detection, and the chat API's streaming behavior. When retrieval parameters change, that suite is what tells you exactly what broke — not a spot check on a few hand-picked queries.
 
-Pre-release smoke: one bounded request against the hosted model, checking p50/p95 latency and cost per query. A sanity check that the endpoint is alive and within budget, nothing more.
+Pre-release smoke runs the full local retrieval pipeline once per smoke case, which is what actually produces enough samples for real p50/p95 latency numbers. A single batched request against the hosted embedding model, in that same pass, confirms the endpoint is alive and responding correctly. It's a liveness check, nothing more.
 
 The per-page diversity cap fix, described above, was caught during calibration, not after release. Real failure transcripts, frozen into calibration cases, drive systematic improvement more reliably than any amount of synthetic query generation.
 
-The Askdocs source is at [github.com/shariqh/askdocs](https://github.com/shariqh/askdocs) if you want to dig into specifics.
-
-None of these pieces is optional once you're serving real tenants. A hybrid retriever with no isolation boundary leaks data across accounts. Evidence gates with no citation parser produce answers a user can't verify. Citation parsing with no evaluation discipline drifts silently as the index changes underneath it. A production-grade RAG system is what happens when all of it holds at once — not a better embedding model, but a product built with the same rigor as the rest of your system.
+None of these pieces is optional once you're serving real tenants. A hybrid retriever with no isolation boundary can surface one tenant's corpus in another tenant's answers. Evidence gates with no citation parser produce answers a user can't verify. Citation parsing with no evaluation discipline drifts silently as the index changes underneath it. A production-grade RAG system is what happens when all of it holds at once — not a better embedding model, but a product built with the same rigor as the rest of your system.
