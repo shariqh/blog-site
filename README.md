@@ -132,12 +132,27 @@ Those stale responses use at most `max-age=60` and `s-maxage=300`, capped by the
 entry's remaining retention time, so public caches retry soon instead of
 pinning the fallback.
 
+Concurrent refreshes for the same article share one upstream request within a
+Pages Function isolate. GoatCounter pageview totals are treated as cumulative:
+immediately before writing, the function re-reads the count cache and preserves
+an observed higher count or equal count with newer fetch metadata. Availability
+failures write a separate 30-second internal backoff marker, never failure data
+in the count entry. While that marker is active, requests skip GoatCounter and
+serve retained stale data or remain unavailable when no valid count exists.
+
 Fresh responses use at most `max-age=300` for browsers and `s-maxage=14400` for
 shared caches, capped by the remaining four-hour freshness window. Invalid
 paths, upstream 404s, malformed responses, and entries older than seven days
 still fail closed. A cold or evicted edge cache also fails closed while
 GoatCounter is unavailable, so the count remains hidden until that edge has
 observed a valid upstream response.
+
+Cloudflare's Cache API remains per-edge and has no conditional write. Coalescing
+is isolate-local, backoff is edge-local, and a cross-isolate write can still
+race between the final re-read and `cache.put`. The cumulative-count guard
+prevents overwriting a higher value already observed by that re-read, but true
+global serialization would require Durable Objects or another coordinated
+store.
 
 ## Authoring posts
 
