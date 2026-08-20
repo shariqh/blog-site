@@ -126,25 +126,12 @@ Keep the session component mounted across follow-ups and update state in place. 
 
 
 
-## Production verification
+## What actually moved the needle
 
-Everything above can look fine in development and break in production. After every meaningful release, work through these checks.
+The instinct when an AI product feels slow is to look at the model. In Oris, the model was rarely the bottleneck that mattered. Cold container start on Azure Container Apps routinely outran the model's own first-token time, and it was configuration, not inference, that erased that floor. One warm replica did more for perceived speed on first interaction than any model swap did.
 
-Trigger the hotkey. Is the panel instant? Type a query. Do lexical results appear before you submit? Submit Ask. Does the query reflect in the panel immediately? Does the first token arrive without a visible pause? Does the answer stream naturally? Do citations appear without blocking the answer? Close and reopen the panel. Is state restored? Navigate away and back. What survived?
+The second-largest lever wasn't a latency fix at all. It was taking the model off the critical path for most queries. Lexical search returns ranked results before a user has decided to invoke the AI, so the product has already responded by the time anyone reaches for Ask. The model only has to be fast for the subset of queries that actually need it, which is a much smaller problem than making every query fast.
 
-These aren't load tests. They're qualitative checks that take two minutes and catch regressions that benchmarks miss.
+The third was the dead zone between submission and streaming. A blank panel with a spinner reads as "this might not have worked." Reflecting the query immediately and rendering citation placeholders as tokens arrive closed that gap without touching the model at all.
 
-## Measurement checklist
-
-Capture these timings from production, at p50 and p95. The values below are illustrative targets, not measured values from a specific deployment. Your numbers will differ; the segments and the p50/p95 gap matter more than any specific threshold.
-
-| Stage | What to measure | Illustrative target |
-|---|---|---|
-| First interaction | Hotkey → panel visible | < 50ms |
-| Search response | Keystroke → lexical results | < 100ms |
-| First token | Ask submit → first streaming chunk | < 1s (warm) |
-| Completion | First chunk → last chunk | scales with length |
-| Citation readiness | Ask submit → citations visible | ≤ completion |
-| Recovery | Close → reopen → state visible | < 100ms |
-
-A large gap between p50 and p95 almost always points at cold-start variance, not model variance. That's where to look first before reaching for a faster model.
+Stacked together, a warm replica, a non-AI first response, and an honestly acknowledged wait did more for how fast Oris feels than any amount of model tuning. That's the actual shape of the problem: nine segments sit outside the model, and most of the perceived speed lives in them, not in shaving milliseconds off inference.
