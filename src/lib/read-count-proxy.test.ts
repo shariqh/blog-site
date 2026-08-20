@@ -671,6 +671,47 @@ describe('handleReadCountRequest', () => {
     expect(coordinator.size).toBe(0)
   })
 
+  it('does not coalesce the same key across different dependencies', async () => {
+    const firstCache = new MemoryReadCountCache()
+    const secondCache = new MemoryReadCountCache()
+    const coordinator = createReadCountRefreshCoordinator()
+    const firstUpstream = deferred<Response>()
+    const secondUpstream = deferred<Response>()
+    const firstFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(() => firstUpstream.promise)
+    const secondFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(() => secondUpstream.promise)
+    const clock = () => NOW
+
+    const first = handleReadCountRequest(request(), {
+      cache: firstCache,
+      coordinator,
+      fetch: firstFetch,
+      now: clock,
+    })
+    const second = handleReadCountRequest(request(), {
+      cache: secondCache,
+      coordinator,
+      fetch: secondFetch,
+      now: clock,
+    })
+    await vi.waitFor(() => {
+      expect(firstFetch).toHaveBeenCalledOnce()
+      expect(secondFetch).toHaveBeenCalledOnce()
+    })
+    expect(coordinator.size).toBe(2)
+
+    firstUpstream.resolve(upstreamResponse({ count: '1' }))
+    secondUpstream.resolve(upstreamResponse({ count: '2' }))
+    const responses = await Promise.all([first, second])
+
+    expect(await responses[0].json()).toEqual({ count: '1' })
+    expect(await responses[1].json()).toEqual({ count: '2' })
+    expect(coordinator.size).toBe(0)
+  })
+
   it('uses request start time as the successful refresh generation', async () => {
     const cache = new MemoryReadCountCache()
     let clock = NOW
@@ -980,6 +1021,37 @@ describe('handleReadCountRequest', () => {
     expect(cache.entries.has(cacheKey())).toBe(true)
     expect(cache.entries.has(backoffKey())).toBe(true)
     expect(coordinator.size).toBe(0)
+  })
+
+  it('keeps a validated stale snapshot when the fallback cache entry is evicted', async () => {
+    const cache = new MemoryReadCountCache()
+    seedCache(cache, {
+      body: { count: '321' },
+      fetchedAt: NOW - 5 * 60 * 60 * 1_000,
+    })
+    cache.onMatch = (matchedRequest) => {
+      const countMatches = cache.matchCalls.filter(
+        (url) => url === cacheKey(),
+      ).length
+      if (matchedRequest.url === cacheKey() && countMatches === 3) {
+        cache.entries.delete(cacheKey())
+      }
+    }
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 503 }))
+
+    const response = await handleReadCountRequest(request(), {
+      cache,
+      coordinator: createReadCountRefreshCoordinator(),
+      fetch: fetchMock,
+      now: () => NOW,
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get(READ_COUNT_CACHE_STATUS_HEADER)).toBe('stale')
+    expect(await response.json()).toEqual({ count: '321' })
+    expect(cache.entries.has(cacheKey())).toBe(false)
   })
 
   it('keeps a cold cache unavailable during failure backoff', async () => {

@@ -211,6 +211,33 @@ const inFlightReadCountRefreshes = new Map<string, InFlightReadCountRefresh>()
 const defaultReadCountRefreshCoordinator = coordinatorFor(
   inFlightReadCountRefreshes,
 )
+const coordinationDependencyIds = new WeakMap<object, number>()
+let nextCoordinationDependencyId = 1
+
+function coordinationDependencyId(dependency: object | undefined): string {
+  if (!dependency) return 'none'
+
+  let id = coordinationDependencyIds.get(dependency)
+  if (id === undefined) {
+    id = nextCoordinationDependencyId
+    nextCoordinationDependencyId += 1
+    coordinationDependencyIds.set(dependency, id)
+  }
+  return String(id)
+}
+
+function refreshCoordinationKey(
+  cacheKey: Request,
+  options: ReadCountProxyOptions,
+): string {
+  return [
+    cacheKey.url,
+    coordinationDependencyId(options.cache),
+    coordinationDependencyId(options.fetch ?? globalThis.fetch),
+    coordinationDependencyId(options.now ?? Date.now),
+    String(options.timeoutMs ?? DEFAULT_READ_COUNT_TIMEOUT_MS),
+  ].join('|')
+}
 
 function cacheControl(
   stale: boolean,
@@ -518,6 +545,26 @@ function revalidateReadCountCache(
   )
 }
 
+function preferLatestValidReadCount(
+  latest: ReadCountCacheLookup,
+  original: ReadCountCacheLookup,
+  now: number,
+): ReadCountCacheLookup {
+  const revalidatedLatest = revalidateReadCountCache(latest, now)
+  if (
+    revalidatedLatest.state === 'fresh' ||
+    revalidatedLatest.state === 'stale'
+  ) {
+    return revalidatedLatest
+  }
+
+  const revalidatedOriginal = revalidateReadCountCache(original, now)
+  return revalidatedOriginal.state === 'fresh' ||
+    revalidatedOriginal.state === 'stale'
+    ? revalidatedOriginal
+    : revalidatedLatest
+}
+
 function validReadCountEntry(
   count: number,
   fetchedAt: number,
@@ -801,7 +848,7 @@ export async function handleReadCountRequest(
   try {
     outcome = await (
       options.coordinator ?? defaultReadCountRefreshCoordinator
-    ).run(cacheKey.url, request.signal, (signal) =>
+    ).run(refreshCoordinationKey(cacheKey, options), request.signal, (signal) =>
       refreshReadCount(
         articlePath,
         cacheKey,
@@ -854,12 +901,7 @@ export async function handleReadCountRequest(
 
   if (outcome.backoffActive) {
     const latest = await lookupReadCountCache(options.cache, cacheKey, now)
-    const original = revalidateReadCountCache(lookup, now())
-    lookup =
-      latest.state === 'error' &&
-      (original.state === 'fresh' || original.state === 'stale')
-        ? original
-        : revalidateReadCountCache(latest, now())
+    lookup = preferLatestValidReadCount(latest, lookup, now())
     if (lookup.state === 'fresh') {
       return countResponse(lookup.count, 'fresh', {
         backoff: 'active',
@@ -894,12 +936,7 @@ export async function handleReadCountRequest(
 
   if (availabilityFailure) {
     const latest = await lookupReadCountCache(options.cache, cacheKey, now)
-    const original = revalidateReadCountCache(lookup, now())
-    lookup =
-      latest.state === 'error' &&
-      (original.state === 'fresh' || original.state === 'stale')
-        ? original
-        : revalidateReadCountCache(latest, now())
+    lookup = preferLatestValidReadCount(latest, lookup, now())
     if (lookup.state === 'fresh') {
       return countResponse(lookup.count, 'fresh', {
         backoff: backoffDiagnostic,
