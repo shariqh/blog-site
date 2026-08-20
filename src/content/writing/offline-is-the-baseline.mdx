@@ -31,9 +31,9 @@ The meeting is happening right now, once, with people who blocked out an hour of
 
 
 
-## The inversion
+## Putting computation on the device
 
-So [Oris inverts it](https://orisnotes.com/blog/on-device-by-default). Audio capture runs locally. Transcription runs through WhisperKit on the Apple Neural Engine. Summarization defaults to an on-device Llama model via MLX. In the core meeting flow, the network does two things. On first setup, it downloads models into a local cache; beyond that, there's an optional cloud summarize path for people who want a larger model on their own API key.
+So [Oris inverts it](https://orisnotes.com/blog/on-device-by-default). Audio capture runs locally. Transcription runs through WhisperKit on the Apple Neural Engine. Summarization defaults to a local Llama model that auto-scales with the transcript (bigger model for a longer call). In the core meeting flow, the network does two things. On first setup, it downloads models into a local cache; beyond that, there's an optional cloud summarize path for people who want a larger model on their own API key.
 
 That second option matters for the honesty of the claim. Offline-first doesn't mean cloud-never. It means the core loop works without a connection, and anything that does touch a network is optional, bring-your-own, and explicitly labeled. When a user connects their own OpenAI key to get GPT-4 summaries, they've made a deliberate tradeoff. The default path (the thing that runs when you open the app on a plane) touches nothing outside the machine.
 
@@ -61,10 +61,8 @@ Model selection gets constrained by the user's RAM. On an 8GB machine, you ship 
 
 None of that work is regrettable; it produced a better product. But offline-first is a constraint you choose, and choosing it means signing up for problems that a cloud-dependent architecture simply doesn't have.
 
-## The principle, generalized
+## The baseline, for Oris
 
-The question worth asking before you commit to an architecture: what is your product's baseline? Not which features you ship, but what absolutely must work when your API is down, the user's network is flaky, and your pricing changes? Build so that baseline depends on nothing you don't control. Everything else can be an add-on.
+You go into a meeting, you come out with a transcript and a summary. That has to work on a plane, in a café with a captive portal, on a connection that hiccups mid-call. Everything beyond that (sync to your note-taking app, a richer cloud model if you bring your own key) layers on top and stays optional. If you've pointed summaries at a cloud provider and it's unreachable, the transcript still lands; only that one step is missing. The core loop is mine to guarantee, because it runs on hardware the user already owns instead of a server I'd have to keep up.
 
-For Oris, the baseline is simple. You go into a meeting, you come out with a transcript and a summary. That has to work on a plane. Everything beyond that (sync to your note-taking app, a richer model if you want one) can layer on top and remain optional. The core loop is yours, running on hardware the user already owns.
-
-Most products can afford to skip this reasoning. The thin-client default is fine when your worst-case is a temporarily broken feature. But if there's a class of failure where "try again later" isn't an answer, where the event is unrepeatable, or the privacy claim is structural, or you can't afford to be hostage to per-use cloud costs, the architecture of offline-first is worth what it costs to build.
+That's the whole tradeoff. A meeting is unrepeatable, so the transcript and summary can't be hostage to a network I don't control. Offline-first cost more to build than a thin client would have, but it's the only architecture where losing the connection doesn't mean losing the meeting.
