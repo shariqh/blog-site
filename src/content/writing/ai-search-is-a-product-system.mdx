@@ -1,6 +1,6 @@
 ---
 title: 'AI Search Architecture Is a System, Not a Chat Bubble'
-date: '2026-08-17'
+date: '2026-08-20'
 tags:
   - ai
   - search
@@ -48,7 +48,7 @@ hero:
 
 Most documentation search ships as a text box that calls an LLM. Engineers write a prompt, wire a completion endpoint, and close the ticket. That handles synthesis: one piece of an AI search architecture, not the whole thing. The other jobs never got a ticket.
 
-I've been building Askdocs and its Oris integration as an attempt to actually cover all of them. Each layer solves a distinct problem that no other layer can absorb. This post walks through what those layers are, why they each need to exist separately, and where the architectural line between them belongs.
+Askdocs and its Oris integration separate those jobs. Each layer solves a distinct problem no other layer can absorb. This post walks through what those layers are, why they each need to exist separately, and where the architectural line between them belongs.
 
 ## Lexical search first
 
@@ -70,11 +70,11 @@ The pinned row matters. Oris doesn't automatically fire a generation call when t
 
 Every Ask call runs retrieval and then generation. Making the transition deliberate means synthesis happens when the user actually needs it, not on every keystroke. It also gives users a chance to see whether lexical results already answered the question — often they do.
 
-## Retrieval and grounding
+## Retrieval and grounding in documentation search
 
 The retrieval step is where quality and hype diverge most visibly. Embedding similarity alone doesn't reliably surface the right chunks for narrow, precise queries. Askdocs runs a retrieval strategy over its indexed content; those chunks ground what the model produces. Without this step, the model answers from its training distribution rather than the actual documentation.
 
-What gets indexed is whatever a tenant's sitemap points to; Askdocs can't infer intent beyond that. What is enforced at the service level, for every tenant, is origin allow-listing and per-tenant index isolation. A host can't opt out of either.
+What gets indexed is whatever a tenant's sitemap points to; Askdocs can't infer intent beyond that. Per-tenant index isolation is structural, not configurable away. Origin allow-listing is a policy layer on top of that: a tenant can set an empty allow-list and open the API to any origin, though both tenants running today configure real ones.
 
 The model generates against the retrieved chunks and streams output back to the Oris component. Citations attach to spans in the answer as the stream resolves, so the reader can follow a claim back to its source section without hunting.
 
@@ -90,7 +90,7 @@ This is the tradeoff worth reasoning about carefully.
 
 Askdocs owns everything that needs to be tenant-safe by default. Indexing, retrieval, generation, citation linking, grounding constraints, and rate limiting are all baked in at the service level. The host doesn't configure any of this.
 
-Oris owns everything that needs to match the host's brand: the command surface's visual weight, color, typography, spacing, and motion. These come through CSS custom properties on a Web Component substrate. The host sets the properties; Askdocs never touches them.
+Oris owns everything that needs to match the host's brand: the command surface's visual weight, color, typography, spacing, and motion. These come through CSS custom properties on a [Web Component](https://developer.mozilla.org/en-US/docs/Web/API/Web_components) substrate. The host sets the properties; Askdocs never touches them.
 
 The Web Component boundary is doing real structural work. It gives Oris encapsulation. The host page's styles don't leak into the component, and the component's styles don't leak back. Accessibility (focus management, ARIA roles, keyboard navigation through results and the answer surface) lives inside the component too, so the host doesn't re-implement it and can't accidentally break it.
 
