@@ -54,17 +54,15 @@ The invariant that fell out of building Agent Inbox is that a human-in-the-loop 
 
 ## The handoff state machine
 
-A blocked row in Agent Inbox moves through a small set of statuses: `pending` when the agent has asked and is waiting, a pickup state when an agent instance takes responsibility for watching for a response, and resolution states when the agent records an outcome.
+A board row in Agent Inbox carries one of six statuses. `tracked`, `partial`, `missing`, `na`, and `done` describe ordinary progress; `blocked` is the one status that escalates into the human's attention layer, and it means the row needs a human and nobody else.
 
-
-
-The key distinction is that human completion is not the agent-owned done status. `handled_at` timestamps when the human marked their action complete. `status` does not change until the agent reads the answer and writes an `outcome`. A row can sit with `handled_at` set and `status` still `pending` if the agent process died before picking it up. This is intentional. It makes the unacknowledged state queryable. `WHERE handled_at IS NOT NULL AND outcome IS NULL` gives you every response that landed but was never acted on.
+The key distinction is that human completion is not the same event as the agent-owned status change. `handled_at` timestamps when the human marked their task complete. `status` stays `blocked` until the agent reads that response and writes a non-empty `outcome`. A row can sit with `handled_at` set and `status` still `blocked` if the agent process died before picking it up. This is intentional. It makes the unacknowledged state queryable: `WHERE handled_at IS NOT NULL AND outcome = ''` gives you every response that landed but was never acted on.
 
 `annotation_seen_at` and `handled_seen_at` are delivery receipts, not completion signals. They record that some agent instance observed the human response. They do not close the row. Pickup is effectively at-least-once. If the process that set `annotation_seen_at` crashes before recording an outcome, another process can pick up the same row. The human sees the row is still open, the system stays consistent, and no response is silently swallowed.
 
 ## Two answer channels, one precedence rule
 
-Issues #29 and #36 made clear why a single answer channel is not enough. An agent might ask a question inside a chat thread and hear the answer there. Agent Inbox also exposes a card where the human can answer directly. Both paths write the same `reply` fields on the item; `reply_source` records whether the current value came from the inbox or was recorded by an agent from chat.
+Issue #29 made clear why a single answer channel is not enough. An agent might ask a question inside a chat thread and hear the answer there. Agent Inbox also exposes a card where the human can answer directly. Both paths write the same `reply` fields on the item; `reply_source` records whether the current value came from the inbox or was recorded by an agent from chat.
 
 The precedence rule is asymmetric on purpose. An inbox write is unconditional: it replaces the current reply, sets `reply_source='inbox'`, and resets `reply_seen_at` so an agent has to pick up the new answer. A chat-recorded answer uses one conditioned `UPDATE`. It can write only when no reply exists or when the current reply has already been picked up:
 
@@ -83,13 +81,13 @@ The single conditioned statement matters because the viewer writes from a separa
 
 ## One ask, one surface
 
-Issues #29 and #37 circle the same problem. What happens if the agent creates a second question item for the same dependency? Two board cards disagree. The human does not know which is canonical. The agent may read the wrong answer.
+What happens if the agent creates a second question item for the same dependency? Two board cards disagree. The human does not know which is canonical. The agent may read the wrong answer.
 
-Agent Inbox enforces one invariant here. If a board row owns a dependency, that blocked row is the question. No duplicate question items. The board's stable labels are the human-facing identity; the row's `revision` field is the machine-facing version. When the agent needs to update what it is asking (because context changed, not because the answer arrived), it updates the existing row and increments the revision. It does not create a second row.
+Agent Inbox enforces one invariant here, spelled out directly in the tool contracts: one ask, one surface. If a board row owns a dependency, that blocked row is the question — never a duplicate question item. The board's stable labels are the human-facing identity; the row's `revision` field is the machine-facing version. When the agent needs to update what it is asking (because context changed, not because the answer arrived), it updates the existing row and increments the revision. It does not create a second row.
 
 ## board_advance as a CAS token
 
-The operation that moves a tracking board forward is `board_advance`. It takes two version tokens: `row_revision` (the current revision of the row being resolved) and `board_revision` (the current generation of the board). If either has advanced since the caller last read, the operation fails and the caller must re-read before retrying.
+The operation that moves a tracking board forward is `board_advance`. It takes two version tokens: `expected_revision` (the current revision of the row being resolved) and `board_version` (the current generation of the board). If either has advanced since the caller last read, the operation fails and the caller must re-read before retrying.
 
 
 
@@ -119,13 +117,11 @@ The screenshot above uses synthetic demo data to illustrate what stable plan row
 
 ## What is not solved yet
 
-Three gaps are worth naming directly.
+Two gaps are worth naming directly.
 
-Item-annotation delivery has an incomplete seam. Annotations on items (as opposed to board rows) follow a different path, and the delivery guarantees are not fully wired. Issue #42 tracks this.
+Remote mode (Agent Inbox running against a shared database rather than a local SQLite file) is not shipped. The data model handles it; the networking and auth layers are not (issue #8). Waking and resuming a local agent session when a remote answer lands is a related open gap (issue #51).
 
-Issue #34 documents a concrete limit. If a human records an answer in chat and wants to correct it, there is no clean path from the viewer to do that. The row stores the original answer; the amendment operation does not exist yet. Fixing it will require a new store operation, not a chat edit.
-
-Remote mode (Agent Inbox running against a shared database rather than a local SQLite file) is not shipped. The data model handles it; the networking and auth layers are not done.
+The other rough edges from early use did get fixed, and that says something about the model itself. Board-row annotations used to be invisible to `pending()` — an agent could poll faithfully and still miss a human's note on a row. Issue #37 closed that by making `pending()` return `{items, rows}` together. A chat-recorded answer used to be uncorrectable once written; issues #34 and #69 closed that by adding a `clarify` reply kind, so the agent resolves the original item and raises a corrected replacement instead of editing history in place. Neither fix touched the precedence rule above — they extended it.
 
 ## The practical reframe
 
