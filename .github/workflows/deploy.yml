@@ -36,6 +36,33 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Enable incoming request cancellation
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          project_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/shariq-dev"
+          project="$(curl --fail-with-body --silent --show-error \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "${project_url}")"
+          production_flags="$(jq -c \
+            '[.result.deployment_configs.production.compatibility_flags[]?, "enable_request_signal"] | unique' \
+            <<<"${project}")"
+          preview_flags="$(jq -c \
+            '[.result.deployment_configs.preview.compatibility_flags[]?, "enable_request_signal"] | unique' \
+            <<<"${project}")"
+          payload="$(jq -nc \
+            --argjson production "${production_flags}" \
+            --argjson preview "${preview_flags}" \
+            '{deployment_configs:{production:{compatibility_flags:$production},preview:{compatibility_flags:$preview}}}')"
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data "${payload}" \
+            "${project_url}" |
+            jq -e '.success == true' >/dev/null
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         id: deploy

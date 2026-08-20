@@ -133,12 +133,17 @@ entry's remaining retention time, so public caches retry soon instead of
 pinning the fallback.
 
 Concurrent refreshes for the same article share one upstream request within a
-Pages Function isolate. GoatCounter pageview totals are treated as cumulative:
-immediately before writing, the function re-reads the count cache and preserves
-an observed higher count or equal count with newer fetch metadata. Availability
-failures write a separate 30-second internal backoff marker, never failure data
-in the count entry. While that marker is active, requests skip GoatCounter and
-serve retained stale data or remain unavailable when no valid count exists.
+Pages Function isolate. A disconnected caller releases its interest without
+cancelling active peers; the shared fetch aborts when no consumers remain.
+The deploy workflow keeps Cloudflare's `enable_request_signal` compatibility
+flag enabled for preview and production so incoming disconnects reach that
+coordinator.
+GoatCounter pageview totals are treated as cumulative: immediately before
+writing, the function re-reads the count cache and preserves an observed higher
+count or equal count with newer fetch metadata. Availability failures write a
+separate 30-second internal backoff marker, never failure data in the count
+entry. While that marker is active, requests skip GoatCounter and serve retained
+stale data or remain unavailable when no valid count exists.
 
 Fresh responses use at most `max-age=300` for browsers and `s-maxage=14400` for
 shared caches, capped by the remaining four-hour freshness window. Invalid

@@ -101,39 +101,104 @@ type ReadCountRefreshOutcome =
       result: ReadCountFailure
     }
 
+interface InFlightReadCountRefresh {
+  consumers: number
+  controller: AbortController
+  promise: Promise<ReadCountRefreshOutcome>
+}
+
 export interface ReadCountRefreshCoordinator {
+  readonly consumers: number
   readonly size: number
   reset(): void
   run(
     key: string,
-    refresh: () => Promise<ReadCountRefreshOutcome>,
+    signal: AbortSignal,
+    refresh: (signal: AbortSignal) => Promise<ReadCountRefreshOutcome>,
   ): Promise<ReadCountRefreshOutcome>
 }
 
 function coordinatorFor(
-  inFlight: Map<string, Promise<ReadCountRefreshOutcome>>,
+  inFlight: Map<string, InFlightReadCountRefresh>,
 ): ReadCountRefreshCoordinator {
   return {
+    get consumers() {
+      let consumers = 0
+      for (const refresh of inFlight.values()) {
+        consumers += refresh.consumers
+      }
+      return consumers
+    },
     get size() {
       return inFlight.size
     },
     reset() {
+      for (const refresh of inFlight.values()) {
+        refresh.controller.abort()
+      }
       inFlight.clear()
     },
-    run(key, refresh) {
-      const pending = inFlight.get(key)
-      if (pending) return pending
+    run(key, signal, refresh) {
+      let pending = inFlight.get(key)
+      if (pending?.controller.signal.aborted) {
+        if (inFlight.get(key) === pending) {
+          inFlight.delete(key)
+        }
+        pending = undefined
+      }
+      if (!pending) {
+        const controller = new AbortController()
+        let created: InFlightReadCountRefresh
+        const tracked = Promise.resolve()
+          .then(() => refresh(controller.signal))
+          .finally(() => {
+            if (inFlight.get(key) === created) {
+              inFlight.delete(key)
+            }
+          })
+        created = { consumers: 0, controller, promise: tracked }
+        inFlight.set(key, created)
+        void tracked.catch(() => undefined)
+        pending = created
+      }
 
-      let tracked: Promise<ReadCountRefreshOutcome>
-      tracked = Promise.resolve()
-        .then(refresh)
-        .finally(() => {
-          if (inFlight.get(key) === tracked) {
-            inFlight.delete(key)
+      pending.consumers += 1
+      return new Promise<ReadCountRefreshOutcome>((resolve, reject) => {
+        let active = true
+        const release = () => {
+          if (!active) return
+          active = false
+          signal.removeEventListener('abort', onAbort)
+          pending.consumers -= 1
+          if (pending.consumers === 0 && inFlight.get(key) === pending) {
+            pending.controller.abort()
           }
-        })
-      inFlight.set(key, tracked)
-      return tracked
+        }
+        const onAbort = () => {
+          release()
+          reject(
+            signal.reason instanceof Error
+              ? signal.reason
+              : new DOMException('Aborted', 'AbortError'),
+          )
+        }
+
+        if (signal.aborted) {
+          onAbort()
+          return
+        }
+        signal.addEventListener('abort', onAbort, { once: true })
+        pending.promise.then(
+          (value) => {
+            release()
+            resolve(value)
+          },
+          (error: unknown) => {
+            release()
+            reject(error)
+          },
+        )
+      })
     },
   }
 }
@@ -142,10 +207,7 @@ export function createReadCountRefreshCoordinator(): ReadCountRefreshCoordinator
   return coordinatorFor(new Map())
 }
 
-const inFlightReadCountRefreshes = new Map<
-  string,
-  Promise<ReadCountRefreshOutcome>
->()
+const inFlightReadCountRefreshes = new Map<string, InFlightReadCountRefresh>()
 const defaultReadCountRefreshCoordinator = coordinatorFor(
   inFlightReadCountRefreshes,
 )
@@ -528,6 +590,7 @@ async function guardedWriteReadCountCache(
     revalidatedCurrent.state === 'stale'
   ) {
     const currentCount = Number(revalidatedCurrent.count)
+    // GoatCounter pageview totals are cumulative; time never authorizes regression.
     if (
       currentCount > count ||
       (currentCount === count &&
@@ -607,6 +670,7 @@ async function refreshReadCount(
   backoffCacheKey: Request,
   refreshStartedAt: number,
   options: ReadCountProxyOptions,
+  signal: AbortSignal,
 ): Promise<ReadCountRefreshOutcome> {
   const now = options.now ?? Date.now
   const current = revalidateReadCountCache(
@@ -638,6 +702,7 @@ async function refreshReadCount(
 
   const result = await fetchGoatCounterReadCount(articlePath, {
     fetch: options.fetch,
+    signal,
     timeoutMs: options.timeoutMs ?? DEFAULT_READ_COUNT_TIMEOUT_MS,
   })
 
@@ -736,13 +801,14 @@ export async function handleReadCountRequest(
   try {
     outcome = await (
       options.coordinator ?? defaultReadCountRefreshCoordinator
-    ).run(cacheKey.url, () =>
+    ).run(cacheKey.url, request.signal, (signal) =>
       refreshReadCount(
         articlePath,
         cacheKey,
         backoffKey,
         requestStartedAt,
         options,
+        signal,
       ),
     )
   } catch {

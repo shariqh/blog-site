@@ -39,8 +39,12 @@ const INVALID_CACHE_CASES: {
   },
 ]
 
-function request(url = REQUEST_URL, method = 'GET'): Request {
-  return new Request(url, { method })
+function request(
+  url = REQUEST_URL,
+  method = 'GET',
+  signal?: AbortSignal,
+): Request {
+  return new Request(url, { method, signal })
 }
 
 function upstreamResponse(
@@ -461,6 +465,124 @@ describe('handleReadCountRequest', () => {
     expect(coordinator.size).toBe(0)
   })
 
+  it('keeps a shared refresh alive while another consumer remains', async () => {
+    const cache = new MemoryReadCountCache()
+    const coordinator = createReadCountRefreshCoordinator()
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const upstream = deferred<Response>()
+    let sharedSignal: AbortSignal | undefined
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation((_input, init) => {
+        sharedSignal = init?.signal ?? undefined
+        return upstream.promise
+      })
+    const options = {
+      cache,
+      coordinator,
+      fetch: fetchMock,
+      now: () => NOW,
+    }
+
+    const first = handleReadCountRequest(
+      request(REQUEST_URL, 'GET', firstController.signal),
+      options,
+    )
+    const second = handleReadCountRequest(
+      request(REQUEST_URL, 'GET', secondController.signal),
+      options,
+    )
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(coordinator.consumers).toBe(2))
+
+    firstController.abort()
+    const firstResponse = await first
+    expect(firstResponse.status).toBe(502)
+    expect(sharedSignal?.aborted).toBe(false)
+    expect(coordinator.size).toBe(1)
+    expect(coordinator.consumers).toBe(1)
+
+    upstream.resolve(upstreamResponse({ count: '456' }))
+    const secondResponse = await second
+    expect(secondResponse.status).toBe(200)
+    expect(await secondResponse.json()).toEqual({ count: '456' })
+    expect(coordinator.size).toBe(0)
+  })
+
+  it('aborts a shared refresh after its last consumer disconnects', async () => {
+    const cache = new MemoryReadCountCache()
+    const coordinator = createReadCountRefreshCoordinator()
+    const controller = new AbortController()
+    let sharedSignal: AbortSignal | undefined
+    const fetchMock: typeof fetch = async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        sharedSignal = init?.signal ?? undefined
+        sharedSignal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true },
+        )
+      })
+
+    const responsePromise = handleReadCountRequest(
+      request(REQUEST_URL, 'GET', controller.signal),
+      {
+        cache,
+        coordinator,
+        fetch: fetchMock,
+        now: () => NOW,
+      },
+    )
+    await vi.waitFor(() => expect(sharedSignal).toBeDefined())
+
+    controller.abort()
+    const response = await responsePromise
+
+    expect(response.status).toBe(502)
+    expect(sharedSignal?.aborted).toBe(true)
+    await vi.waitFor(() => expect(coordinator.size).toBe(0))
+  })
+
+  it('does not let a new caller join an aborted refresh', async () => {
+    const cache = new MemoryReadCountCache()
+    const coordinator = createReadCountRefreshCoordinator()
+    const controller = new AbortController()
+    const abandonedFetch = deferred<Response>()
+    let abandonedSignal: AbortSignal | undefined
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementationOnce((_input, init) => {
+        abandonedSignal = init?.signal ?? undefined
+        return abandonedFetch.promise
+      })
+      .mockResolvedValueOnce(upstreamResponse({ count: '456' }))
+    const options = {
+      cache,
+      coordinator,
+      fetch: fetchMock,
+      now: () => NOW,
+    }
+
+    const abandoned = handleReadCountRequest(
+      request(REQUEST_URL, 'GET', controller.signal),
+      options,
+    )
+    await vi.waitFor(() => expect(abandonedSignal).toBeDefined())
+    controller.abort()
+    expect((await abandoned).status).toBe(502)
+    expect(abandonedSignal?.aborted).toBe(true)
+    expect(coordinator.size).toBe(1)
+
+    const recovered = await handleReadCountRequest(request(), options)
+    expect(recovered.status).toBe(200)
+    expect(await recovered.json()).toEqual({ count: '456' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    abandonedFetch.reject(new DOMException('Aborted', 'AbortError'))
+    await vi.waitFor(() => expect(coordinator.size).toBe(0))
+  })
+
   it('rechecks cache state when a late caller becomes refresh leader', async () => {
     const cache = new MemoryReadCountCache()
     const coordinator = createReadCountRefreshCoordinator()
@@ -637,6 +759,33 @@ describe('handleReadCountRequest', () => {
     expect(stored?.headers.get(READ_COUNT_CACHE_FETCHED_AT_HEADER)).toBe(
       String(clock),
     )
+    expect(cache.putCalls).toEqual([])
+  })
+
+  it('never replaces an older cumulative count with a lower refresh', async () => {
+    const cache = new MemoryReadCountCache()
+    const fetchedAt = NOW - 5 * 60 * 60 * 1_000
+    seedCache(cache, { body: { count: '200' }, fetchedAt })
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(upstreamResponse({ count: '150' }))
+
+    const response = await handleReadCountRequest(request(), {
+      cache,
+      coordinator: createReadCountRefreshCoordinator(),
+      fetch: fetchMock,
+      now: () => NOW,
+    })
+
+    expect(response.headers.get(READ_COUNT_CACHE_STATUS_HEADER)).toBe(
+      'preserved',
+    )
+    expect(await response.json()).toEqual({ count: '200' })
+    expect(
+      cache.entries
+        .get(cacheKey())
+        ?.headers.get(READ_COUNT_CACHE_FETCHED_AT_HEADER),
+    ).toBe(String(fetchedAt))
     expect(cache.putCalls).toEqual([])
   })
 
