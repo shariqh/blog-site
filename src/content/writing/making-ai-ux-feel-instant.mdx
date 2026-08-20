@@ -8,8 +8,8 @@ tags:
   - systems
   - infrastructure
 summary: >-
-  Making AI product UX feel fast is a ten-stage systems problem. Optimizing only
-  the model leaves nine other latency sources exactly where you found them.
+  Making AI product UX feel fast is a nine-stage systems problem. Optimizing only
+  the model leaves eight other latency sources exactly where you found them.
 draft: false
 hero:
   image: /static/images/blog/making-ai-ux-feel-instant/cover.png
@@ -134,4 +134,4 @@ The second-largest lever wasn't a latency fix at all. It was taking the model of
 
 The third was the dead zone between submission and streaming. A blank panel with a spinner reads as "this might not have worked." Reflecting the query immediately and rendering citation placeholders as tokens arrive closed that gap without touching the model at all.
 
-Stacked together, a warm replica, a non-AI first response, and an honestly acknowledged wait did more for how fast Oris feels than any amount of model tuning. That's the actual shape of the problem: nine segments sit outside the model, and most of the perceived speed lives in them, not in shaving milliseconds off inference.
+Stacked together, a warm replica, a non-AI first response, and an honestly acknowledged wait did more for how fast Oris feels than any amount of model tuning. That's the actual shape of the problem: eight of the nine stages sit outside the model, and most of the perceived speed lives in them, not in shaving milliseconds off inference.
