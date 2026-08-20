@@ -66,6 +66,9 @@ describe('buildArticlePath', () => {
     'nested//article.mdx',
     './article.mdx',
     'nested/../article.mdx',
+    'back\\slash.mdx',
+    'line\nbreak.mdx',
+    `delete-${String.fromCharCode(0x7f)}.mdx`,
   ])('rejects unsafe path segments in %j', (id) => {
     expect(() => buildArticlePath(id)).toThrow(TypeError)
   })

@@ -1,5 +1,6 @@
 import {
   fetchReadCount,
+  isCanonicalArticlePath,
   type ReadCountFetchOptions,
   type ReadCountResult,
 } from './read-count'
@@ -37,16 +38,13 @@ function compareIds(left: string, right: string): number {
 export function buildArticlePath(id: string): string {
   const slug = id.replace(/\.mdx$/, '')
   const segments = slug.split('/')
-  if (
-    segments.some(
-      (segment) => segment.length === 0 || segment === '.' || segment === '..',
-    )
-  ) {
+  const path = `/blog/${segments.map(encodeURIComponent).join('/')}/`
+  if (!isCanonicalArticlePath(path)) {
     throw new TypeError(
       'Article IDs must contain safe, non-empty path segments',
     )
   }
-  return `/blog/${segments.map(encodeURIComponent).join('/')}/`
+  return path
 }
 
 export function hasUniquePopularArticleIds(
