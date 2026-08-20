@@ -51,10 +51,8 @@ class MemoryReadCountCache implements ReadCountCache {
   readonly entries = new Map<string, Response>()
   readonly matchCalls: string[] = []
   readonly putCalls: string[] = []
-  readonly deleteCalls: string[] = []
   failMatch = false
   failPut = false
-  failDelete = false
 
   async match(request: Request): Promise<Response | undefined> {
     this.matchCalls.push(request.url)
@@ -66,12 +64,6 @@ class MemoryReadCountCache implements ReadCountCache {
     this.putCalls.push(request.url)
     if (this.failPut) throw new Error('cache put failed')
     this.entries.set(request.url, response.clone())
-  }
-
-  async delete(request: Request): Promise<boolean> {
-    this.deleteCalls.push(request.url)
-    if (this.failDelete) throw new Error('cache delete failed')
-    return this.entries.delete(request.url)
   }
 }
 
@@ -315,6 +307,32 @@ describe('handleReadCountRequest', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('revalidates freshness after an asynchronous cache lookup', async () => {
+    const cache = new MemoryReadCountCache()
+    seedCache(cache, { fetchedAt: NOW })
+    const freshnessBoundary = NOW + READ_COUNT_CACHE_FRESH_SECONDS * 1_000
+    const times = [
+      freshnessBoundary - 1,
+      freshnessBoundary + 1,
+      freshnessBoundary + 1,
+    ]
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(upstreamResponse({ count: '456' }))
+
+    const response = await handleReadCountRequest(request(), {
+      cache,
+      fetch: fetchMock,
+      now: () => times.shift() ?? freshnessBoundary + 1,
+    })
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(response.headers.get(READ_COUNT_CACHE_STATUS_HEADER)).toBe(
+      'refreshed',
+    )
+    expect(await response.json()).toEqual({ count: '456' })
+  })
+
   it('refreshes a retained stale cache entry from upstream', async () => {
     const cache = new MemoryReadCountCache()
     seedCache(cache, {
@@ -454,6 +472,40 @@ describe('handleReadCountRequest', () => {
     )
   })
 
+  it('revalidates retention after an upstream availability failure', async () => {
+    const cache = new MemoryReadCountCache()
+    seedCache(cache, { fetchedAt: NOW })
+    const retentionBoundary = NOW + READ_COUNT_CACHE_RETENTION_SECONDS * 1_000
+    const times = [
+      retentionBoundary - 1,
+      retentionBoundary - 1,
+      retentionBoundary + 1,
+    ]
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => {
+      seedCache(cache, {
+        body: { count: '999' },
+        fetchedAt: retentionBoundary,
+      })
+      return new Response(null, { status: 503 })
+    })
+
+    const response = await handleReadCountRequest(request(), {
+      cache,
+      fetch: fetchMock,
+      now: () => times.shift() ?? retentionBoundary + 1,
+    })
+
+    expect(response.status).toBe(502)
+    expect(response.headers.get(READ_COUNT_CACHE_STATUS_HEADER)).toBe('expired')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(await response.json()).toEqual({ error: 'unavailable' })
+    const concurrentEntry = cache.entries.get(cacheKey())
+    expect(await concurrentEntry?.clone().json()).toEqual({ count: '999' })
+    expect(
+      concurrentEntry?.headers.get(READ_COUNT_CACHE_FETCHED_AT_HEADER),
+    ).toBe(String(retentionBoundary))
+  })
+
   it('does not serve a cache entry beyond the retention window', async () => {
     const cache = new MemoryReadCountCache()
     seedCache(cache, {
@@ -473,8 +525,7 @@ describe('handleReadCountRequest', () => {
     expect(response.headers.get(READ_COUNT_CACHE_STATUS_HEADER)).toBe('expired')
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(await response.json()).toEqual({ error: 'unavailable' })
-    expect(cache.deleteCalls).toEqual([cacheKey()])
-    expect(cache.entries.has(cacheKey())).toBe(false)
+    expect(cache.entries.has(cacheKey())).toBe(true)
   })
 
   it('fails closed when upstream fails and the cache is empty', async () => {
@@ -496,7 +547,7 @@ describe('handleReadCountRequest', () => {
   })
 
   it.each(INVALID_CACHE_CASES)(
-    'evicts $cacheProblem instead of serving it stale',
+    'ignores $cacheProblem instead of serving it stale',
     async ({ body, headers }) => {
       const cache = new MemoryReadCountCache()
       seedCache(cache, {
@@ -519,8 +570,7 @@ describe('handleReadCountRequest', () => {
         'invalid',
       )
       expect(await response.json()).toEqual({ error: 'unavailable' })
-      expect(cache.deleteCalls).toEqual([cacheKey()])
-      expect(cache.entries.has(cacheKey())).toBe(false)
+      expect(cache.entries.has(cacheKey())).toBe(true)
     },
   )
 

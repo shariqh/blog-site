@@ -20,7 +20,6 @@ export const READ_COUNT_CACHE_FETCHED_AT_HEADER =
 export const READ_COUNT_CACHE_STATUS_HEADER = 'x-read-count-cache'
 
 const READ_COUNT_CACHE_WRITE_HEADER = 'x-read-count-cache-write'
-const READ_COUNT_CACHE_DELETE_HEADER = 'x-read-count-cache-delete'
 const JSON_CONTENT_TYPE = 'application/json'
 
 const JSON_HEADERS = {
@@ -31,7 +30,6 @@ const JSON_HEADERS = {
 export interface ReadCountCache {
   match(request: Request): Promise<Response | undefined>
   put(request: Request, response: Response): Promise<void>
-  delete(request: Request): Promise<boolean>
 }
 
 export interface ReadCountProxyOptions extends Pick<
@@ -46,6 +44,7 @@ type ReadCountCacheEntry =
   | {
       state: 'fresh' | 'stale'
       count: string
+      fetchedAt: number
       remainingSeconds: number
     }
   | { state: 'expired' | 'invalid' }
@@ -56,13 +55,10 @@ type ReadCountCacheLookup =
   | {
       state: 'fresh' | 'stale'
       count: string
+      fetchedAt: number
       remainingSeconds: number
-      deleteFailed: false
     }
-  | {
-      state: 'bypass' | 'error' | 'expired' | 'invalid' | 'miss'
-      deleteFailed: boolean
-    }
+  | { state: 'bypass' | 'error' | 'expired' | 'invalid' | 'miss' }
 
 type PublicReadCountCacheStatus =
   | ReadCountCacheLookup['state']
@@ -114,14 +110,10 @@ function errorResponse(
 
 function publicCacheHeaders(
   status: PublicReadCountCacheStatus,
-  lookup: ReadCountCacheLookup,
   writeFailed = false,
 ): Record<string, string> {
   return {
     [READ_COUNT_CACHE_STATUS_HEADER]: status,
-    ...(lookup.deleteFailed
-      ? { [READ_COUNT_CACHE_DELETE_HEADER]: 'error' }
-      : {}),
     ...(writeFailed ? { [READ_COUNT_CACHE_WRITE_HEADER]: 'error' } : {}),
   }
 }
@@ -129,7 +121,6 @@ function publicCacheHeaders(
 function countResponse(
   count: string,
   status: PublicReadCountCacheStatus,
-  lookup: ReadCountCacheLookup,
   {
     remainingSeconds,
     stale = false,
@@ -144,7 +135,7 @@ function countResponse(
     { count },
     200,
     cacheControl(stale, remainingSeconds),
-    publicCacheHeaders(status, lookup, writeFailed),
+    publicCacheHeaders(status, writeFailed),
   )
 }
 
@@ -192,6 +183,7 @@ export function classifyReadCountCacheEntry(
     return {
       state: 'fresh',
       count: String(count),
+      fetchedAt,
       remainingSeconds: Math.floor(
         (READ_COUNT_CACHE_FRESH_SECONDS * 1_000 - age) / 1_000,
       ),
@@ -201,6 +193,7 @@ export function classifyReadCountCacheEntry(
     return {
       state: 'stale',
       count: String(count),
+      fetchedAt,
       remainingSeconds: Math.floor(
         (READ_COUNT_CACHE_RETENTION_SECONDS * 1_000 - age) / 1_000,
       ),
@@ -244,31 +237,35 @@ async function lookupReadCountCache(
   now: number,
 ): Promise<ReadCountCacheLookup> {
   if (!cache) {
-    return { state: 'bypass', deleteFailed: false }
+    return { state: 'bypass' }
   }
 
   let response: Response | undefined
   try {
     response = await cache.match(key)
   } catch {
-    return { state: 'error', deleteFailed: false }
+    return { state: 'error' }
   }
   if (!response) {
-    return { state: 'miss', deleteFailed: false }
+    return { state: 'miss' }
   }
 
-  const entry = await readCacheEntry(response, now)
-  if (entry.state === 'fresh' || entry.state === 'stale') {
-    return { ...entry, deleteFailed: false }
+  return readCacheEntry(response, now)
+}
+
+function revalidateReadCountCache(
+  lookup: ReadCountCacheLookup,
+  now: number,
+): ReadCountCacheLookup {
+  if (lookup.state !== 'fresh' && lookup.state !== 'stale') {
+    return lookup
   }
 
-  let deleteFailed = false
-  try {
-    await cache.delete(key)
-  } catch {
-    deleteFailed = true
-  }
-  return { state: entry.state, deleteFailed }
+  return classifyReadCountCacheEntry(
+    { count: lookup.count },
+    String(lookup.fetchedAt),
+    now,
+  )
 }
 
 function cachedResponse(count: number, fetchedAt: number): Response {
@@ -328,13 +325,14 @@ export async function handleReadCountRequest(
   }
 
   const cacheKey = buildReadCountCacheKey(request.url, paths[0])
-  const lookup = await lookupReadCountCache(
+  let lookup = await lookupReadCountCache(
     options.cache,
     cacheKey,
     (options.now ?? Date.now)(),
   )
+  lookup = revalidateReadCountCache(lookup, (options.now ?? Date.now)())
   if (lookup.state === 'fresh') {
-    return countResponse(lookup.count, 'fresh', lookup, {
+    return countResponse(lookup.count, 'fresh', {
       remainingSeconds: lookup.remainingSeconds,
     })
   }
@@ -352,7 +350,6 @@ export async function handleReadCountRequest(
       'unavailable',
       publicCacheHeaders(
         lookup.state === 'stale' ? 'stale-rejected' : lookup.state,
-        lookup,
       ),
     )
   }
@@ -367,20 +364,21 @@ export async function handleReadCountRequest(
     return countResponse(
       String(result.count),
       lookup.state === 'stale' ? 'refreshed' : lookup.state,
-      lookup,
       { writeFailed },
     )
   }
   if (lookup.state === 'stale' && canServeStaleReadCount(result)) {
-    return countResponse(lookup.count, 'stale', lookup, {
-      remainingSeconds: lookup.remainingSeconds,
-      stale: true,
-    })
+    lookup = revalidateReadCountCache(lookup, (options.now ?? Date.now)())
+    if (lookup.state === 'stale') {
+      return countResponse(lookup.count, 'stale', {
+        remainingSeconds: lookup.remainingSeconds,
+        stale: true,
+      })
+    }
   }
 
   const headers = publicCacheHeaders(
     lookup.state === 'stale' ? 'stale-rejected' : lookup.state,
-    lookup,
   )
   if (result.reason === 'http' && result.status === 404) {
     return errorResponse(404, 'not_found', headers)

@@ -58,10 +58,6 @@ class SmokeReadCountCache implements ReadCountCache {
   async put(request: Request, response: Response): Promise<void> {
     this.entries.set(request.url, response.clone())
   }
-
-  async delete(request: Request): Promise<boolean> {
-    return this.entries.delete(request.url)
-  }
 }
 
 async function warmReadCountCache(

@@ -26,9 +26,6 @@ describe('read-count Pages Function', () => {
       async put() {
         throw new Error('fresh cache hits must not write')
       },
-      async delete() {
-        throw new Error('fresh cache hits must not delete')
-      },
     }
     const originalCaches = Object.getOwnPropertyDescriptor(globalThis, 'caches')
     Object.defineProperty(globalThis, 'caches', {
