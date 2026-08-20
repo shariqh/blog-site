@@ -87,7 +87,7 @@ The most expensive call in a RAG pipeline is generation. The second-most expensi
 
 Before sending any candidates to the model, the pipeline checks:
 
-- **Exact phrase coverage**: does any candidate contain the queried entity or product name verbatim?
+- **Exact phrase coverage**: does any candidate resolve to the queried entity's canonical identity — via the same alias index built at ingestion, not a fresh substring match — rather than just a semantically nearby chunk?
 - **Relation evidence**: if the query implies a relationship (A supports B, A connects to B), is there evidence of that specific relation in the candidates, or just co-occurrence?
 
 Co-occurrence is the subtle failure mode. A document mentioning "Obsidian" and "Apple Notes" in adjacent paragraphs will rank highly for "Apple Notes to Obsidian" even if it never asserts they're connected. Without a relation gate, you'll generate a confident answer about a workflow that doesn't exist.
