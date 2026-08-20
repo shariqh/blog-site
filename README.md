@@ -137,7 +137,8 @@ Pages Function isolate. A disconnected caller releases its interest without
 cancelling active peers; the shared fetch aborts when no consumers remain.
 The deploy workflow keeps Cloudflare's `enable_request_signal` compatibility
 flag enabled for preview and production so incoming disconnects reach that
-coordinator.
+coordinator. It serializes Pages project updates and changes only the target
+environment's flags, so preview deploys do not mutate production configuration.
 GoatCounter pageview totals are treated as cumulative: immediately before
 writing, the function re-reads the count cache and preserves an observed higher
 count or equal count with newer fetch metadata. Availability failures write a
@@ -157,7 +158,9 @@ is isolate-local, backoff is edge-local, and a cross-isolate write can still
 race between the final re-read and `cache.put`. The cumulative-count guard
 prevents overwriting a higher value already observed by that re-read, but true
 global serialization would require Durable Objects or another coordinated
-store.
+store. Cache API operations also do not accept an `AbortSignal`; request
+cancellation stops the shared upstream fetch but cannot cancel an already-issued
+edge cache operation.
 
 ## Authoring posts
 

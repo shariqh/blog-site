@@ -1023,6 +1023,36 @@ describe('handleReadCountRequest', () => {
     expect(coordinator.size).toBe(0)
   })
 
+  it('uses a concurrent fresh count while backoff is active', async () => {
+    const cache = new MemoryReadCountCache()
+    seedCache(cache, {
+      body: { count: '321' },
+      fetchedAt: NOW - 5 * 60 * 60 * 1_000,
+    })
+    seedBackoff(cache)
+    cache.onMatch = (matchedRequest) => {
+      if (matchedRequest.url === backoffKey()) {
+        seedCache(cache, { body: { count: '999' }, fetchedAt: NOW })
+      }
+    }
+    const fetchMock = vi.fn<typeof fetch>()
+
+    const response = await handleReadCountRequest(request(), {
+      cache,
+      coordinator: createReadCountRefreshCoordinator(),
+      fetch: fetchMock,
+      now: () => NOW,
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get(READ_COUNT_CACHE_STATUS_HEADER)).toBe('fresh')
+    expect(response.headers.get(READ_COUNT_BACKOFF_STATUS_HEADER)).toBe(
+      'active',
+    )
+    expect(await response.json()).toEqual({ count: '999' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('keeps a validated stale snapshot when the fallback cache entry is evicted', async () => {
     const cache = new MemoryReadCountCache()
     seedCache(cache, {

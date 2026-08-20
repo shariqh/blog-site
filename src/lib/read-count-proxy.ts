@@ -829,7 +829,14 @@ export async function handleReadCountRequest(
 
   const backoff = await lookupReadCountBackoff(options.cache, backoffKey, now)
   if (backoff.state === 'active') {
-    lookup = revalidateReadCountCache(lookup, now())
+    const latest = await lookupReadCountCache(options.cache, cacheKey, now)
+    lookup = preferLatestValidReadCount(latest, lookup, now())
+    if (lookup.state === 'fresh') {
+      return countResponse(lookup.count, 'fresh', {
+        backoff: 'active',
+        remainingSeconds: lookup.remainingSeconds,
+      })
+    }
     if (lookup.state === 'stale') {
       return countResponse(lookup.count, 'stale', {
         backoff: 'active',

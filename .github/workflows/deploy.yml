@@ -12,8 +12,9 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  group: deploy-shariq-dev
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   deploy:
@@ -45,16 +46,21 @@ jobs:
           project="$(curl --fail-with-body --silent --show-error \
             --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             "${project_url}")"
-          production_flags="$(jq -c \
-            '[.result.deployment_configs.production.compatibility_flags[]?, "enable_request_signal"] | unique' \
-            <<<"${project}")"
-          preview_flags="$(jq -c \
-            '[.result.deployment_configs.preview.compatibility_flags[]?, "enable_request_signal"] | unique' \
-            <<<"${project}")"
-          payload="$(jq -nc \
-            --argjson production "${production_flags}" \
-            --argjson preview "${preview_flags}" \
-            '{deployment_configs:{production:{compatibility_flags:$production},preview:{compatibility_flags:$preview}}}')"
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            flags="$(jq -c \
+              '[.result.deployment_configs.production.compatibility_flags[]?, "enable_request_signal"] | unique' \
+              <<<"${project}")"
+            payload="$(jq -nc \
+              --argjson flags "${flags}" \
+              '{deployment_configs:{production:{compatibility_flags:$flags}}}')"
+          else
+            flags="$(jq -c \
+              '[.result.deployment_configs.preview.compatibility_flags[]?, "enable_request_signal"] | unique' \
+              <<<"${project}")"
+            payload="$(jq -nc \
+              --argjson flags "${flags}" \
+              '{deployment_configs:{preview:{compatibility_flags:$flags}}}')"
+          fi
           curl --fail-with-body --silent --show-error \
             --request PATCH \
             --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
