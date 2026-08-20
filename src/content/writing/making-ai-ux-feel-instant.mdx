@@ -44,11 +44,11 @@ hero:
   style: line-art
 ---
 
-Perceived AI performance is mostly a systems engineering problem. The model's time-to-first-token is one segment in a longer chain (panel open, lexical results, reflected state, streaming, citations, follow-up, session restore). Optimizing the model sharpens one variable. The others stay exactly as slow as you left them.
+Making AI product UX feel fast is mostly a systems engineering problem, not a model problem. The model's time-to-first-token is one segment in a longer chain (panel open, lexical results, reflected state, streaming, citations, follow-up, session restore). Optimizing the model sharpens one variable. The others stay exactly as slow as you left them.
 
 Infrastructure, UI transitions, preserved state: all of it compounds. A 40ms model improvement disappears into a 500ms cold container start. A fast first-token disappears into a blank loading screen.
 
-Building Oris, the AI search layer in Askdocs, forced this view on us. Here's how the full budget breaks down, and what actually moves at each stage.
+Building [Oris](/blog/local-llms-bespoke-apps), the AI search layer in Askdocs, forced this view on us. Here's how the full budget breaks down, and what actually moves at each stage.
 
 ## The latency waterfall
 
