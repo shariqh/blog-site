@@ -1,24 +1,65 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  buildGoatCounterReadCountUrl,
   buildReadCountUrl,
   fetchReadCount,
   formatReadCount,
+  isCanonicalArticlePath,
+  MAX_READ_COUNT_RESPONSE_BYTES,
   parseReadCount,
 } from './read-count'
 
+const ARTICLE_PATH = '/blog/post/'
+
 describe('buildReadCountUrl', () => {
-  it('encodes the exact URL pathname for GoatCounter', () => {
-    expect(buildReadCountUrl('/blog/nested/an%20article')).toBe(
-      'https://shariq-blog.goatcounter.com/counter/%2Fblog%2Fnested%2Fan%2520article.json',
+  it('encodes the exact URL pathname for the same-origin endpoint', () => {
+    expect(buildReadCountUrl('/blog/nested/an%20article/')).toBe(
+      '/api/read-count?path=%2Fblog%2Fnested%2Fan%2520article%2F',
     )
   })
 
-  it.each(['/blog/post?source=home', '/blog/post#section', 'blog/post'])(
+  it('encodes the exact URL pathname for GoatCounter upstream', () => {
+    expect(buildGoatCounterReadCountUrl('/blog/nested/an%20article/')).toBe(
+      'https://shariq-blog.goatcounter.com/counter/%2Fblog%2Fnested%2Fan%2520article%2F.json',
+    )
+  })
+
+  it.each(['/blog/post/?source=home', '/blog/post/#section', 'blog/post/'])(
     'rejects non-canonical path %s',
     (path) => {
       expect(() => buildReadCountUrl(path)).toThrow(TypeError)
     },
   )
+})
+
+describe('isCanonicalArticlePath', () => {
+  it.each([
+    '/blog/post/',
+    '/blog/nested/post/',
+    '/blog/an%20article/',
+    '/blog/nextjs_context/',
+  ])('accepts canonical article path %s', (path) => {
+    expect(isCanonicalArticlePath(path)).toBe(true)
+  })
+
+  it.each([
+    '',
+    '/',
+    '/projects/',
+    '/blog/',
+    '/blog/post',
+    '/blog//post/',
+    '/blog/./post/',
+    '/blog/../post/',
+    '/blog/%2e%2e/post/',
+    '/blog/%2Fsecret/',
+    '/blog/bad%path/',
+    '/blog/raw space/',
+    '/blog/back\\slash/',
+    `/blog/${'a'.repeat(512)}/`,
+  ])('rejects invalid article path %s', (path) => {
+    expect(isCanonicalArticlePath(path)).toBe(false)
+  })
 })
 
 describe('parseReadCount', () => {
@@ -81,10 +122,10 @@ describe('fetchReadCount', () => {
     )
 
     await expect(
-      fetchReadCount('/blog/post', { fetch: fetchMock }),
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
     ).resolves.toEqual({ ok: true, count: 2_345 })
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://shariq-blog.goatcounter.com/counter/%2Fblog%2Fpost.json',
+      '/api/read-count?path=%2Fblog%2Fpost%2F',
       expect.objectContaining({
         credentials: 'omit',
         headers: { accept: 'application/json' },
@@ -105,7 +146,7 @@ describe('fetchReadCount', () => {
         })
 
       await expect(
-        fetchReadCount('/blog/post', { fetch: fetchMock }),
+        fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
       ).resolves.toEqual({ ok: false, reason: 'http', status })
       expect(requestSignal?.aborted).toBe(true)
     },
@@ -117,7 +158,7 @@ describe('fetchReadCount', () => {
       .mockResolvedValue(new Response('{', { status: 200 }))
 
     await expect(
-      fetchReadCount('/blog/post', { fetch: fetchMock }),
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
     ).resolves.toEqual({ ok: false, reason: 'invalid-response' })
   })
 
@@ -127,7 +168,25 @@ describe('fetchReadCount', () => {
       .mockResolvedValue(new Response(JSON.stringify({ count: 'many' })))
 
     await expect(
-      fetchReadCount('/blog/post', { fetch: fetchMock }),
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
+    ).resolves.toEqual({ ok: false, reason: 'invalid-response' })
+  })
+
+  it.each([
+    new Response(
+      JSON.stringify({ count: '1' }) +
+        ' '.repeat(MAX_READ_COUNT_RESPONSE_BYTES),
+    ),
+    new Response(JSON.stringify({ count: '1' }), {
+      headers: {
+        'content-length': String(MAX_READ_COUNT_RESPONSE_BYTES + 1),
+      },
+    }),
+  ])('rejects oversized responses', async (response) => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response)
+
+    await expect(
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
     ).resolves.toEqual({ ok: false, reason: 'invalid-response' })
   })
 
@@ -137,7 +196,7 @@ describe('fetchReadCount', () => {
       .mockRejectedValue(new TypeError('Failed to fetch'))
 
     await expect(
-      fetchReadCount('/blog/post', { fetch: fetchMock }),
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
     ).resolves.toEqual({ ok: false, reason: 'network' })
   })
 
@@ -152,7 +211,7 @@ describe('fetchReadCount', () => {
         )
       })
 
-    const result = fetchReadCount('/blog/post', {
+    const result = fetchReadCount(ARTICLE_PATH, {
       fetch: fetchMock,
       timeoutMs: 50,
     })
@@ -167,7 +226,7 @@ describe('fetchReadCount', () => {
     const fetchMock = vi.fn<typeof fetch>()
 
     await expect(
-      fetchReadCount('/blog/post', {
+      fetchReadCount(ARTICLE_PATH, {
         fetch: fetchMock,
         signal: controller.signal,
       }),
@@ -186,7 +245,7 @@ describe('fetchReadCount', () => {
         )
       })
 
-    const result = fetchReadCount('/blog/post', {
+    const result = fetchReadCount(ARTICLE_PATH, {
       fetch: fetchMock,
       signal: controller.signal,
     })
@@ -201,7 +260,7 @@ describe('fetchReadCount', () => {
       const fetchMock = vi.fn<typeof fetch>()
 
       await expect(
-        fetchReadCount('/blog/post', { fetch: fetchMock, timeoutMs }),
+        fetchReadCount(ARTICLE_PATH, { fetch: fetchMock, timeoutMs }),
       ).rejects.toThrow(RangeError)
       expect(fetchMock).not.toHaveBeenCalled()
     },
@@ -213,7 +272,7 @@ describe('fetchReadCount', () => {
       .mockRejectedValue(new Error('broken fetch adapter'))
 
     await expect(
-      fetchReadCount('/blog/post', { fetch: fetchMock }),
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
     ).rejects.toThrow('broken fetch adapter')
   })
 
@@ -227,7 +286,7 @@ describe('fetchReadCount', () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response)
 
     await expect(
-      fetchReadCount('/blog/post', { fetch: fetchMock }),
+      fetchReadCount(ARTICLE_PATH, { fetch: fetchMock }),
     ).rejects.toThrow('broken response adapter')
   })
 })

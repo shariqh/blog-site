@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildReadCountUrl } from './read-count'
+import { buildGoatCounterReadCountUrl, buildReadCountUrl } from './read-count'
 import {
   POPULAR_ARTICLE_FETCH_CONCURRENCY,
   buildArticlePath,
@@ -46,10 +46,13 @@ describe('buildArticlePath', () => {
     expect(buildArticlePath(id)).toBe(expected)
   })
 
-  it('preserves encoded pathnames through GoatCounter route encoding', () => {
+  it('preserves encoded pathnames through proxy and upstream encoding', () => {
     const articlePath = buildArticlePath('nested/an article?#%.mdx')
 
     expect(buildReadCountUrl(articlePath)).toBe(
+      '/api/read-count?path=%2Fblog%2Fnested%2Fan%2520article%253F%2523%2525%2F',
+    )
+    expect(buildGoatCounterReadCountUrl(articlePath)).toBe(
       'https://shariq-blog.goatcounter.com/counter/%2Fblog%2Fnested%2Fan%2520article%253F%2523%2525%2F.json',
     )
   })

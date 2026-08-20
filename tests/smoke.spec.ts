@@ -28,7 +28,13 @@ const SLUGS = walkMdx('src/content/writing')
 const READ_COUNT_SLUG =
   'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
 const READ_COUNT_PATH = `/blog/${READ_COUNT_SLUG}/`
-const READ_COUNT_ROUTE = 'https://shariq-blog.goatcounter.com/counter/**'
+const READ_COUNT_ROUTE = /\/api\/read-count(?:\?|$)/
+
+function relativeRequestUrl(requestUrl: string): string {
+  const url = new URL(requestUrl)
+  return `${url.pathname}${url.search}`
+}
+
 const READ_COUNT_URL = buildReadCountUrl(READ_COUNT_PATH)
 
 interface HomeArticleFixture {
@@ -121,15 +127,21 @@ test('homepage ranks popular articles without duplication or overflow', async ({
   page,
 }) => {
   const errors: string[] = []
+  const directGoatCounterRequests: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
   page.on('pageerror', (error) => errors.push(error.message))
+  page.on('request', (request) => {
+    if (new URL(request.url()).hostname.endsWith('goatcounter.com')) {
+      directGoatCounterRequests.push(request.url())
+    }
+  })
   const countByUrl = new Map<string, string>([
-      [buildReadCountUrl(buildArticlePath(HOME_FEATURED.slug)), '9,999'],
+    [buildReadCountUrl(buildArticlePath(HOME_FEATURED.slug)), '9,999'],
     ...POPULAR_FIXTURES.map(
       ({ article, count }) =>
-          [buildReadCountUrl(buildArticlePath(article.slug)), count] as const,
+        [buildReadCountUrl(buildArticlePath(article.slug)), count] as const,
     ),
   ])
   await page.unroute(READ_COUNT_ROUTE)
@@ -137,7 +149,7 @@ test('homepage ranks popular articles without duplication or overflow', async ({
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
-        count: countByUrl.get(route.request().url()) ?? '0',
+        count: countByUrl.get(relativeRequestUrl(route.request().url())) ?? '0',
       }),
     }),
   )
@@ -185,6 +197,7 @@ test('homepage ranks popular articles without duplication or overflow', async ({
     expect(widths.section).toBeLessThanOrEqual(widths.viewport)
   }
 
+  expect(directGoatCounterRequests).toEqual([])
   expect(errors).toEqual([])
 })
 
@@ -199,7 +212,7 @@ test('homepage shows partial popularity and hides total failure cleanly', async 
   const validUrl = buildReadCountUrl(buildArticlePath(POPULAR_THIRD.slug))
   await page.unroute(READ_COUNT_ROUTE)
   await page.route(READ_COUNT_ROUTE, (route) =>
-    route.request().url() === validUrl
+    relativeRequestUrl(route.request().url()) === validUrl
       ? route.fulfill({
           contentType: 'application/json',
           body: JSON.stringify({ count: '1' }),
@@ -447,18 +460,24 @@ for (const slug of SLUGS) {
   })
 }
 
-test('blog post reveals GoatCounter views without responsive or console regressions', async ({
+test('blog post uses the same-origin view proxy without responsive or console regressions', async ({
   page,
 }) => {
   const errors: string[] = []
   const requests: string[] = []
+  const directGoatCounterRequests: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
   page.on('pageerror', (error) => errors.push(error.message))
+  page.on('request', (request) => {
+    if (new URL(request.url()).hostname.endsWith('goatcounter.com')) {
+      directGoatCounterRequests.push(request.url())
+    }
+  })
   await page.unroute(READ_COUNT_ROUTE)
   await page.route(READ_COUNT_ROUTE, (route) => {
-    requests.push(route.request().url())
+    requests.push(relativeRequestUrl(route.request().url()))
     return route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({ count: '1,234' }),
@@ -486,6 +505,7 @@ test('blog post reveals GoatCounter views without responsive or console regressi
   }
 
   expect(requests).toEqual([READ_COUNT_URL, READ_COUNT_URL])
+  expect(directGoatCounterRequests).toEqual([])
   expect(errors).toEqual([])
 })
 
@@ -508,7 +528,7 @@ test('blog post keeps unavailable views hidden and non-blog pages omit them', as
   page.on('pageerror', (error) => pageErrors.push(error.message))
   await page.unroute(READ_COUNT_ROUTE)
   await page.route(READ_COUNT_ROUTE, (route) =>
-    route.fulfill({ status: 403 }),
+    route.fulfill({ status: 502 }),
   )
 
   for (const viewport of [
