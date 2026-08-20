@@ -48,7 +48,7 @@ hero:
 
 Most documentation search ships as a text box that calls an LLM. Engineers write a prompt, wire a completion endpoint, and close the ticket. That handles synthesis: one piece of an AI search architecture, not the whole thing. The other jobs never got a ticket.
 
-Askdocs and its Oris integration separate those jobs. Each layer solves a distinct problem no other layer can absorb. This post walks through what those layers are, why they each need to exist separately, and where the architectural line between them belongs.
+Askdocs and its Oris integration separate those jobs. Each layer solves a distinct problem no other layer can absorb.
 
 ## Lexical search first
 
@@ -88,7 +88,7 @@ Follow-up state is the other piece most bolt-on tools drop. After an answer, con
 
 This is the tradeoff worth reasoning about carefully.
 
-Askdocs owns everything that needs to be tenant-safe by default. Indexing, retrieval, generation, citation linking, grounding constraints, and rate limiting are all baked in at the service level. The host doesn't configure any of this.
+Askdocs owns the behavioral layer: indexing, retrieval, generation, citation handling, grounding rules, and rate limiting run in the service. Each tenant supplies configuration, but the host surface does not reimplement those systems.
 
 Oris owns everything that needs to match the host's brand: the command surface's visual weight, color, typography, spacing, and motion. These come through CSS custom properties on a [Web Component](https://developer.mozilla.org/en-US/docs/Web/API/Web_components) substrate. The host sets the properties; Askdocs never touches them.
 
