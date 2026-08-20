@@ -104,7 +104,7 @@ Askdocs separates retrieval candidates (what went in) from used citations (what 
 
 The "Sources" section in the UI shows only resolved, used citations. What you see corresponds to what was actually cited.
 
-Marker dedup runs before resolution, not after. If the model cites the same source in two different sentences, the parser collapses that to one entry in the sources list instead of showing the same link twice. Small, but trust erodes around exactly this kind of inconsistency.
+Marker dedup runs after resolution, not before. Two different citation markers can resolve to the same canonical source URL, so deduplicating raw markers wouldn't catch that; collapsing by resolved URL means the sources list can't show the same link twice. Small, but trust erodes around exactly this kind of inconsistency.
 
 ## Response states
 
