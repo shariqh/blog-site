@@ -3,15 +3,35 @@ import { getCollection } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PortraitDeck from "../components/PortraitDeck.astro";
 import FeaturedCard from "../components/FeaturedCard.astro";
+import PopularArticles from "../components/PopularArticles.astro";
 import { HOME } from "../lib/home";
 import { active, safeHref } from "../lib/projects";
 import { pickFeatured } from "../lib/featured";
 import { resolveBucket } from "../lib/buckets";
+import {
+  buildArticlePath,
+  hasUniquePopularArticleIds,
+  type PopularArticleCandidate,
+} from "../lib/popular-articles";
 import { SITE } from "../lib/site";
 
 const all = await getCollection("writing", ({ data }) => !data.draft);
 const featured = pickFeatured(all);
 const fb = featured ? resolveBucket(featured.data.tags) : null;
+const featuredId = featured?.id.replace(/\.mdx$/, "");
+const popularCandidates: PopularArticleCandidate[] = all.map((post) => {
+  const id = post.id.replace(/\.mdx$/, "");
+  return {
+    id,
+    path: buildArticlePath(post.id),
+    title: post.data.title,
+    bucket: resolveBucket(post.data.tags).label,
+    publishedAt: post.data.date.getTime(),
+  };
+});
+if (!hasUniquePopularArticleIds(popularCandidates)) {
+  throw new Error("Homepage popularity candidates must have unique article IDs");
+}
 const m = HOME.manifesto;
 const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
 const focusProjects = active.filter((project) => focusNames.has(project.name));
@@ -74,13 +94,15 @@ const homeLd = [
 
   {featured && fb && (
     <FeaturedCard
-      href={`/blog/${featured.id.replace(/\.mdx$/, "")}`}
+      href={buildArticlePath(featured.id)}
       category={`${fb.label} · Latest`}
       title={featured.data.title}
       hook={featured.data.summary}
       coverData={featured.data}
     />
   )}
+
+  <PopularArticles candidates={popularCandidates} featuredId={featuredId} />
 
 </BaseLayout>
 

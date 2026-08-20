@@ -1,0 +1,58 @@
+---
+interface Props {
+  path: string;
+}
+
+const { path } = Astro.props;
+---
+
+<span
+  data-read-count
+  data-read-count-state="idle"
+  data-path={path}
+  aria-live="polite"
+  hidden
+>
+  <span class="whitespace-nowrap">
+    <span class="mx-2" aria-hidden="true">·</span>
+    <span data-read-count-value></span>
+  </span>
+</span>
+
+<script>
+  import { fetchReadCount, formatReadCount } from "../lib/read-count";
+
+  async function loadReadCount(element: HTMLElement) {
+    if (element.dataset.readCountState !== "idle") return;
+
+    const path = element.dataset.path;
+    const value = element.querySelector<HTMLElement>("[data-read-count-value]");
+    if (!path || !value) {
+      element.dataset.readCountState = "unavailable";
+      return;
+    }
+
+    element.dataset.readCountState = "loading";
+    let result;
+    try {
+      result = await fetchReadCount(path);
+    } catch {
+      element.dataset.readCountState = "unavailable";
+      return;
+    }
+    if (!result.ok) {
+      element.dataset.readCountState = "unavailable";
+      return;
+    }
+
+    value.textContent = formatReadCount(result.count);
+    element.hidden = false;
+    element.dataset.readCountState = "loaded";
+  }
+
+  document
+    .querySelectorAll<HTMLElement>("[data-read-count]")
+    .forEach((element) => {
+      void loadReadCount(element);
+    });
+</script>

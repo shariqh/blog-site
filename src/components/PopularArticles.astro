@@ -1,0 +1,252 @@
+---
+import type { PopularArticleCandidate } from "../lib/popular-articles";
+
+interface Props {
+  candidates: PopularArticleCandidate[];
+  featuredId?: string;
+}
+
+const { candidates, featuredId } = Astro.props;
+---
+
+<section
+  class="popular"
+  data-popular-articles
+  data-popular-articles-state="idle"
+  data-featured-id={featuredId}
+  aria-labelledby="popular-articles-heading"
+  aria-live="polite"
+  hidden
+>
+  <h2 id="popular-articles-heading">Most popular</h2>
+  <ol data-popular-list>
+    {
+      candidates.map((candidate) => (
+        <li
+          data-popular-candidate
+          data-article-id={candidate.id}
+          data-article-path={candidate.path}
+          data-published-at={candidate.publishedAt}
+          hidden
+        >
+          <a href={candidate.path}>
+            <span class="title" data-popular-title>
+              {candidate.title}
+            </span>
+            <span class="meta">
+              <span class="bucket" data-popular-bucket>
+                {candidate.bucket}
+              </span>
+              <span class="separator" aria-hidden="true">
+                ·
+              </span>
+              <span class="count" data-popular-count />
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<script>
+  import { formatReadCount } from "../lib/read-count";
+  import {
+    hasUniquePopularArticleIds,
+    resolvePopularArticles,
+    type PopularArticle,
+    type PopularArticleCandidate,
+  } from "../lib/popular-articles";
+
+  interface CandidateElement {
+    article: PopularArticleCandidate;
+    element: HTMLElement;
+  }
+
+  function readCandidate(element: HTMLElement): CandidateElement | null {
+    const id = element.dataset.articleId;
+    const path = element.dataset.articlePath;
+    const title = element.querySelector<HTMLElement>(
+      "[data-popular-title]",
+    )?.textContent;
+    const bucket = element.querySelector<HTMLElement>(
+      "[data-popular-bucket]",
+    )?.textContent;
+    const publishedAt = Number(element.dataset.publishedAt);
+
+    if (!id || !path || !title || !bucket || !Number.isFinite(publishedAt)) {
+      return null;
+    }
+
+    return {
+      article: { id, path, title, bucket, publishedAt },
+      element,
+    };
+  }
+
+  async function loadPopularArticles(section: HTMLElement) {
+    if (section.dataset.popularArticlesState !== "idle") return;
+
+    const list = section.querySelector<HTMLOListElement>("[data-popular-list]");
+    const candidateElements = [
+      ...section.querySelectorAll<HTMLElement>("[data-popular-candidate]"),
+    ];
+    const candidates = candidateElements.map(readCandidate);
+    const availableCandidates = candidates.filter(
+      (candidate): candidate is CandidateElement => candidate !== null,
+    );
+    if (
+      !list ||
+      availableCandidates.length !== candidateElements.length ||
+      !hasUniquePopularArticleIds(
+        availableCandidates.map((candidate) => candidate.article),
+      )
+    ) {
+      section.dataset.popularArticlesState = "unavailable";
+      return;
+    }
+
+    section.dataset.popularArticlesState = "loading";
+    let ranked: PopularArticle[];
+    try {
+      ranked = await resolvePopularArticles(
+        availableCandidates.map((candidate) => candidate.article),
+        section.dataset.featuredId,
+      );
+    } catch {
+      section.dataset.popularArticlesState = "unavailable";
+      return;
+    }
+    if (ranked.length === 0) {
+      section.dataset.popularArticlesState = "unavailable";
+      return;
+    }
+
+    const elementsById = new Map(
+      availableCandidates.map((candidate) => [
+        candidate.article.id,
+        candidate.element,
+      ]),
+    );
+    const rankedElements = ranked.map((article) => {
+      const element = elementsById.get(article.id);
+      const count = element?.querySelector<HTMLElement>("[data-popular-count]");
+      return element && count ? { article, count, element } : null;
+    });
+    const availableRankedElements = rankedElements.filter(
+      (
+        entry,
+      ): entry is {
+        article: (typeof ranked)[number];
+        count: HTMLElement;
+        element: HTMLElement;
+      } => entry !== null,
+    );
+    if (availableRankedElements.length !== ranked.length) {
+      section.dataset.popularArticlesState = "unavailable";
+      return;
+    }
+
+    const selected = new Set(ranked.map((article) => article.id));
+    candidateElements
+      .filter((element) => !selected.has(element.dataset.articleId ?? ""))
+      .forEach((element) => element.remove());
+
+    for (const { article, count, element } of availableRankedElements) {
+      count.textContent = formatReadCount(article.count);
+      element.hidden = false;
+      list.append(element);
+    }
+
+    section.hidden = false;
+    section.dataset.popularArticlesState = "loaded";
+  }
+
+  document
+    .querySelectorAll<HTMLElement>("[data-popular-articles]")
+    .forEach((section) => {
+      void loadPopularArticles(section);
+    });
+</script>
+
+<style>
+  .popular {
+    margin-bottom: 16px;
+  }
+  h2 {
+    margin-bottom: 24px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+  }
+  li {
+    border-bottom: 1px dashed color-mix(in oklab, var(--fg) 22%, transparent);
+  }
+  a {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 32px;
+    padding: 22px 0;
+    color: inherit;
+    text-decoration: none;
+  }
+  .title {
+    min-width: 0;
+    font-family: var(--font-display);
+    font-size: clamp(21px, 2.6vw, 28px);
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    overflow-wrap: anywhere;
+  }
+  .meta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .bucket {
+    color: var(--color-terracotta);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .separator {
+    opacity: 0.3;
+  }
+  .count {
+    min-width: 8ch;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+    opacity: 0.65;
+  }
+  a:hover .title {
+    color: var(--color-terracotta);
+  }
+
+  @media (max-width: 600px) {
+    a {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      padding: 20px 0;
+    }
+    .meta {
+      justify-content: flex-start;
+    }
+    .count {
+      min-width: 0;
+      text-align: left;
+    }
+  }
+</style>

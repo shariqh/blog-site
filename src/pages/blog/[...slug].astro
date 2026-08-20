@@ -29,8 +29,11 @@ const readingMinutes = remarkPluginFrontmatter?.readingTime
   ? Math.ceil(remarkPluginFrontmatter.readingTime / 60)
   : undefined;
 const slug = post.id.replace(/\.mdx$/, "");
+const articlePath = Astro.url.pathname.endsWith("/")
+  ? Astro.url.pathname
+  : `${Astro.url.pathname}/`;
 const ogImage = new URL(`/og/${slug}.png`, SITE.url).toString();
-const postUrl = new URL(`/blog/${slug}`, SITE.url).toString();
+const postUrl = new URL(articlePath, SITE.url).toString();
 const jsonLd = [
   {
     "@context": "https://schema.org",
@@ -84,6 +87,7 @@ const jsonLd = [
       bucketLabel={bucket.label}
       summary={post.data.summary}
       readingMinutes={readingMinutes}
+      articlePath={articlePath}
     />
 
     {headings.length > 4 && <Toc headings={headings} />}
@@ -102,7 +106,7 @@ const jsonLd = [
     )}
 
     <ShareFooter
-      url={post.data.canonical ?? new URL(`/blog/${slug}`, SITE.url).toString()}
+      url={post.data.canonical ?? postUrl}
       title={post.data.title}
       xHandle="ShariqHirani"
       feedUrl="/feed.xml"

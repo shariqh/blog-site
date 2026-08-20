@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import matter from 'gray-matter'
 import { active, built } from '../src/lib/projects'
+import { buildArticlePath } from '../src/lib/popular-articles'
+import { buildReadCountUrl } from '../src/lib/read-count'
 import { SITE } from '../src/lib/site'
 
 function walkMdx(dir: string, prefix = ''): string[] {
@@ -22,6 +25,84 @@ function walkMdx(dir: string, prefix = ''): string[] {
 }
 
 const SLUGS = walkMdx('src/content/writing')
+const READ_COUNT_SLUG =
+  'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
+const READ_COUNT_PATH = `/blog/${READ_COUNT_SLUG}/`
+const READ_COUNT_ROUTE = /\/api\/read-count(?:\?|$)/
+
+function relativeRequestUrl(requestUrl: string): string {
+  const url = new URL(requestUrl)
+  return `${url.pathname}${url.search}`
+}
+
+const READ_COUNT_URL = buildReadCountUrl(READ_COUNT_PATH)
+
+interface HomeArticleFixture {
+  slug: string
+  title: string
+  publishedAt: number
+}
+
+function readHomeArticles(dir: string, prefix = ''): HomeArticleFixture[] {
+  const articles: HomeArticleFixture[] = []
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name)
+    const relativePath = prefix ? `${prefix}/${name}` : name
+    if (statSync(path).isDirectory()) {
+      if (name.startsWith('_')) continue
+      articles.push(...readHomeArticles(path, relativePath))
+      continue
+    }
+    if (!relativePath.endsWith('.mdx')) continue
+
+    const { data } = matter(readFileSync(path, 'utf8'))
+    if (data.draft === true) continue
+    const publishedAt = Date.parse(String(data.date))
+    if (typeof data.title !== 'string' || Number.isNaN(publishedAt)) {
+      throw new Error(`Invalid homepage article fixture: ${relativePath}`)
+    }
+    articles.push({
+      slug: relativePath.replace(/\.mdx$/, ''),
+      title: data.title,
+      publishedAt,
+    })
+  }
+  return articles
+}
+
+const HOME_ARTICLES = readHomeArticles('src/content/writing')
+const HOME_FEATURED = HOME_ARTICLES.toSorted(
+  (left, right) => right.publishedAt - left.publishedAt,
+)[0]
+const [POPULAR_FIRST, POPULAR_SECOND, POPULAR_THIRD] = HOME_ARTICLES.filter(
+  (article) => article.slug !== HOME_FEATURED?.slug,
+).toSorted((left, right) =>
+  left.slug < right.slug ? -1 : left.slug > right.slug ? 1 : 0,
+)
+
+if (!HOME_FEATURED || !POPULAR_FIRST || !POPULAR_SECOND || !POPULAR_THIRD) {
+  throw new Error(
+    'Homepage popularity smoke tests require four published posts',
+  )
+}
+
+const POPULAR_FIXTURES = [
+  { article: POPULAR_FIRST, count: '2,345', label: '2,345 views' },
+  { article: POPULAR_SECOND, count: '42', label: '42 views' },
+  { article: POPULAR_THIRD, count: '1', label: '1 view' },
+] as const
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/gc.zgo.at/count.js', (route) =>
+    route.fulfill({ contentType: 'application/javascript', body: '' }),
+  )
+  await page.route(READ_COUNT_ROUTE, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({}),
+    }),
+  )
+})
 
 test('homepage renders the zine hero', async ({ page }) => {
   await page.goto('/')
@@ -40,6 +121,152 @@ test('homepage renders the zine hero', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: "More on what I'm doing now" }),
   ).toHaveAttribute('href', '/now')
+})
+
+test('homepage ranks popular articles without duplication or overflow', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  const directGoatCounterRequests: string[] = []
+  const proxyRequests: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('request', (request) => {
+    if (new URL(request.url()).hostname.endsWith('goatcounter.com')) {
+      directGoatCounterRequests.push(request.url())
+    }
+  })
+  const countByUrl = new Map<string, string>([
+    [buildReadCountUrl(buildArticlePath(HOME_FEATURED.slug)), '9,999'],
+    ...POPULAR_FIXTURES.map(
+      ({ article, count }) =>
+        [buildReadCountUrl(buildArticlePath(article.slug)), count] as const,
+    ),
+  ])
+  await page.unroute(READ_COUNT_ROUTE)
+  await page.route(READ_COUNT_ROUTE, (route) => {
+    const requestUrl = relativeRequestUrl(route.request().url())
+    proxyRequests.push(requestUrl)
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        count: countByUrl.get(requestUrl) ?? '0',
+      }),
+    })
+  })
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/')
+
+    const popular = page.locator('[data-popular-articles]')
+    await expect(popular).toHaveAttribute(
+      'data-popular-articles-state',
+      'loaded',
+    )
+    await expect(popular).toBeVisible()
+    await expect(
+      popular.getByRole('heading', { name: 'Most popular' }),
+    ).toBeVisible()
+    await expect(popular.locator('[data-popular-candidate]')).toHaveCount(3)
+    await expect(popular.locator('[data-popular-title]')).toHaveText(
+      POPULAR_FIXTURES.map(({ article }) => article.title),
+    )
+    await expect(popular.locator('[data-popular-count]')).toHaveText(
+      POPULAR_FIXTURES.map(({ label }) => label),
+    )
+    await expect(
+      popular.locator(
+        `[data-popular-candidate][data-article-id="${HOME_FEATURED.slug}"]`,
+      ),
+    ).toHaveCount(0)
+
+    const widths = await page.evaluate(() => {
+      const section = document.querySelector<HTMLElement>(
+        '[data-popular-articles]',
+      )
+      return {
+        viewport: document.documentElement.clientWidth,
+        document: document.documentElement.scrollWidth,
+        section: section?.scrollWidth ?? 0,
+      }
+    })
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport)
+    expect(widths.section).toBeLessThanOrEqual(widths.viewport)
+  }
+
+  expect(proxyRequests).not.toContain(
+    buildReadCountUrl(buildArticlePath(HOME_FEATURED.slug)),
+  )
+  expect(directGoatCounterRequests).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('homepage hides incomplete and unexpected popularity failures cleanly', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  page.on('pageerror', (error) => errors.push(error.message))
+  const validUrl = buildReadCountUrl(buildArticlePath(POPULAR_THIRD.slug))
+  await page.unroute(READ_COUNT_ROUTE)
+  await page.route(READ_COUNT_ROUTE, (route) =>
+    relativeRequestUrl(route.request().url()) === validUrl
+      ? route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ count: '1' }),
+        })
+      : route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({}),
+        }),
+  )
+
+  await page.goto('/')
+  const popular = page.locator('[data-popular-articles]')
+  await expect(popular).toHaveAttribute(
+    'data-popular-articles-state',
+    'unavailable',
+  )
+  await expect(popular).toBeHidden()
+
+  await page.unroute(READ_COUNT_ROUTE)
+  await page.route(READ_COUNT_ROUTE, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({}),
+    }),
+  )
+  await page.goto('/')
+  await expect(popular).toHaveAttribute(
+    'data-popular-articles-state',
+    'unavailable',
+  )
+  await expect(popular).toBeHidden()
+
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = (input, init) => {
+      if (String(input).startsWith('/api/read-count')) {
+        return Promise.reject(new Error('unexpected read-count failure'))
+      }
+      return originalFetch(input, init)
+    }
+  })
+  await page.goto('/')
+  await expect(popular).toHaveAttribute(
+    'data-popular-articles-state',
+    'unavailable',
+  )
+  await expect(popular).toBeHidden()
+  expect(errors).toEqual([])
 })
 
 test('header nav + footer socials', async ({ page }) => {
@@ -252,6 +479,104 @@ for (const slug of SLUGS) {
     await expect(page.locator('h1').first()).toBeVisible()
   })
 }
+
+test('blog post uses the same-origin view proxy without responsive or console regressions', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  const requests: string[] = []
+  const directGoatCounterRequests: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('request', (request) => {
+    if (new URL(request.url()).hostname.endsWith('goatcounter.com')) {
+      directGoatCounterRequests.push(request.url())
+    }
+  })
+  await page.unroute(READ_COUNT_ROUTE)
+  await page.route(READ_COUNT_ROUTE, (route) => {
+    requests.push(relativeRequestUrl(route.request().url()))
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ count: '1,234' }),
+    })
+  })
+
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto(READ_COUNT_PATH)
+
+    const readCount = page.locator('[data-read-count]')
+    await expect(readCount).toHaveAttribute('data-path', READ_COUNT_PATH)
+    await expect(readCount).toHaveAttribute('data-read-count-state', 'loaded')
+    await expect(readCount).toBeVisible()
+    await expect(readCount).toContainText('1,234 views')
+
+    const widths = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+    }))
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport)
+  }
+
+  expect(requests).toEqual([READ_COUNT_URL, READ_COUNT_URL])
+  expect(directGoatCounterRequests).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('blog post keeps unavailable views hidden and non-blog pages omit them', async ({
+  page,
+}) => {
+  const pageErrors: string[] = []
+  await page.addInitScript(() => {
+    const consoleErrors: string[] = []
+    Object.defineProperty(window, '__readCountConsoleErrors', {
+      value: consoleErrors,
+      configurable: true,
+    })
+    const originalConsoleError = console.error
+    console.error = (...args) => {
+      consoleErrors.push(args.map(String).join(' '))
+      originalConsoleError(...args)
+    }
+  })
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.unroute(READ_COUNT_ROUTE)
+  await page.route(READ_COUNT_ROUTE, (route) =>
+    route.fulfill({ status: 502 }),
+  )
+
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto(READ_COUNT_PATH)
+    const readCount = page.locator('[data-read-count]')
+    await expect(readCount).toHaveAttribute(
+      'data-read-count-state',
+      'unavailable',
+    )
+    await expect(readCount).toBeHidden()
+    const consoleErrors = await page.evaluate(
+      () =>
+        (
+          window as Window &
+            typeof globalThis & { __readCountConsoleErrors: string[] }
+        ).__readCountConsoleErrors,
+    )
+    expect(consoleErrors).toEqual([])
+  }
+
+  await page.goto('/')
+  await expect(page.locator('[data-read-count]')).toHaveCount(0)
+  expect(pageErrors).toEqual([])
+})
 
 test('blog post exposes OG image meta and the PNG is built', async ({
   page,
