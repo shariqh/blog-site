@@ -62,7 +62,7 @@ The key distinction is that human completion is not the same event as the agent-
 
 ## Two answer channels, one precedence rule
 
-Issue #29 made clear why a single answer channel is not enough. An agent might ask a question inside a chat thread and hear the answer there. Agent Inbox also exposes a card where the human can answer directly. Both paths write the same `reply` fields on the item; `reply_source` records whether the current value came from the inbox or was recorded by an agent from chat.
+Issue [#29](https://github.com/shariqh/agent-inbox/issues/29) made clear why a single answer channel is not enough. An agent might ask a question inside a chat thread and hear the answer there. Agent Inbox also exposes a card where the human can answer directly. Both paths write the same `reply` fields on the item; `reply_source` records whether the current value came from the inbox or was recorded by an agent from chat.
 
 The precedence rule is asymmetric on purpose. An inbox write is unconditional: it replaces the current reply, sets `reply_source='inbox'`, and resets `reply_seen_at` so an agent has to pick up the new answer. A chat-recorded answer uses one conditioned `UPDATE`. It can write only when no reply exists or when the current reply has already been picked up:
 
@@ -93,7 +93,7 @@ The operation that moves a tracking board forward is `board_advance`. It takes t
 
 This is compare-and-swap at the application layer. It covers a class of bugs where two agents both think they are advancing the same board step and one installs stale state. `board_advance` atomically archives the old human step and installs the next one in a single transaction. There is no window where the board is half-advanced.
 
-The test suite (real temporary SQLite databases, not mocks) includes a trigger-based race test that verifies the revision tokens catch concurrent modifications. Two writes race on the same row; one must observe the other's revision bump and back off. `test/store.test.ts` and `test/mcp.integration.test.ts` both run actual store operations, and the integration test exercises a real stdio MCP round trip, because the MCP server's lifetime is itself a source of state worth testing directly.
+The test suite (real temporary SQLite databases, not mocks) tests these two mechanisms differently. Board-row revision protection is proven sequentially: a client calls `board_advance`, `board_row`, or `board_upsert` with a stale `expected_revision` or `board_version`, and the transaction's explicit revision check rejects the call — no second connection required to prove it holds. The forced two-connection race, with two live SQLite connections and timing pinned so one write lands inside another's read-then-write window, is reserved for item reply/pickup, where a viewer process and an MCP process genuinely interleave. `test/store.test.ts` and `test/mcp.integration.test.ts` both run actual store operations, and the integration test exercises a real stdio MCP round trip, because the MCP server's lifetime is itself a source of state worth testing directly.
 
 ## MCP server lifetime and per-process context
 
@@ -119,9 +119,9 @@ The screenshot above uses synthetic demo data to illustrate what stable plan row
 
 Two gaps are worth naming directly.
 
-Remote mode (Agent Inbox running against a shared database rather than a local SQLite file) is not shipped. The data model handles it; the networking and auth layers are not (issue #8). Waking and resuming a local agent session when a remote answer lands is a related open gap (issue #51).
+Remote mode (Agent Inbox running against a shared database rather than a local SQLite file) is not shipped. The data model handles it; the networking and auth layers are not (issue [#8](https://github.com/shariqh/agent-inbox/issues/8)). Waking and resuming a local agent session when a remote answer lands is a related open gap (issue [#51](https://github.com/shariqh/agent-inbox/issues/51)).
 
-The other rough edges from early use did get fixed, and that says something about the model itself. Board-row annotations used to be invisible to `pending()` — an agent could poll faithfully and still miss a human's note on a row. Issue #37 closed that by making `pending()` return `{items, rows}` together. A chat-recorded answer used to be uncorrectable once written; issues #34 and #69 closed that by adding a `clarify` reply kind, so the agent resolves the original item and raises a corrected replacement instead of editing history in place. Neither fix touched the precedence rule above — they extended it.
+The other rough edges from early use did get fixed, and that says something about the model itself. Board-row annotations used to be invisible to `pending()` — an agent could poll faithfully and still miss a human's note on a row. Issue [#37](https://github.com/shariqh/agent-inbox/issues/37) closed that by making `pending()` return `{items, rows}` together. A chat-recorded answer used to be uncorrectable once written; issues [#34](https://github.com/shariqh/agent-inbox/issues/34) and [#69](https://github.com/shariqh/agent-inbox/issues/69) closed that by adding a `clarify` reply kind, so the agent resolves the original item and raises a corrected replacement instead of editing history in place. Neither fix touched the precedence rule above — they extended it.
 
 ## The practical reframe
 
