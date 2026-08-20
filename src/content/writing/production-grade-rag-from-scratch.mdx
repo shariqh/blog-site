@@ -43,17 +43,9 @@ hero:
   style: line-art
 ---
 
-The thing that broke my mental model of RAG wasn't a hallucination. It was an abstention.
+Every "Sources" panel in a RAG product looks identical, whether the answer actually used those sources or not. That gap — between what got retrieved and what shaped the response — is the one that cost me a release cycle, right up until I stopped treating citation display as a formatting detail and started treating it as its own pipeline stage.
 
-A user asked which apps and destinations Askdocs supported. The system said it didn't have enough indexed evidence to answer. Two seconds later, a narrower question about Apple Notes specifically returned a full, grounded response. Same index, same user, seconds apart. The coverage existed; the retrieval wasn't surfacing it broadly enough.
-
-
-
-<Image src="/static/images/blog/production-grade-rag-from-scratch/img1.png" alt="Askdocs conversation showing a broad supported-apps question failing while a narrower Apple Notes question succeeds" />
-
-
-
-Fixing that required treating the whole thing as a product, with failure modes spanning retrieval, history, evidence gating, citation parsing, streaming, and evaluation. Here's how I'd build it from scratch, using Askdocs as the running case study.
+Retrieval quality alone doesn't get a RAG system to production. Tenant isolation, bounded history, evidence gating before generation, citation parsing after generation, and evaluation discipline all have to hold at the same time, or the gaps between them surface as user-facing trust failures. Here's how I'd build the whole system from scratch, using Askdocs as the running case study.
 
 
 
@@ -77,7 +69,7 @@ After ranking, two filters run before any candidates reach the prompt.
 
 **Deduplication by page, then by content.** A 512-token chunk and a 256-token chunk from the same page can both rank highly. Without dedup, the same paragraph appears twice in context, wasting tokens and diluting attention.
 
-**Per-page diversity cap.** After dedup, a single highly-relevant page shouldn't crowd out five others. Enforce a candidate limit per source page. This was critical for the broad query failure: "which apps and destinations does Askdocs support?" spans coverage distributed across many pages. Without diversity enforcement, the top candidates all came from the most-referenced single page and missed the breadth the question needed.
+**Per-page diversity cap.** After dedup, a single highly-relevant page shouldn't crowd out five others. Enforce a candidate limit per source page. This matters most on aggregation queries that span the whole corpus rather than one document — without a cap, the ranked list clusters on whichever page has the most chunks, and the answer only reflects that one source instead of the full breadth the question needed.
 
 ## Bounded history without trusting the assistant
 
@@ -106,21 +98,13 @@ If the evidence gates fail, the system returns `insufficient_evidence` without c
 
 ## Candidate citations vs. used citations
 
-This distinction cost me a release cycle.
-
 "Sources" in a RAG UI typically shows what was retrieved. The model's answer draws on a subset of that. A user reading five source links expects all five to support what was said. If the model cited only sources 1 and 3, sources 2, 4, and 5 are noise at best.
 
 Askdocs separates retrieval candidates (what went in) from used citations (what came out). After generation, a safe parser extracts inline citation markers, validates each against the candidate list, and resolves them to authoritative URLs. Any marker that doesn't resolve gets stripped server-side rather than served broken.
 
 The "Sources" section in the UI shows only resolved, used citations. What you see corresponds to what was actually cited.
 
-
-
-<Image src="/static/images/blog/production-grade-rag-from-scratch/img2.png" alt="Askdocs conversation with grounded Apple Notes answers, setup steps, linked citations, and a safe abstention" />
-
-
-
-One thing caught in independent review: a terminal citation marker appended to the last sentence of an otherwise complete answer. The source was already cited mid-paragraph; the trailing marker was redundant. A deduplication pass on inline citations before rendering fixed it. Small, but trust erodes around exactly this kind of thing.
+Marker dedup runs before resolution, not after. If the model cites the same source in two different sentences, the parser collapses that to one entry in the sources list instead of showing the same link twice. Small, but trust erodes around exactly this kind of inconsistency.
 
 ## Response states
 
@@ -150,26 +134,8 @@ The Askdocs release shipped with 325 tests passing: retrieval unit tests, pipeli
 
 Pre-release smoke: one bounded request against the hosted model, checking p50/p95 latency and cost per query. A sanity check that the endpoint is alive and within budget, nothing more.
 
-The broad Apple Notes false abstention was caught during calibration, not after release. Real failure transcripts, frozen into calibration cases, drive systematic improvement more reliably than any amount of synthetic query generation.
-
-## A build checklist
-
-Before calling a RAG system production-ready:
-
-- Tenant isolation at index time, not query time
-- SHA-pinned snapshots for reproducible evaluation
-- BM25 + vector hybrid with RRF ranking
-- Dedup by page, then by content; per-page diversity cap
-- History bounded to user turns only, with a hard recency limit
-- Alias expansion in ingestion, not at query time
-- Exact-phrase and relation evidence gates before generation
-- Candidate vs. used citation separation; safe inline citation parser
-- Unresolved citation markers stripped server-side
-- Three response states (grounded/corrected/insufficient) rendered distinctly in the UI
-- Non-destructive correction storage with audit trail
-- Frozen calibration set separate from holdout; metrics include abstention rate and calibration
-- Full test suite; bounded pre-release smoke check on latency and cost
+The per-page diversity cap fix, described above, was caught during calibration, not after release. Real failure transcripts, frozen into calibration cases, drive systematic improvement more reliably than any amount of synthetic query generation.
 
 The Askdocs source is at [github.com/shariqh/askdocs](https://github.com/shariqh/askdocs) if you want to dig into specifics.
 
-The best first step before writing any retrieval code is collecting real failure transcripts from something already running, yours or anyone else's. Every failure mode described here appeared first as a production transcript where something felt slightly off. Build your calibration set from those. Evaluate the retrieval-to-UX loop end to end, not just embedding similarity. That's the gap between a RAG prototype and something you can actually ship.
+None of these pieces is optional once you're serving real tenants. A hybrid retriever with no isolation boundary leaks data across accounts. Evidence gates with no citation parser produce answers a user can't verify. Citation parsing with no evaluation discipline drifts silently as the index changes underneath it. A production-grade RAG system is what happens when all of it holds at once — not a better embedding model, but a product built with the same rigor as the rest of your system.
