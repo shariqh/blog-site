@@ -42,7 +42,9 @@ hero:
   style: line-art
 ---
 
-The screenshot sat in a folder I'd labeled "embarrassing." A user asked Oris's documentation assistant which apps and export destinations were supported. The assistant responded with *Not enough indexed evidence.* Seconds earlier, on the same session, a narrower question about Apple Notes permissions had answered correctly, with numbered citations and real source references.
+A confidently wrong answer and a confident non-answer cost a product the same thing: the user's trust. Most evaluation effort goes into catching the first failure. The second is easy to miss entirely, because it looks like caution instead of a bug.
+
+That screenshot sat in a folder I'd labeled "embarrassing" for weeks before I looked at it straight. A user had asked Oris's documentation assistant which apps and export destinations were supported, and the assistant answered *Not enough indexed evidence.* Seconds earlier, on the same session, a narrower question about Apple Notes permissions had answered correctly, with numbered citations and real source references.
 
 The corpus contained the answer to the broad question. The system just hadn't found it.
 
@@ -70,11 +72,11 @@ Both failures were invisible. False abstentions look like responsible hedging. D
 
 ## What I resisted doing
 
-The reflex when a model-adjacent system fails is to swap in a bigger model. I've done that before. It's rarely the right first move.
+The reflex when a model-adjacent system fails is to swap in a bigger model. It's rarely the right first move.
 
-I kept the failure transcript instead. Then I split the problem into three separate workstreams — retrieval scope, citation truthfulness, and correction-aware UX. Fixing all three at once in a single branch would have made it impossible to attribute any improvement to any specific change.
+I kept the failure transcript instead, then split the problem into three separate workstreams — retrieval scope, citation truthfulness, and correction-aware UX. Fixing all three at once in a single branch would have made it impossible to attribute any improvement to any specific change.
 
-## The fix
+## Fixing retrieval, citations, and UX separately
 
 The retrieval side needed a hybrid approach, combining dense-vector similarity for narrow factual lookups with sparse (BM25-style) term matching for broad aggregation queries. A re-ranker merges the candidates before they reach the evidence gate. The gate threshold stayed the same; the inputs to it changed.
 
@@ -106,15 +108,9 @@ Apple Notes permissions: grounded answer, numbered citations, sources provably u
 
 False abstentions don't feel safe from the outside. "Not enough evidence" sounds like responsible hedging, but if the user asked a reasonable question and the corpus had the answer, they got a wrong response, one that looked exactly like a right one. The trust cost is roughly equivalent to a hallucination. The user doesn't know which kind of failure they got; they just know the system didn't help.
 
-I'd been treating abstention as the conservative outcome. After this, it's a potential failure mode that needs its own evaluation coverage.
+I'd been treating abstention as the conservative outcome. After this, it's a potential failure mode that needs its own evaluation coverage, the same way a hallucination would.
 
-A few other things I'll carry forward.
-
-Sources in an AI response should mean the system actually drew from them when composing a specific claim. Citing a document that was retrieved but not used is a kind of soft hallucination — the citations look real, but they're not evidence of the thing they appear next to.
-
-Testing conversations rather than prompts catches a different failure class. A conversation has memory, correction dynamics, prior-answer supersession. If your eval suite doesn't include multi-turn cases, you're testing a simpler system than you've built.
-
-Deploy the exact SHA you validated. It sounds obvious. It's easier to skip than it sounds.
+The direct takeaway: a citation, an abstention, or any other signal of confidence is only trustworthy if the system can prove it, not just display it. That's the whole difference between building trustworthy AI products and building ones that only look that way.
 
 ## Save the embarrassing screenshots
 
