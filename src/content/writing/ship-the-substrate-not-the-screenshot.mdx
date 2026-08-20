@@ -44,9 +44,9 @@ hero:
   style: conceptual
 ---
 
-Platform work has a gravitational pull toward the visible. Ship a beautiful UI, get credit, unblock the next team. The problem is that a screenshot is a snapshot — it encodes assumptions that break the moment the downstream team needs to do something you didn't anticipate.
+Platform engineering work has a gravitational pull toward the visible. Ship a beautiful UI, get credit, unblock the next team. The problem is that a screenshot is a snapshot — it encodes assumptions that break the moment the downstream team needs to do something you didn't anticipate.
 
-The work that actually reduces coordination over time is different. It ships a behavioral substrate: a surface with predictable state, stable identity, and clear seams that let another team own the final experience without calling you every other day.
+The work that actually reduces coordination over time is different. It ships a reusable behavioral substrate: a surface with predictable state, stable identity, and clear seams that let another team own the final experience without calling you every other day.
 
 The Oris command bar hosting the Askdocs chat experience makes this concrete.
 
@@ -54,13 +54,13 @@ The Oris command bar hosting the Askdocs chat experience makes this concrete.
 
 Askdocs is a search-and-chat product that lives at the center of a page. Oris is a command bar that overlays any surface, dim-blurs the host page, and brings a specific brand vocabulary: amber borders, clay bubbles, a waveform, a distinct typographic register. When we decided that Oris should host the Askdocs chat panel, the obvious path was to have Oris restyle Askdocs's component. Theme token it. Override the colors. Ship.
 
-We didn't do that, and the reason comes down to one question — who should own what when Askdocs changes something about how its chat panel works?
+We didn't do that, and the reason comes down to one question: who should own what when Askdocs changes something about how its chat panel works? That's the leadership call underneath the technical one: draw the line in the wrong place and you either strand Oris waiting on Askdocs's roadmap for every color tweak, or hand Askdocs's behavioral surface to a team that has no reason to understand focus management or streaming state.
 
-## Drawing the seam
+## Drawing the platform seam
 
 Askdocs owns the behavioral layer. That includes which messages are in memory, how streaming arrives, how the panel responds to Escape, when focus returns to the composer, how follow-up questions attach to the conversation rather than replacing it. It also owns accessibility attributes, stable DOM identity on every interactive element, and the CSS custom properties and part selectors it exposes. It owns the `open`, `closing`, and `activity` state attributes that describe what the panel is doing at any moment.
 
-Oris owns everything visual. Typography, color, spacing, motion, the waveform, imagery, and how brand choreography unfolds when the panel opens. It reads the state attributes Askdocs exposes and uses them to drive its own animations. It applies typographic and color treatment through part-selector hooks without touching Askdocs's internal structure.
+Oris owns everything visual. Typography, color, spacing, motion, the waveform, imagery, and how brand choreography unfolds when the panel opens. It reads the state attributes Askdocs exposes and uses them to drive its own animations. It applies typographic and color treatment through [`::part` selector](https://developer.mozilla.org/en-US/docs/Web/CSS/::part) hooks without touching Askdocs's internal structure.
 
 
 
@@ -68,7 +68,7 @@ The practical result: when Askdocs shipped changes to how follow-up conversation
 
 ## What "stable" actually means
 
-Stable DOM identity is worth being specific about. Every interactive element in the Askdocs panel has a `part` attribute versioned in their interface contract: `part="composer"`, `part="message-list"`, `part="source-item"`. These names don't change unless Askdocs bumps the interface version and gives Oris migration time. They're not internal class names that get refactored — they're published API.
+Stable DOM identity is worth being specific about. Every interactive element in the Askdocs panel has a `part` attribute versioned in their interface contract: `part="composer"`, `part="message-list"`, `part="source-item"`. These names don't change unless Askdocs bumps the interface version and gives Oris migration time. They're not internal class names that get refactored; they're published API.
 
 The state attributes follow the same discipline. When the panel is mid-close (the exit animation hasn't finished), it carries `closing` on the host element. When streaming is active, it carries `activity="streaming"`. Oris reads these with CSS attribute selectors and JavaScript observers. The waveform pulses during streaming. The amber border dims during closing. None of this required Askdocs to know anything about waveforms or amber.
 
@@ -92,28 +92,6 @@ This is not a story about coordination disappearing. The interface agreement its
 
 What disappeared was ongoing coordination. After the seam was agreed, Askdocs could ship streaming improvements, citation UI changes, and accessibility fixes without scheduling a review with Oris. Oris could update its motion system and rebrand the waveform without touching Askdocs. The coordination cost moved from weekly to "when the contract changes."
 
-That's the shift. Not eliminating communication, but making it proportional to actual interface changes.
+That's the shift. Not eliminating communication, but making it proportional to actual interface changes: the `part` names, the state values, the append behavior, and nothing else.
 
-## A checklist for deciding what the platform should own
-
-Before splitting a surface between two teams, I run through these questions:
-
-**Platform (behavioral layer) owns it if:**
-- The answer requires knowledge of user state, accessibility, or focus management
-- Getting it wrong silently corrupts persistence or conversation continuity
-- It needs to be testable in isolation, without any visual context
-- Two different host surfaces will need the same behavior
-
-**Downstream team owns it if:**
-- The decision is purely visual (color, spacing, motion timing, imagery)
-- The host brand has explicit requirements that should vary across surfaces
-- You'd have to hard-code a value to satisfy it from the platform side
-
-**It belongs in the interface contract if:**
-- Both teams need to know about it for either side to work
-- It's a name, identifier, or state value that must not change silently
-- A change here requires coordination and possibly migration
-
-The last category is the one that gets skipped. Teams agree on behavior informally, nothing is written down, and a month later the downstream team is filing bugs against an "undocumented change." Write the contract. Version it. Make the seam reviewable.
-
-That's the work. Not shipping a pixel-perfect handoff, but shipping a surface another team can own without you.
+That's why the follow-up append change never touched Oris. Nobody had to hand over a pixel-perfect screenshot to make that true. They had to hand over a seam, and a seam, unlike a screenshot, keeps holding after the design changes underneath it.
