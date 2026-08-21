@@ -4,6 +4,11 @@ import { join } from 'node:path'
 import matter from 'gray-matter'
 import { active, built } from '../src/lib/projects'
 import { buildArticlePath } from '../src/lib/popular-articles'
+import {
+  handleReadCountRequest,
+  READ_COUNT_CACHE_STATUS_HEADER,
+  type ReadCountCache,
+} from '../src/lib/read-count-proxy'
 import { buildReadCountUrl } from '../src/lib/read-count'
 import { SITE } from '../src/lib/site'
 
@@ -41,6 +46,47 @@ interface HomeArticleFixture {
   slug: string
   title: string
   publishedAt: number
+}
+
+class SmokeReadCountCache implements ReadCountCache {
+  private readonly entries = new Map<string, Response>()
+
+  async match(request: Request): Promise<Response | undefined> {
+    return this.entries.get(request.url)?.clone()
+  }
+
+  async put(request: Request, response: Response): Promise<void> {
+    this.entries.set(request.url, response.clone())
+  }
+
+  async delete(request: Request): Promise<boolean> {
+    return this.entries.delete(request.url)
+  }
+}
+
+async function warmReadCountCache(
+  cache: ReadCountCache,
+  articlePath: string,
+  count: string,
+  fetchedAt: number,
+): Promise<void> {
+  const fetchCount: typeof fetch = async () =>
+    new Response(JSON.stringify({ count }), {
+      headers: { 'content-type': 'application/json' },
+    })
+  const response = await handleReadCountRequest(
+    new Request(
+      new URL(buildReadCountUrl(articlePath), 'http://localhost:4321'),
+    ),
+    {
+      cache,
+      fetch: fetchCount,
+      now: () => fetchedAt,
+    },
+  )
+  if (!response.ok) {
+    throw new Error(`Unable to warm read count cache for ${articlePath}`)
+  }
 }
 
 function readHomeArticles(dir: string, prefix = ''): HomeArticleFixture[] {
@@ -205,6 +251,71 @@ test('homepage ranks popular articles without duplication or overflow', async ({
   )
   expect(directGoatCounterRequests).toEqual([])
   expect(errors).toEqual([])
+})
+
+test('cached counts keep articles and popularity visible during an upstream outage', async ({
+  page,
+}) => {
+  const cache = new SmokeReadCountCache()
+  const now = Date.parse('2026-08-20T19:00:00.000Z')
+  const fetchedAt = now - 5 * 60 * 60 * 1_000
+  const candidates = HOME_ARTICLES.filter(
+    (article) => article.slug !== HOME_FEATURED.slug,
+  )
+  for (const article of candidates) {
+    const count =
+      POPULAR_FIXTURES.find((fixture) => fixture.article.slug === article.slug)
+        ?.count ?? '0'
+    await warmReadCountCache(
+      cache,
+      buildArticlePath(article.slug),
+      count,
+      fetchedAt,
+    )
+  }
+
+  const cacheStates: (string | null)[] = []
+  const upstreamRequests: string[] = []
+  const unavailableFetch: typeof fetch = async (input) => {
+    upstreamRequests.push(String(input))
+    return new Response(null, { status: 503 })
+  }
+  await page.unroute(READ_COUNT_ROUTE)
+  await page.route(READ_COUNT_ROUTE, async (route) => {
+    const response = await handleReadCountRequest(
+      new Request(route.request().url()),
+      {
+        cache,
+        fetch: unavailableFetch,
+        now: () => now,
+      },
+    )
+    cacheStates.push(response.headers.get(READ_COUNT_CACHE_STATUS_HEADER))
+    await route.fulfill({
+      body: await response.text(),
+      headers: Object.fromEntries(response.headers),
+      status: response.status,
+    })
+  })
+
+  await page.goto('/')
+  const popular = page.locator('[data-popular-articles]')
+  await expect(popular).toHaveAttribute('data-popular-articles-state', 'loaded')
+  await expect(popular.locator('[data-popular-count]')).toHaveText(
+    POPULAR_FIXTURES.map(({ label }) => label),
+  )
+
+  const cachedArticlePath = buildArticlePath(HOME_FEATURED.slug)
+  await warmReadCountCache(cache, cachedArticlePath, '1,234', fetchedAt)
+  await page.goto(cachedArticlePath)
+  const readCount = page.locator('[data-read-count]')
+  await expect(readCount).toHaveAttribute('data-path', cachedArticlePath)
+  await expect(readCount).toHaveAttribute('data-read-count-state', 'loaded')
+  await expect(readCount).toContainText('1,234 views')
+
+  expect(cacheStates).toHaveLength(candidates.length + 1)
+  expect(cacheStates.every((state) => state === 'stale')).toBe(true)
+  expect(upstreamRequests).toHaveLength(candidates.length + 1)
 })
 
 test('homepage hides incomplete and unexpected popularity failures cleanly', async ({

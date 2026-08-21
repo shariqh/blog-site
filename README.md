@@ -120,13 +120,49 @@ Article metadata reads public pageview totals through the same-origin
 Tracking Protection and other content blockers can block direct browser
 requests to GoatCounter. It validates canonical `/blog/.../` paths and forwards
 only to the fixed public GoatCounter JSON endpoint; there is no admin API,
-token, cookie, user data storage, or additional tracking.
+token, cookie, user data storage, or additional tracking. Internal cache keys
+accept only the production, Cloudflare Pages preview, and local-development
+origins.
 
 In GoatCounter, keep **Settings → Allow adding visitor counts on your website**
-enabled. When it is disabled or the upstream is unavailable, the count stays
-hidden. Successful proxy responses use `max-age=300` for browsers and
-`s-maxage=14400` (four hours) for shared caches, matching GoatCounter's
-up-to-four-hour response cache.
+enabled. The function stores only validated `{count:string}` responses in
+Cloudflare's per-edge Cache API under an internal same-origin key. Counts are
+fresh for four hours and retained for up to seven days. After four hours the
+function refreshes synchronously; an upstream timeout, network failure, HTTP
+429, or HTTP 5xx serves the retained value with `x-read-count-cache: stale`.
+Those stale responses use at most `max-age=60` and `s-maxage=300`, capped by the
+entry's remaining retention time, so public caches retry soon instead of
+pinning the fallback.
+
+Concurrent refreshes for the same article share one upstream request within a
+Pages Function isolate. A disconnected caller releases its interest without
+cancelling active peers; the shared fetch aborts when no consumers remain.
+The deploy workflow keeps Cloudflare's `enable_request_signal` compatibility
+flag enabled for preview and production so incoming disconnects reach that
+coordinator. It serializes Pages project updates and changes only the target
+environment's flags, so preview deploys do not mutate production configuration.
+GoatCounter pageview totals are treated as cumulative: immediately before
+writing, the function re-reads the count cache and preserves an observed higher
+count or equal count with newer fetch metadata. Availability failures write a
+separate 30-second internal backoff marker, never failure data in the count
+entry. While that marker is active, requests skip GoatCounter and serve retained
+stale data or remain unavailable when no valid count exists.
+
+Fresh responses use at most `max-age=300` for browsers and `s-maxage=14400` for
+shared caches, capped by the remaining four-hour freshness window. Invalid
+paths, upstream 404s, malformed responses, and entries older than seven days
+still fail closed. A cold or evicted edge cache also fails closed while
+GoatCounter is unavailable, so the count remains hidden until that edge has
+observed a valid upstream response.
+
+Cloudflare's Cache API remains per-edge and has no conditional write. Coalescing
+is isolate-local, backoff is edge-local, and a cross-isolate write can still
+race between the final re-read and `cache.put`. The cumulative-count guard
+prevents overwriting a higher value already observed by that re-read, but true
+global serialization would require Durable Objects or another coordinated
+store. Cache API operations also do not accept an `AbortSignal`; request
+cancellation stops the shared upstream fetch but cannot cancel an already-issued
+edge cache operation.
 
 ## Authoring posts
 

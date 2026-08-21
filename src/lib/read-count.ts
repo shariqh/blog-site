@@ -136,7 +136,7 @@ function classifyRequestFailure(
 
 class InvalidReadCountResponseError extends Error {}
 
-async function readLimitedJson(response: Response): Promise<unknown> {
+export async function readLimitedJson(response: Response): Promise<unknown> {
   const contentLength = response.headers.get('content-length')
   if (contentLength !== null) {
     const declaredBytes = Number(contentLength)
@@ -257,7 +257,7 @@ async function fetchReadCountFromUrl(
         error,
         timedOut,
         options.signal,
-        false,
+        true,
       )
       if (failure) return failure
       throw error
