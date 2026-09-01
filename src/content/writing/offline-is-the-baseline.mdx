@@ -1,0 +1,67 @@
+---
+title: Offline-First Is the Baseline
+date: '2026-09-01'
+tags:
+  - ai
+  - offline-first
+  - product-engineering
+  - on-device
+  - oris
+summary: Building an offline-first AI meeting recorder forced me to invert the
+  cloud default, changing reliability, privacy claims, pricing, and the stack.
+draft: false
+hero:
+  image: /static/images/blog/offline-is-the-baseline/cover.png
+  alt: Cover illustration for "Offline-First Is the Baseline".
+  prompt: |-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight line-art (thin, confident strokes), minimal and geometric — a vintage mid-century editorial spot illustration. Flat color fills, subtle paper grain, no gradients, no 3D, no glossy realism.
+
+    Visual concept only: A laptop open on a dark airplane tray table, screen casting a steady glow, stylized sound waveforms curling inward toward the machine rather than outward; oval window beside it reveals cloud layers below, cabin otherwise dark; no text, no UI, no numbers. Do not depict or quote any phrase from the article title or summary.
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do NOT render any readable words, letters, numbers, captions, labels, interface text, signs, headlines, sentences, or paragraphs. Use only abstract shapes, symbolic objects, and nonverbal diagrams because a title will be overlaid afterward. No photorealistic human faces. Wide 3:2 landscape composition with deliberate empty negative space in the LEFT third so a title can be overlaid later.
+  style: line-art
+---
+
+While building Oris, I know the one principle I want to follow is "offline is the baseline". It came to furition in [the Oris 0.8 release notes](https://orisnotes.com/blog/apple-notes-destination). It's not a simple claim I'm practicing having it as an actual design constraint that shapes almost every engineering decision in [Oris](https://orisnotes.com).
+
+The default architecture for an AI product is too often a thin client with a fat cloud. Your frontend captures input, sends it over the wire, and the cloud does the work. What does that cloud do once you get your output back no one can say other than those large models and hosting companies. For most products, when the network goes down the failure mode is a temporarily broken feature — annoying, but recoverable.  To me at least, that is not acceptable. With Oris, the model lives in one place on your machine, you update it and you know exactly what hardware it runs on. 
+
+With meethings that are happening right now, just once, with people who blocked out an hour of their calendar if transcription depends on a connection you don't control (your uptime, hotel Wi-Fi, a captive portal), the failure isn't a temporarily broken feature. It's losing something that cannot be re-created. The recording might exist, but if transcription and summarization are cloud-dependent, you've handed the reliability of the whole system to the weakest link in a chain you have no control over.
+
+
+
+## Putting computation on the device
+
+So [Oris inverts it](https://orisnotes.com/blog/on-device-by-default). Audio capture runs locally. Transcription runs through WhisperKit on the Apple Neural Engine. Summarization defaults to a [local Llama model](/blog/local-llms-bespoke-apps) that auto-scales with the transcript (bigger model for a longer call). In the core meeting flow, the network does two things. On first setup, it downloads models into a local cache; beyond that, there's an optional cloud summarize path for people who want a larger model on their own API key.
+
+Offline-first doesn't mean cloud-never. It means the core loop works without a connection, and anything that does touch a network is optional, bring-your-own-key, and explicitly labeled. When a user connects their own OpenAI key to get GPT summaries, they've made a deliberate tradeoff. The default path touches nothing outside the machine.
+
+
+
+## What does this buy users
+
+Three things, roughly ascending order of importance.
+
+The obvious one is reliability. I've used Oris in a café with a captive portal that dropped every few minutes, in a dodgy airport with Wi-Fi off, and during a call where my home internet hiccupped mid-meeting. Same experience either way, because the work doesn't depend on the network.
+
+The second is privacy. A lot of software promises "your data stays private" and means "we try not to look at it," which is a claim that is not often defended by architectural backing. When audio capture, transcription, and summarization all run on the device, "your audio stays on your Mac" is not a promise that requires organizational enforcement to keep.
+
+The third is pricing. Per-use cloud AI costs money on every note. When the base loop has no per-use cost underneath it, when the compute is the user's own Apple Neural Engine, you can charge a flat price or offer a robust free tier without bleeding on every transcription. The economics of the product stop being hostage to GPU time.
+
+## What it costs
+
+Offline-first is more generally more engineering which is why thin clients are the default.
+
+Shipping multi-gigabyte models means owning the download experience (progress, resume, and failures). That UX didn't exist in the first version; I added it after watching people think the app had frozen.
+
+Local model choice is capped by unified memory, not user preference. Summarization auto-scales down to whatever local model fits the Mac's available RAM, so a machine with less memory gets a smaller model automatically. Transcription works differently as the Whisper variant is user-selected in settings, a speed-versus-accuracy tradeoff you make yourself. This isn't hard to implement, but it's a layer of decision-making that cloud deployments don't need — the server has whatever you provision.
+
+[Moving to native Swift](https://orisnotes.com/blog/going-native-cleaner-transcripts-more-macs) was a direct consequence of wanting better performance on every transcription. The offline-first constraint pushed the architecture from a Python backend all the way toward a native stack because latency and resource usage matter when you're running on a MacBook that's also running the meeting you're recording.
+
+Offline-first is a constraint you choose, and choosing it means signing up for problems that a cloud-dependent architecture simply doesn't have.
+
+## The baseline, for Oris
+
+You go into a meeting, you come out with a transcript and a summary. That has to work in any siuation. Everything beyond that (sync to your note-taking app, a richer cloud model if you bring your own key) layers on top and stays optional. If you've pointed summaries at a cloud provider and it's unreachable, the transcript still lands; only that one step is missing.
+
+A meeting is unrepeatable so the transcript and summary can't be hostage to a network. Offline-first cost more to build than a thin client would have, but it's the only architecture where losing the connection doesn't mean losing the meeting.
