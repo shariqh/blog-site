@@ -1,5 +1,5 @@
 ---
-title: 'Hooks, not vibes: deterministic guard-rails for an AI coding agent'
+title: 'Hooks, not vibes: deterministic guard-rails for Claude Code'
 date: '2026-06-29'
 draft: false
 tags:
@@ -11,20 +11,20 @@ tags:
 summary: >-
   The rules you give a coding agent live as prose in a config file and rely on
   it remembering them every turn. That breaks when the context summarizes. I
-  moved seven of lognote's rules into Claude Code hooks, and learned where
-  determinism actually stops.
+  moved seven of lognote's rules into Claude Code's PreToolUse and PostToolUse
+  hooks, and learned where determinism stops.
 hero:
   image: /static/images/blog/hooks-not-vibes-deterministic-guard-rails/cover.png
   alt: >-
-    Cover illustration for "Hooks, not vibes: deterministic guard-rails for an
-    AI coding agent".
+    Cover illustration for "Hooks, not vibes: deterministic guard-rails for
+    Claude Code".
   prompt: >-
     Style: rich conceptual editorial illustration, like a Wired or New Yorker
     feature spread, with one clear central metaphor. Painterly flat shading,
     depth, texture, sophisticated. Constrained to the palette.
 
 
-    Concept: Hooks, not vibes: deterministic guard-rails for an AI coding agent.
+    Concept: Hooks, not vibes: deterministic guard-rails for Claude Code.
     The rules you give a coding agent live as prose in a config file and rely on
     it remembering them every turn. That breaks when the context summarizes. I
     moved seven of lognote's rules into Claude Code hooks, and learned where
@@ -53,9 +53,9 @@ Every coding agent I run has a list of rules.
 
 Most of the time, those rules live as prose in a `CLAUDE.md` or a memory file or have to be prompted each iteration and that is a problem. Text in a config file is a suggestion the agent has to remember on every single turn. It might work in the beginning but when the context gets too long the runtime summarizes it to save tokens and your rule quietly evaporates along with the rest of the detail as the agent just stops doing the thing because the sentence that told it to is no longer in its "head". You find out later.
 
-So I stopped trusting memory and moved the rules into hooks.
+So I stopped trusting memory and moved the rules into Claude Code hooks.
 
-## What a hook can and cannot do
+## What a Claude Code hook can and cannot do
 
 A hook is a script the runtime fires on a lifecycle event, not a request the model chooses to honor. In Claude Code, a `PreToolUse` hook runs before a tool call and can hard-block it. A `PostToolUse` hook runs after and can inject text back into the conversation. The trigger is deterministic because it is wired to the runtime, not to the agent's attention.
 
@@ -63,9 +63,9 @@ But, a hook makes the *trigger* deterministic. It does not make the *work* deter
 
 A `PreToolUse` hook can deny a `git commit` on `main` before it ever runs - a real gate that is deterministic in, deterministic out. But anything generative, like spawning a reviewer or writing the fix, can only be done by the agent itself. The best a hook can do there is fire a reliable, summary-proof nudge that says "now do X." Whether the agent then does X well is back in non-deterministic territory.
 
-## The seven hooks
+## The seven Claude Code hooks
 
-I built seven hooks for [Oris](https://orisnotes.com/?utm_source=shariq.dev&utm_medium=blog&utm_campaign=hooks), back when it was still called lognote.
+I built seven hooks for [Oris](https://orisnotes.com/?utm_source=shariq.dev&utm_medium=blog&utm_campaign=hooks), back when it was still [called lognote](/blog/the-night-i-shipped-lognote).
 
 Four are committed and repo-wide as invariants every agent clone should enforce:
 
@@ -82,7 +82,7 @@ Repo invariants ship to everyone who clones; my personal ways of working stay on
 
 When my new hook-based auto-dispatch reviewer fired for the first time it was reviewing the guard hooks I had just finished writing. An independent model read them and reported that they were trivially bypassable. The tooling I built to catch bugs immediately caught the bugs in itself.
 
-That loop, an independent model attacking my work the instant it exists, is an awesome payoff. The hook did not fix anything itself but it guaranteed the review happened on every PR no matter what state the context was in.
+That loop, an independent model attacking my work the instant it exists, is an awesome payoff. The hook did not fix anything itself but it guaranteed the review happened on every PR no matter what state the context was in. I later measured how that review discipline held up across the whole repo, not just this one PR, in [a breakdown of every agent-labeled pull request Oris merged](/blog/ai-became-my-operating-model).
 
 ## Determinism has a floor
 

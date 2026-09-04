@@ -43,7 +43,7 @@ hero:
 
 In the last 30 days on the Oris repo, 86% of merged pull requests carried an agent label, and those PRs accounted for 98% of all changed lines. Those numbers look significant. What they don't capture is that changed lines measure activity, not value or quality. PR count is throughput, not outcomes. Neither number answers whether the software is better, whether the architecture decisions were sound, or whether I shipped the right things.
 
-What matters more is how the unit of delegation changed, and whether the control system kept pace.
+Running an AI-assisted software development workflow at that volume raises a different question: not how much got automated, but whether the control system kept pace with the unit of delegation.
 
 
 
@@ -93,7 +93,7 @@ In the latest 14 days there were 75 agent-labeled PRs. All 75 had an automated G
 
 
 
-These review gates don't replace judgment. They filter signal from noise and surface things that warrant attention before I decide what to look at closely. When the volume is 75 agent PRs in two weeks, I need that layer to be reliable and consistent.
+These review gates don't replace judgment. They filter signal from noise and surface things that warrant attention before I decide what to look at closely. When the volume is 75 agent PRs in two weeks, I need that layer to be reliable and consistent. Some of that reliability comes from wiring the gates as [deterministic Claude Code hooks](/blog/hooks-not-vibes-deterministic-guard-rails) instead of instructions I hope the agent remembers.
 
 Increasing reliance on agents without building out the review infrastructure is how drift happens. The two have to scale together.
 
@@ -121,6 +121,6 @@ If you're thinking about how to track this in your own repo, four things are wor
 
 **Review coverage.** What fraction of agent-produced work gets automated review against the final head? That number should be close to 100. If it's not, you're operating at scale without enough signal.
 
-**Decision ownership.** Who's writing the spec? Who decides what merges? Track those explicitly rather than leaving them as implicit assumptions.
+**Decision ownership.** Who's writing the spec? Who decides what merges? Track those explicitly rather than leaving them as implicit assumptions. When terminal scroll made that tracking impossible to keep straight across repos, I built [a dedicated inbox for exactly that](/blog/terminal-scroll-is-not-a-workflow).
 
 The thing I keep returning to is that reliance changes where control has to be designed, not whether you need it. Hand off execution without redesigning the specification and review layers, and you haven't built a better system. You've moved the failure modes somewhere less visible.
