@@ -82,7 +82,7 @@ Repo invariants ship to everyone who clones; my personal ways of working stay on
 
 When my new hook-based auto-dispatch reviewer fired for the first time it was reviewing the guard hooks I had just finished writing. An independent model read them and reported that they were trivially bypassable. The tooling I built to catch bugs immediately caught the bugs in itself.
 
-That loop, an independent model attacking my work the instant it exists, is an awesome payoff. The hook did not fix anything itself but it guaranteed the review happened on every PR no matter what state the context was in. I later measured how that review discipline held up across the whole repo, not just this one PR, in [a breakdown of every agent-labeled pull request Oris merged](/blog/ai-became-my-operating-model).
+That loop, an independent model attacking my work the instant it exists, is an awesome payoff. The hook did not fix anything itself but it guaranteed the review happened on every PR no matter what state the context was in. I later measured that same review-gate coverage across 75 agent-labeled PRs in a two-week window, not just this one PR, in [a breakdown of Oris's review-gate numbers](/blog/ai-became-my-operating-model).
 
 ## Determinism has a floor
 
