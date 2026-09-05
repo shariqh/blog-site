@@ -1,0 +1,132 @@
+---
+title: 'AI Agent Handoff: A State Machine, Not a Message Thread'
+date: '2026-08-07'
+tags:
+  - ai
+  - agent-systems
+  - sqlite
+  - state-machines
+  - human-in-the-loop
+summary: >-
+  Building Agent Inbox showed me that an AI agent handoff is a state machine:
+  explicit state ownership, version tokens, and acknowledgement semantics.
+draft: false
+hero:
+  image: /static/images/blog/agent-handoffs-are-a-state-machine/cover.png
+  alt: >-
+    Cover illustration for "AI Agent Handoff: A State Machine, Not a Message
+    Thread".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: Create a wide 3:2 conceptual editorial cover for an
+    engineering feature about agent handoffs as a state machine. Show an
+    abstract baton or sealed decision packet moving through a sequence of sturdy
+    gates, receipts, and versioned checkpoints between machine-like agents and a
+    human hand, with one clear path and no loose chat bubbles. The visual
+    metaphor is ownership, acknowledgement, and atomic transitions. Do not
+    depict or quote any phrase from the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
+---
+
+The first version of [Agent Inbox](https://github.com/shariqh/agent-inbox) took an afternoon to sketch. A table in SQLite, a column for the question, a column for the answer, a status flag. When the agent needed a human decision, it wrote a row. When the human responded, the agent read it. Clean, obvious, done.
+
+Then I tried running two CLI processes at the same time.
+
+What followed is a familiar story for anyone who has built a queue or a scheduler. The simple version is correct for the happy path and wrong in every way that matters once the environment gets real. The gap between "store a question" and "reliably hand off between an agent and a human across multiple OS processes, long-lived MCP servers, sibling subagents, and two competing answer channels" is not a storage problem. It is a state ownership problem.
+
+The invariant that fell out of building Agent Inbox is that a human-in-the-loop handoff is a state machine, not a message thread. Every row has an owner at every moment. Transitions happen through defined operations that carry version tokens. Acknowledgement is tracked separately from delivery. That framing is what makes the system debuggable when something goes wrong — and something always goes wrong.
+
+## The handoff state machine
+
+A board row in Agent Inbox carries one of six statuses. `tracked`, `partial`, `missing`, `na`, and `done` describe ordinary progress; `blocked` is the one status that escalates into the human's attention layer, and it means the row needs a human and nobody else.
+
+The key distinction is that human completion is not the same event as the agent-owned status change. `handled_at` timestamps when the human marked their task complete. `status` stays `blocked` until the agent reads that response and writes a non-empty `outcome`. A row can sit with `handled_at` set and `status` still `blocked` if the agent process died before picking it up. This is intentional. It makes the unacknowledged state queryable: `WHERE handled_at IS NOT NULL AND outcome = ''` gives you every response that landed but was never acted on.
+
+`annotation_seen_at` and `handled_seen_at` are delivery receipts, not completion signals. They record that some agent instance observed the human response. They do not close the row. Pickup is effectively at-least-once. If the process that set `annotation_seen_at` crashes before recording an outcome, another process can pick up the same row. The human sees the row is still open, the system stays consistent, and no response is silently swallowed.
+
+## Two answer channels, one precedence rule
+
+Issue [#29](https://github.com/shariqh/agent-inbox/issues/29) made clear why a single answer channel is not enough. An agent might ask a question inside a chat thread and hear the answer there. Agent Inbox also exposes a card where the human can answer directly. Both paths write the same `reply` fields on the item; `reply_source` records whether the current value came from the inbox or was recorded by an agent from chat.
+
+The precedence rule is asymmetric on purpose. An inbox write is unconditional: it replaces the current reply, sets `reply_source='inbox'`, and resets `reply_seen_at` so an agent has to pick up the new answer. A chat-recorded answer uses one conditioned `UPDATE`. It can write only when no reply exists or when the current reply has already been picked up:
+
+```sql
+WHERE id = ?
+  AND kind = 'question'
+  AND status = 'open'
+  AND (reply IS NULL OR reply = '' OR reply_seen_at IS NOT NULL)
+```
+
+If an unread inbox answer is waiting, the chat update affects zero rows and returns `unread_inbox_answer` with the answer that won. A fresh inbox answer can always supersede a chat-recorded one. Once an agent has picked up an inbox answer, a newer answer given in chat may replace it. This is not timestamp-based last-write-wins, and it is not simple first-writer-wins. It is inbox precedence until acknowledgement.
+
+The `reply = ''` branch is defensive compatibility for an old empty representation, not an unread inbox answer. The current viewer trims an empty response to `NULL`, clears its source, and only permits that clear before pickup. A real inbox answer is therefore non-empty with `reply_seen_at IS NULL`, which the chat update cannot overwrite.
+
+The single conditioned statement matters because the viewer writes from a separate OS process. A SELECT followed by an UPDATE would leave a window where the human could answer between the two statements and have that answer clobbered. The condition and write have to be one atomic operation.
+
+## One ask, one surface
+
+What happens if the agent creates a second question item for the same dependency? Two board cards disagree. The human does not know which is canonical. The agent may read the wrong answer.
+
+Agent Inbox enforces one invariant here, spelled out directly in the tool contracts: one ask, one surface. If a board row owns a dependency, that blocked row is the question — never a duplicate question item. The board's stable labels are the human-facing identity; the row's `revision` field is the machine-facing version. When the agent needs to update what it is asking (because context changed, not because the answer arrived), it updates the existing row and increments the revision. It does not create a second row.
+
+## board_advance as a CAS token
+
+The operation that moves a tracking board forward is `board_advance`. It takes two version tokens: `expected_revision` (the current revision of the row being resolved) and `board_version` (the current generation of the board). If either has advanced since the caller last read, the operation fails and the caller must re-read before retrying.
+
+
+
+This is compare-and-swap at the application layer. It covers a class of bugs where two agents both think they are advancing the same board step and one installs stale state. `board_advance` atomically archives the old human step and installs the next one in a single transaction. There is no window where the board is half-advanced.
+
+The test suite (real temporary SQLite databases, not mocks) tests these two mechanisms differently. Board-row revision protection is proven sequentially: a client calls `board_advance`, `board_row`, or `board_upsert` with a stale `expected_revision` or `board_version`, and the transaction's explicit revision check rejects the call — no second connection required to prove it holds. The forced two-connection race, with two live SQLite connections and timing pinned so one write lands inside another's read-then-write window, is reserved for item reply/pickup, where a viewer process and an MCP process genuinely interleave. `test/store.test.ts` and `test/mcp.integration.test.ts` both run actual store operations, and the integration test exercises a real stdio MCP round trip, because the MCP server's lifetime is itself a source of state worth testing directly.
+
+## MCP server lifetime and per-process context
+
+A stdio MCP server is long-lived for the duration of a CLI process. A subagent that spawns inside the same process shares the MCP connection. Per-process context handoff is therefore an optimization, never a correctness guarantee. A subagent on a fresh connection, or a process restart, begins with no local context.
+
+The recovery hatch is `full:true` on a context read, which fetches current state from the database rather than trusting whatever the process cache holds. Any handoff that cannot afford to drift should use it. The per-process cache is a latency optimization; `full:true` is the source of truth.
+
+## SQLite in practice
+
+SQLite with WAL mode and `busy_timeout=5000` handles the many-small-writes pattern that agent systems generate better than you might expect. WAL lets readers and a writer proceed concurrently in the common case, but it does not eliminate `SQLITE_BUSY` or `SQLITE_BUSY_SNAPSHOT`. The timeout waits up to five seconds for eligible lock contention; callers still need to handle a busy error when SQLite cannot safely wait or advance the snapshot. In practice, contention has been rare, and the timeout absorbs most short bursts.
+
+What WAL does not help with is logical races. Two processes checking a condition before writing still race, because WAL is a durability primitive, not an application-level serialization primitive. The conditioned `reply` guard described above and the `board_advance` transaction are what prevent logical corruption. WAL makes durable writes fast; the schema makes concurrent writes safe.
+
+
+
+<Image src="/static/images/blog/agent-handoffs-are-a-state-machine/img1.png" alt="Agent Inbox Plans view with two tracking boards and a highlighted authentication decision" />
+
+
+
+The screenshot above uses synthetic demo data to illustrate what stable plan rows look like in practice. Each row has a human-readable status, visible progress, and one human-owned decision at a time. The board label is stable across revisions — the display does not change as the agent updates its internal state. The difference between a descriptive status and an actual blocker (a row that cannot advance until a human acts) is visible at a glance. The remote-mode row shown is illustrative; that path is not shipped.
+
+## What is not solved yet
+
+Two gaps are worth naming directly.
+
+Remote mode (Agent Inbox running against a shared database rather than a local SQLite file) is not shipped. The data model handles it; the networking and auth layers are not (issue [#8](https://github.com/shariqh/agent-inbox/issues/8)). Waking and resuming a local agent session when a remote answer lands is a related open gap (issue [#51](https://github.com/shariqh/agent-inbox/issues/51)).
+
+The other rough edges from early use did get fixed, and that says something about the model itself. Board-row annotations used to be invisible to `pending()` — an agent could poll faithfully and still miss a human's note on a row. Issue [#37](https://github.com/shariqh/agent-inbox/issues/37) closed that by making `pending()` return `{items, rows}` together. A chat-recorded answer used to be uncorrectable once written; issues [#34](https://github.com/shariqh/agent-inbox/issues/34) and [#69](https://github.com/shariqh/agent-inbox/issues/69) closed that by adding a `clarify` reply kind, so the agent resolves the original item and raises a corrected replacement instead of editing history in place. Neither fix touched the precedence rule above — they extended it.
+
+## The practical reframe
+
+Model quality does not remove the need for explicit state ownership. A smarter model still creates and resolves rows. It still races with other processes. It still needs to distinguish "the human responded" from "I recorded an outcome." The state machine is the contract between the agent and the human, and that contract has to be explicit regardless of what is generating the agent's actions.
+
+If you are building a human-in-the-loop system, the question worth asking early is who owns each transition, and what token proves it is valid. Everything else (the UI, the prompt, the notification) sits on top of that contract.
+
+The invariants and tests are in the public repository at [github.com/shariqh/agent-inbox](https://github.com/shariqh/agent-inbox). `src/store.ts` is where the state machine lives; `test/store.test.ts` and `test/mcp.integration.test.ts` are where it gets exercised. Start there.
