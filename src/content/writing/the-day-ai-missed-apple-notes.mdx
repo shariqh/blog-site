@@ -1,0 +1,119 @@
+---
+title: 'Building Trustworthy AI Products from One Bad Answer'
+date: '2026-08-20'
+tags:
+  - ai
+  - ai-systems
+  - retrieval
+  - evaluation
+  - product-quality
+summary: >-
+  The assistant had the corpus to answer a broad question and still abstained.
+  Building trustworthy AI products means fixing the system, not swapping models.
+draft: false
+hero:
+  image: /static/images/blog/the-day-ai-missed-apple-notes/cover.png
+  alt: >-
+    Cover illustration for "Building Trustworthy AI Products from One Bad
+    Answer".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: A single lit magnifying glass held over one narrow
+    strip of text in a vast open book, the surrounding pages receding into
+    darkness; the illuminated fragment is sharply in focus, the rest of the book
+    exists but is unreachable, suggesting knowledge present but not found. Do
+    not depict or quote any phrase from the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
+---
+
+Building trustworthy AI products means treating a confident non-answer like a wrong answer: both cost the user's trust. Most evaluation effort goes into catching the first failure. The second is easy to miss entirely, because it looks like caution instead of a bug.
+
+That screenshot sat in a folder I'd labeled "embarrassing" for weeks before I looked at it straight. A user had asked [Oris](https://orisnotes.com)'s documentation assistant which apps and export destinations were supported, and the assistant answered *Not enough indexed evidence.* Seconds earlier, on the same session, a narrower question about [Apple Notes permissions](https://orisnotes.com/handbook/apple-notes/) had answered correctly, with numbered citations and real source references.
+
+The corpus contained the answer to the broad question. The system just hadn't found it.
+
+
+
+<Image src="/static/images/blog/the-day-ai-missed-apple-notes/img1.png" alt="Askdocs conversation showing a broad supported-apps question failing while a narrower Apple Notes question succeeds" />
+
+
+
+The model barely touched it. The failure lived in the product system around the model, and the visual presentation made both the wrong answer and the right one look identical, all showing clean framing, a confident tone, and cited sources. If you didn't already know what the correct answer looked like, you couldn't tell them apart.
+
+## Why the product system failed, not the model
+
+When a user asks a narrow question like "how do I grant Apple Notes permission," the retriever has a direct surface to hit. Vocabulary matches chunk headings. A handful of dense-vector neighbors are topically close, and they clear the evidence gate with room to spare. The model gets real context and produces a grounded answer.
+
+Ask "which apps and export destinations are supported" and you're asking the retriever to aggregate across a sparse, spread-out corpus. None of the individual chunks are close neighbors to that query phrasing. They're close to "Obsidian," "Apple Notes," "permissions," "setup" individually. The evidence gate fires (correctly, by its own logic) and the system reports insufficient evidence.
+
+The chunks existed. The evidence gate was doing what I asked it to do. The problem was that the retriever couldn't surface the right spread of content for a broad aggregation query.
+
+
+
+The second failure was subtler, and it came down to citations. The response included source references, which reads as grounded and careful. But I hadn't verified that each cited source actually contributed to the specific claim it appeared next to. A citation can be present and still be decorative. The model knows the documents exist, so it names them, but the text that shaped the answer may have come from somewhere else.
+
+Both failures were invisible. False abstentions look like responsible hedging. Decorative citations look like verification. The only way to catch either one was to have the expected answer in hand and compare.
+
+## What I resisted doing
+
+The reflex when a model-adjacent system fails is to swap in a bigger model. It's rarely the right first move.
+
+I kept the failure transcript instead, then split the problem into three separate workstreams — retrieval scope, citation truthfulness, and correction-aware UX. Fixing all three at once in a single branch would have made it impossible to attribute any improvement to any specific change.
+
+## Fixing retrieval, citation integrity, and UX separately
+
+The retrieval side needed a hybrid approach, combining dense-vector similarity for narrow factual lookups with sparse (BM25-style) term matching for broad aggregation queries. A re-ranker merges the candidates before they reach the evidence gate. The gate threshold stayed the same; the inputs to it changed.
+
+
+
+Askdocs now verifies citation integrity: each displayed marker must resolve to a candidate chunk the model actually had in context, and unresolved markers get stripped. That ties the Sources panel to evidence the model received — it doesn't prove semantic support for every claim the citation sits next to.
+
+Correction-aware UX meant building an explicit acknowledgement flow. When a user pushes back on an answer, the system says it missed information rather than silently producing a corrected one. A system that says "I missed that" is one a user can calibrate. One that silently corrects itself reads as potentially silently wrong again.
+
+## Evaluation before deploy
+
+The evaluation suite ran conversations, not isolated prompts. Single-turn testing had hidden the original failure; it only surfaced in multi-turn sessions where a prior wrong answer could be compared against a correction.
+
+A bounded set of smoke queries ran against a staging environment before I touched the live instance. An independent review pass found one edge case the suite hadn't covered. A terminal citation (the last source in a numbered list) was getting dropped when the response hit a character limit. That got a fix before merge.
+
+The deploy used the exact validated SHA, not a branch tip. After deployment, the first verification step was re-running the original failure queries live.
+
+
+
+
+
+<Image src="/static/images/blog/the-day-ai-missed-apple-notes/img2.png" alt="Askdocs conversation with grounded Apple Notes answers, setup steps, linked citations, and a safe abstention" />
+
+
+
+Apple Notes permissions: grounded answer, numbered citations, citation markers resolved to the actual context chunks and the source links were correct. The broad supported-apps question returned a correct, scoped response this time, with explicit acknowledgement that earlier sessions had returned insufficient evidence.
+
+## What trustworthy AI products must prove
+
+False abstentions don't feel safe from the outside. "Not enough evidence" sounds like responsible hedging, but if the user asked a reasonable question and the corpus had the answer, they got a wrong response, one that looked exactly like a right one. The trust cost is roughly equivalent to a hallucination. The user doesn't know which kind of failure they got; they just know the system didn't help.
+
+I'd been treating abstention as the conservative outcome. After this, it's a potential failure mode that needs its own evaluation coverage, the same way a hallucination would.
+
+The direct takeaway: a citation, an abstention, or any other signal of confidence should reflect what the system can actually verify, not just what it can make look authoritative. That's the whole difference between building trustworthy AI products and building ones that only look that way.
+
+## Save the embarrassing screenshots
+
+If you're building in this space and you have a folder of failure screenshots, keep it. Those frames reveal what your retrieval scope misses, where your evidence gates misbehave, and which UX affordances make failures invisible. They're the most honest product backlog you have.
+
+The screenshot I almost deleted was the one that shaped the next six weeks of work.
