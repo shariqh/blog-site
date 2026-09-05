@@ -1,0 +1,161 @@
+---
+title: Secure cross-platform Electron updater with Ed25519 signing
+date: '2026-08-31'
+tags:
+  - ai
+  - electron
+  - security
+  - updates
+  - ed25519
+summary: >-
+  Agent Inbox needed a secure cross-platform Electron updater with Ed25519
+  signing — so I ported Sparkle's trust contracts, not Sparkle itself.
+draft: false
+hero:
+  image: >-
+    /static/images/blog/building-a-signed-cross-platform-electron-updater/cover.png
+  alt: >-
+    Cover illustration for "Secure cross-platform Electron updater with Ed25519
+    signing".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: A single ornate brass key resting at the junction of
+    three diverging paths on aged parchment, each path leading to a distinct wax
+    seal pressed into the paper, warm raking light from one side casting a long
+    shadow from the key. Do not depict or quote any phrase from the article
+    title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
+---
+
+Agent Inbox ships as a notarized universal macOS DMG, x64 and arm64 AppImages, and x64 and arm64 DEBs, packaged by hand without electron-builder. When I needed update checking, the obvious answer was Sparkle. Sparkle is Cocoa-only. WinSparkle is a separate DLL project. Linux has neither. What I needed wasn't a library; it was the trust contracts those tools encode, ported cleanly across all three platforms.
+
+
+
+<Image src="/static/images/blog/building-a-signed-cross-platform-electron-updater/img2.png" alt="Dark Agent Inbox Live Operations Desk dashboard with four summary cards and a row of child-aware active-agent dots." />
+
+
+
+The trust model I settled on: a deterministic manifest signed with Ed25519, a publisher that cannot undraft a release until it passes a three-way verification circuit, a client that verifies raw bytes before parsing anything, and a key rotation scheme that prevents bricking any installed version across a rotation event. Automatic download and install are Phase 2. This implementation checks, verifies, and notifies.
+
+## Threat model
+
+Before writing any code, I mapped the surfaces worth defending:
+
+- **Manifest integrity**: a tampered manifest redirects users to arbitrary binaries.
+- **Key compromise**: a leaked signing key lets an attacker mint valid manifests indefinitely.
+- **Rollback**: a manipulated version field downgrades a client to a known-vulnerable release.
+- **Rotation without bricking**: safely replacing a compromised or expiring key without orphaning installed clients.
+- **Stale manifests**: a 180-day expiry renders any old manifest invalid regardless of its signature.
+- **MITM and redirects**: the client follows attacker-controlled redirects to untrusted hosts.
+- **Hostile HTTP bodies**: an oversized or infinitely-streaming response hangs the UI.
+
+The client trusts exactly one thing before any parsing: a raw Ed25519 signature over the exact UTF-8 bytes of the manifest JSON. Everything else follows from that verification.
+
+## The manifest
+
+`update-manifest.json` is generated deterministically from already-verified build artifacts, never hand-authored. It carries exactly five targets: `macos-dmg`, `linux-x64-appimage`, `linux-arm64-appimage`, `linux-x64-deb`, and `linux-arm64-deb`.
+
+Each target specifies:
+
+- Platform, architecture, package type, and update strategy
+- Byte length and SHA-256 hash of the release asset
+- Canonical GitHub release asset URL (no CDN aliases)
+- Source commit SHA, tree SHA, and tag timestamp
+- A 180-day expiry computed from tag time
+
+The generation script runs only after all five packages are built and verified. It won't write a manifest if any hash is missing. Seven assets exist before signing: the five packages, the manifest, and a checksum file. Signing produces one additional output, a detached `.sig` containing the Ed25519 envelope.
+
+
+
+A single publisher with `contents:write` stages a draft, then runs three checks before undrafting: GitHub API asset digests compared against expected hashes, downloaded bytes compared byte-for-byte, and a local rehash of all five packages. The draft stays invisible until all three pass.
+
+## Signing and key isolation
+
+The Ed25519 keypair is the root of trust. Only a SPKI-derived key ID is committed to the repo — never the private key. It lives in a separate credential scope from Apple notarization credentials and the GitHub PAT, with a different secret store, different machine context, and different blast radius if any one of them leaks.
+
+The signing envelope carries the key ID alongside the signature, so the client knows which public key to verify against without trusting anything in the manifest body. The envelope format supports sorted multiple signatures: a client with key A committed can accept an envelope containing `[sig-by-A, sig-by-B]` during a rotation window. A signature from a key with no committed key ID entry fails verification immediately. The production signer currently emits one signature; dual-signing is the rotation path when needed, not a routine cost.
+
+## Anti-brick key rotation
+
+Key rotation is where updater implementations most often get the ordering wrong. If swapping the key requires clients to already have the new manifest, any client that didn't update in time is orphaned.
+
+The contract:
+
+- The first release bootstraps with no prior manifest history. It lists only its own key ID in `trustedKeyIds`.
+- Every subsequent release downloads and verifies the currently published signed manifest before undrafting. The new release proceeds only if the new signing key already appears in that predecessor's `trustedKeyIds`.
+- The new manifest lists both the old and new key IDs in its own `trustedKeyIds`.
+
+
+
+Rotation takes two sequential releases: one that adds the new key to `trustedKeyIds` (signed with the old key, so all existing clients can verify it), then one signed with the new key (which the predecessor already trusted). A client that fetches any signed release during the transition retains a valid path forward. No client is bricked by subsequent rotation.
+
+## Client verification
+
+The update client is packaged-only; it never runs in development. It loads through a boundary that logs loudly if invoked outside a packaged context but fails safe: the UI stays visible, checks just don't run.
+
+The fetch and verification sequence:
+
+
+
+1. Validate the URL is HTTPS and the host matches GitHub's known domain with a dot-safe regex; no partial-match bypasses.
+2. Follow redirects manually with a max-hop counter; abort on any non-GitHub destination.
+3. Stream the response with a byte cap; abort and discard the connection on overrun or network error.
+4. Verify the Ed25519 signature over the raw bytes before JSON parsing.
+5. Parse, validate schema, check expiry against the current clock.
+6. Compare numeric semver; skip if the running version is equal or newer.
+7. Select the exact target for the running platform, architecture, and package type.
+8. Notify once per version via a preference-keyed dedupe record; a repeat check does not re-notify until the version changes.
+
+IPC messages carry only verified version metadata, with no install URL the renderer can redirect. The renderer asks the main process to open the release page; the main process constructs that URL from the already-verified manifest. IPC handlers validate that messages come from live windows with the expected origin. Preference writes are atomic; a mid-write crash can't corrupt the dedupe state.
+
+Checks are opt-in, scheduled every 24 hours with random jitter, and are plain GET requests with no payload — no telemetry, no analytics, no beacon. Settings remains visible even when the check fails. The scheduler runs off the critical path to window load, so a slow manifest server doesn't delay startup.
+
+## From v1.2.0 to v1.2.1
+
+I ran the first full end-to-end test across two real signed releases.
+
+v1.2.0 ran its scheduled check. The published manifest at that point was v1.2.0's own, so the client correctly reported no update available.
+
+I published v1.2.1. The publish script fetched the live v1.2.0 signed manifest, verified the v1.2.1 signing key was listed in its `trustedKeyIds`, and only then undrafted. Predecessor continuity check passed.
+
+The untouched v1.2.0 app ran its next scheduled check. It fetched the v1.2.1 manifest, verified the Ed25519 signature with the committed public key, parsed and validated schema and expiry, compared versions, selected `macos-dmg` as the target for the running platform, exposed the exact GitHub release asset URL in Settings, and wrote the dedupe preference so subsequent checks wouldn't re-notify.
+
+
+
+<Image src="/static/images/blog/building-a-signed-cross-platform-electron-updater/img3.png" alt="Agent Inbox Settings Updates section showing Agent Inbox 1.2.1 available to the running 1.2.0 app." />
+
+
+
+Settings showed the newer release and a "Review release" action. The verified state matched the manifest exactly. The v1.2.0 binary reported a signed, schema-valid, unexpired, target-matched update without being modified.
+
+## Practical lessons
+
+**Don't hand-author `latest-*.yml` outside electron-builder.** Those files are an electron-builder internal format. Generating them independently is extra surface area for bugs that nothing will catch. Use a manifest format you own and fully control.
+
+**Never overwrite package-manager-owned DEB files.** APT tracks checksums. A DEB that differs from what APT cached, even by a single byte, can break installs silently. Hash before signing, verify the downloaded hash against the published hash, and treat any mismatch as a build failure.
+
+**Keep OS code signing and publisher authenticity separate.** Apple notarization proves the binary hasn't been tampered with at the OS level. Ed25519 over the manifest proves the update pipeline itself is intact. These are different threat surfaces with different revocation paths. Conflating the credentials collapses both protections simultaneously if one is compromised.
+
+**Manifest is last; fix forward.** The manifest is generated after all packages are built and hashed. If a package is wrong, fix the package and regenerate from scratch. Never patch a published manifest in place; publish a corrected release.
+
+**Fail closed on verification, fail safe for the optional UI.** A failed signature check, an expired manifest, or a schema error all result in a rejected update and no notification. A network failure results in silence. Silence is the correct behavior for a non-critical feature.
+
+**Cancel hostile HTTP bodies.** A byte cap with an active abort is not optional. A response that grows past the cap gets the connection terminated, not buffered to the limit and then discarded.
+
+**Test with two real releases.** A synthetic manifest against a single key finds almost nothing. Key rotation ordering bugs, byte-cap edge cases, and IPC contract gaps only surface when a second signed release has to be verified by a client built against the first.
