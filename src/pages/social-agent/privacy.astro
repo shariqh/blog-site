@@ -1,0 +1,130 @@
+---
+import SocialAgentPage from "../../components/SocialAgentPage.astro";
+---
+
+<SocialAgentPage
+  current="privacy"
+  title="Social Agent privacy"
+  lead="How this privately operated tool accesses, uses, stores, and handles Google user data."
+  description="Privacy notice for Social Agent, including its read-only Google access, data use, storage, retention, and deletion process."
+>
+  <p><strong>Last updated:</strong> September 5, 2026.</p>
+
+  <p>
+    Social Agent is operated by Shariq Hirani for private content publishing and
+    growth reporting. This notice covers Google user data accessed through the
+    Social Agent integration. It does not turn the private dashboard into a
+    public service.
+  </p>
+
+  <h2>Google data the tool accesses</h2>
+
+  <p>Social Agent requests these Google OAuth scopes:</p>
+
+  <ul>
+    <li>
+      <code>webmasters.readonly</code> for authorized Search Console property, page,
+      date, and query performance.
+    </li>
+    <li>
+      <code>youtube.readonly</code> for authorized YouTube channel and video metadata.
+    </li>
+    <li>
+      <code>yt-analytics.readonly</code> for aggregate viewing and engagement statistics,
+      such as views, engaged views, watch time, and average view duration.
+    </li>
+  </ul>
+
+  <p>
+    These grants are read-only. They do not provide the Google account password
+    or permission to upload, edit, or delete videos. Search Console query
+    results can be provider-limited rather than exhaustive, and the reports
+    preserve that limitation instead of treating missing data as a measured
+    zero.
+  </p>
+
+  <h2>How Google data is used</h2>
+
+  <p>
+    The tool links the operator's published content with private search and
+    viewing reports so the operator can understand available evidence and decide
+    what to improve. The data is not sold, shared with data brokers, used for
+    advertising, or used to build advertising profiles.
+  </p>
+
+  <p>
+    Growth reports are generated deterministically and do not require sending
+    Google API data to a third-party language model. Separate content-drafting
+    workflows may use a model to prepare drafts, but they are not the Google
+    reporting flow and remain subject to human approval before publication.
+  </p>
+
+  <h2>Storage and access</h2>
+
+  <p>
+    Content inventory, source-labelled observations, connection status, and
+    reports are stored in SQLite on systems controlled by the operator. Access
+    is restricted to the operator and explicitly authorized people. Google OAuth
+    client credentials and refresh tokens are kept in protected secret storage
+    rather than in public pages or growth reports.
+  </p>
+
+  <p>
+    Operational backups may contain content metadata and aggregate observations.
+    They are kept under the same restricted access controls as the active data.
+    Social Agent does not currently promise a fixed retention period or
+    automatic deletion schedule.
+  </p>
+
+  <h2>Revoking access and requesting deletion</h2>
+
+  <p>
+    Revoking Social Agent's Google connection stops future access after the
+    authorization is no longer valid. Revocation does not by itself delete
+    observations or backups already created from an earlier authorized
+    connection.
+  </p>
+
+  <p>
+    To ask what Google data is stored or request deletion, use the
+    <a href="/about#contact">contact options on the About page</a>. The operator
+    will review the active data and applicable backups and explain what can be
+    removed and any operational constraints.
+  </p>
+
+  <h2>Google API policy</h2>
+
+  <p>
+    Social Agent's use and transfer of information received from Google APIs
+    adheres to the
+    <a
+      href="https://developers.google.com/terms/api-services-user-data-policy"
+      target="_blank"
+      rel="noopener noreferrer">Google API Services User Data Policy</a
+    >, including its Limited Use requirements.
+  </p>
+
+  <h2>Public website analytics</h2>
+
+  <p>
+    These public information pages use the same GoatCounter pageview analytics
+    as the rest of shariq.dev. That website analytics is separate from the
+    Google data accessed by Social Agent.
+  </p>
+
+  <p>
+    Social Agent also has an optional first-party tracker for bounded page and
+    known call-to-action counts. If enabled for a site, it excludes full query
+    strings and can keep validated campaign labels in same-tab
+    <code>sessionStorage</code> for up to 30 minutes. The private dashboard uses authentication
+    cookies. Neither feature changes the read-only Google permissions described above.
+  </p>
+
+  <h2>Changes to this notice</h2>
+
+  <p>
+    This notice will be updated before Social Agent uses Google user data in a
+    materially different way. The date at the top identifies the current
+    version.
+  </p>
+</SocialAgentPage>
