@@ -1,0 +1,106 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHeader from "./PageHeader.astro";
+import Prose from "./Prose.astro";
+
+interface Props {
+  current: "overview" | "privacy" | "terms";
+  title: string;
+  lead: string;
+  description: string;
+}
+
+const { current, title, lead, description } = Astro.props;
+const links = [
+  { id: "overview", href: "/social-agent/", label: "Overview" },
+  { id: "privacy", href: "/social-agent/privacy/", label: "Privacy" },
+  { id: "terms", href: "/social-agent/terms/", label: "Terms" },
+] as const;
+---
+
+<BaseLayout title={title} description={description}>
+  <!--
+    THESIS: Explain a private operator tool plainly, without presenting it as a public SaaS.
+    OWN-WORLD: Inherit shariq.dev's white field, ink type, warm accents, and editorial rules.
+    STORY: Identify the tool, explain its boundaries, then make privacy and terms easy to inspect.
+    FIRST VIEWPORT: Compact local navigation, direct title, and a factual lead within the reading column.
+    FORM: A restrained policy reading surface that extends the site's established page composition.
+  -->
+  <div class="social-agent-page">
+    <nav class="section-nav" aria-label="Social Agent information">
+      {
+        links.map((link) => (
+          <a
+            href={link.href}
+            aria-current={current === link.id ? "page" : undefined}
+          >
+            {link.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <PageHeader title={title} lead={lead} />
+
+    <Prose>
+      <slot />
+    </Prose>
+
+    <footer class="information-footer">
+      <p>
+        Questions about Social Agent or its data practices can be sent through
+        the <a href="/about#contact">contact options on the About page</a>.
+      </p>
+    </footer>
+  </div>
+</BaseLayout>
+
+<style>
+  .social-agent-page {
+    padding-top: 28px;
+  }
+
+  .section-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .section-nav a {
+    color: var(--fg-soft);
+    text-decoration: none;
+    text-underline-offset: 5px;
+  }
+
+  .section-nav a:hover {
+    color: var(--color-terracotta);
+  }
+
+  .section-nav a[aria-current="page"] {
+    color: var(--fg);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-decoration-thickness: 2px;
+  }
+
+  .information-footer {
+    max-width: 65ch;
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
+    color: var(--fg-soft);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .information-footer a {
+    color: var(--color-terracotta);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 3px;
+  }
+</style>
