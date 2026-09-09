@@ -191,6 +191,8 @@ Deployment is automated by `.github/workflows/deploy.yml`. On push to
 URL, posted back as a PR comment. Fork and Dependabot PRs still run ordinary
 CI, but do not publish previews or enter the credential-bearing deploy job.
 Manual workflow runs retain the selected branch's production/preview mapping.
+Push/manual deployments require an explicit branch ref; tags cannot select
+production by sharing the name `main`.
 Deployment branch names may contain letters, numbers, combining marks, and
 `_`, `.`, `/`, `@`, `+`, or `-`; shell metacharacters are intentionally rejected
 before provider operations rather than interpolated into a command.

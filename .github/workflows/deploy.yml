@@ -224,6 +224,10 @@ jobs:
             if (!/^[a-f0-9]{40}$/.test(sha) || stdout.trim() !== sha) {
               throw new Error('Checkout does not match the immutable deployment commit');
             }
+            if (context.eventName !== 'pull_request' &&
+                (process.env.GITHUB_REF_TYPE !== 'branch' || context.ref !== `refs/heads/${branch}`)) {
+              throw new Error('Push and manual deployments require an unambiguous branch ref');
+            }
             if (!/^[\p{L}\p{N}_@+][\p{L}\p{N}\p{M}._/@+-]*$/u.test(branch ?? '') ||
                 (context.eventName === 'pull_request' && branch.toLowerCase() === 'main')) {
               throw new Error('Unsafe deployment branch or production branch selected by a PR');

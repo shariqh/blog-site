@@ -128,6 +128,7 @@ function harness(records: Deployment[] = []) {
       pull_request: pullRequest() as ReturnType<typeof pullRequest> | undefined,
     },
     eventName: "pull_request",
+    ref: "refs/pull/95/merge",
     sha: MERGE,
     serverUrl: "https://github.com",
     runId: 1001,
@@ -402,8 +403,14 @@ describe("immutable checkout provenance", () => {
       const h = harness();
       h.context.eventName = eventName;
       h.context.payload.pull_request = undefined;
+      h.context.ref = "refs/heads/main";
       h.exec.getExecOutput.mockResolvedValue({ stdout: `${MERGE}\n` });
-      expect(await h.execute(provenance, { GITHUB_REF_NAME: "main" })).toEqual({
+      expect(
+        await h.execute(provenance, {
+          GITHUB_REF_NAME: "main",
+          GITHUB_REF_TYPE: "branch",
+        }),
+      ).toEqual({
         command: `pages deploy dist --project-name=shariq-dev --branch=main --commit-hash=${MERGE}`,
       });
     },
@@ -426,10 +433,39 @@ describe("immutable checkout provenance", () => {
     h.context.eventName = "workflow_dispatch";
     h.context.payload.pull_request = undefined;
     h.context.sha = HEAD;
+    h.context.ref = `refs/heads/${branch}`;
     expect(
-      (await h.execute(provenance, { GITHUB_REF_NAME: branch })).command,
+      (
+        await h.execute(provenance, {
+          GITHUB_REF_NAME: branch,
+          GITHUB_REF_TYPE: "branch",
+        })
+      ).command,
     ).toContain(`--branch=${branch} `);
   });
+
+  it.each([
+    { ref: "refs/tags/main", name: "main", type: "tag" },
+    { ref: "refs/tags/main", name: "main", type: "branch" },
+    { ref: "refs/heads/preview", name: "main", type: "branch" },
+    { ref: "refs/heads/main", name: "main", type: "" },
+  ])(
+    "rejects ambiguous manual production ref %j",
+    async ({ ref, name, type }) => {
+      const h = harness();
+      h.context.eventName = "workflow_dispatch";
+      h.context.payload.pull_request = undefined;
+      h.context.sha = HEAD;
+      h.context.ref = ref;
+      await expect(
+        h.execute(provenance, {
+          GITHUB_REF_NAME: name,
+          GITHUB_REF_TYPE: type,
+        }),
+      ).rejects.toThrow("unambiguous branch ref");
+      expect(h.core.setOutput).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     "main",
