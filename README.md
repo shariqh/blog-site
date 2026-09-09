@@ -191,6 +191,9 @@ Deployment is automated by `.github/workflows/deploy.yml`. On push to
 URL, posted back as a PR comment. Fork and Dependabot PRs still run ordinary
 CI, but do not publish previews or enter the credential-bearing deploy job.
 Manual workflow runs retain the selected branch's production/preview mapping.
+Deployment branch names may contain letters, numbers, combining marks, and
+`_`, `.`, `/`, `@`, `+`, or `-`; shell metacharacters are intentionally rejected
+before provider operations rather than interpolated into a command.
 
 PR previews build the immutable PR head, not Actions' synthetic merge commit.
 The separate CI workflow still tests the merge tree. Wrangler receives the

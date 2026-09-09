@@ -224,7 +224,7 @@ jobs:
             if (!/^[a-f0-9]{40}$/.test(sha) || stdout.trim() !== sha) {
               throw new Error('Checkout does not match the immutable deployment commit');
             }
-            if (!/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(branch ?? '') ||
+            if (!/^[\p{L}\p{N}_@+][\p{L}\p{N}\p{M}._/@+-]*$/u.test(branch ?? '') ||
                 (context.eventName === 'pull_request' && branch.toLowerCase() === 'main')) {
               throw new Error('Unsafe deployment branch or production branch selected by a PR');
             }

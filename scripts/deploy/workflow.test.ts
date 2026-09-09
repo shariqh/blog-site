@@ -410,12 +410,37 @@ describe("immutable checkout provenance", () => {
   );
 
   it.each([
+    "review@topic",
+    "release/1.2.5+metadata",
+    "@review",
+    "+review",
+    "_review",
+    "feature/\u00e9tude",
+    "\u66f4\u65b0/topic",
+  ])("preserves command-safe Git branch %j", async (branch) => {
+    const h = harness();
+    h.context.payload.pull_request!.head.ref = branch;
+    expect((await h.execute(provenance)).command).toContain(
+      `--branch=${branch} `,
+    );
+    h.context.eventName = "workflow_dispatch";
+    h.context.payload.pull_request = undefined;
+    h.context.sha = HEAD;
+    expect(
+      (await h.execute(provenance, { GITHUB_REF_NAME: branch })).command,
+    ).toContain(`--branch=${branch} `);
+  });
+
+  it.each([
     "main",
     "MAIN",
     "--branch=main",
     'topic";process.exit(0)//',
     "topic\n--branch=main",
     "topic$(id)",
+    "topic`id`",
+    "topic;id",
+    "topic|id",
   ])(
     "rejects unsafe PR branch %j before passing a command to Wrangler",
     async (branch) => {
