@@ -13,7 +13,10 @@ import { SITE } from "./src/lib/site.ts";
 
 export default defineConfig({
   site: SITE.url,
-  integrations: [mdx(), sitemap()],
+  integrations: [
+    mdx(),
+    sitemap({ customPages: [`${SITE.url}/agent-inbox/`] }),
+  ],
   markdown: {
     remarkPlugins: [remarkMath, remarkReadingTime],
     rehypePlugins: [

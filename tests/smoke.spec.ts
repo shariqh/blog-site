@@ -34,6 +34,7 @@ const READ_COUNT_SLUG =
   'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
 const READ_COUNT_PATH = `/blog/${READ_COUNT_SLUG}/`
 const READ_COUNT_ROUTE = /\/api\/read-count(?:\?|$)/
+const AGENT_INBOX_URL = `${SITE.url}/agent-inbox/`
 
 function relativeRequestUrl(requestUrl: string): string {
   const url = new URL(requestUrl)
@@ -423,6 +424,78 @@ test('RSS feed serves', async ({ request }) => {
   expect(res.headers()['content-type']).toMatch(/xml/)
 })
 
+test('Agent Inbox landing is standalone and interactive', async ({ page }) => {
+  const response = await page.goto('/agent-inbox/')
+
+  expect(response?.status()).toBe(200)
+  await expect(page).toHaveTitle(
+    'Agent Inbox — An inbox for your coding agents',
+  )
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: 'Stop checking every terminal.',
+    }),
+  ).toBeVisible()
+  await expect(page.locator('script[data-goatcounter]')).toHaveCount(0)
+
+  const plansTab = page.getByRole('tab', { name: 'Plans' })
+  await plansTab.click()
+  await expect(plansTab).toHaveAttribute('aria-selected', 'true')
+  await expect(
+    page.getByRole('tabpanel', { name: 'Plans' }),
+  ).toContainText('Ship the customer portal')
+
+  const liveTab = page.getByRole('tab', { name: 'Live' })
+  await liveTab.click()
+  await expect(liveTab).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tabpanel', { name: 'Live' })).toContainText(
+    "See who's working on what.",
+  )
+
+  const themeToggle = page.getByRole('button', {
+    name: 'Switch to dark mode',
+  })
+  await themeToggle.click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect(
+    page.getByRole('button', { name: 'Switch to light mode' }),
+  ).toBeVisible()
+})
+
+test('Agent Inbox landing avoids narrow horizontal overflow', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.goto('/agent-inbox/')
+
+  const widths = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    document: document.documentElement.scrollWidth,
+  }))
+  expect(widths.document).toBeLessThanOrEqual(widths.viewport)
+})
+
+test('Agent Inbox extensionless path resolves in preview', async ({ page }) => {
+  const response = await page.goto('/agent-inbox')
+
+  expect(response?.status()).toBe(200)
+  expect(['/agent-inbox', '/agent-inbox/']).toContain(
+    new URL(page.url()).pathname,
+  )
+  await expect(page).toHaveTitle(
+    'Agent Inbox — An inbox for your coding agents',
+  )
+})
+
+test('sitemap includes the Agent Inbox landing', async ({ request }) => {
+  const response = await request.get('/sitemap-0.xml')
+
+  expect(response.status()).toBe(200)
+  expect(response.headers()['content-type']).toMatch(/xml/)
+  expect(await response.text()).toContain(`<loc>${AGENT_INBOX_URL}</loc>`)
+})
+
 test('custom site icons serve', async ({ request }) => {
   const svg = await request.get('/favicon.svg')
   expect(svg.status()).toBe(200)
@@ -462,7 +535,7 @@ test('home keeps current work compact', async ({ page }) => {
   ).toHaveAttribute('href', 'https://orisnotes.com')
   await expect(
     page.getByRole('link', { name: 'Agent Inbox', exact: true }).first(),
-  ).toBeVisible()
+  ).toHaveAttribute('href', AGENT_INBOX_URL)
   await expect(
     page.locator('.right-now').getByText('AskDocs', { exact: true }),
   ).toBeVisible()
@@ -556,6 +629,18 @@ test('projects remains the detailed project inventory', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'GitHub Enterprise Settings Configurator' }),
   ).toBeVisible()
+  const agentInbox = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Agent Inbox', exact: true }),
+  })
+  await expect(
+    agentInbox.getByRole('link', { name: 'Agent Inbox', exact: true }),
+  ).toHaveAttribute('href', AGENT_INBOX_URL)
+  await expect(
+    agentInbox.getByRole('link', { name: 'shariq.dev ↗', exact: true }),
+  ).toHaveAttribute('href', AGENT_INBOX_URL)
+  await expect(
+    agentInbox.getByRole('link', { name: 'github ↗', exact: true }),
+  ).toHaveAttribute('href', 'https://github.com/shariqh/agent-inbox')
   for (const retired of ['coffee-ui', 'unrivaledpro', 'myspace']) {
     await expect(page.getByText(retired, { exact: true })).toHaveCount(0)
   }

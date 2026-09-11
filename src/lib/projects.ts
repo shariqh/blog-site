@@ -33,6 +33,7 @@ export const active: Project[] = [
     description:
       "A local, cross-project attention inbox where Copilot CLI and Claude Code surface decisions, plans, and handoffs through MCP.",
     kind: "tool",
+    site: "https://shariq.dev/agent-inbox/",
     repo: "https://github.com/shariqh/agent-inbox",
     status: "building",
   },
