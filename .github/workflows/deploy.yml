@@ -4,12 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, closed]
   workflow_dispatch:
 
 permissions:
   contents: read
-  deployments: write
-  pull-requests: write
 
 concurrency:
   group: deploy-shariq-dev
@@ -17,13 +16,223 @@ concurrency:
   queue: max
 
 jobs:
+  prepare-preview:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.actor != 'dependabot[bot]' &&
+      github.triggering_actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      deployments: write
+      pull-requests: read
+    outputs:
+      should-deploy: ${{ steps.metadata.outputs.should-deploy }}
+      deployment-id: ${{ steps.metadata.outputs.deployment-id }}
+      attempt: ${{ steps.metadata.outputs.attempt }}
+    steps:
+      - name: Prepare or retire preview metadata
+        id: metadata
+        uses: actions/github-script@v7
+        env:
+          PHASE: prepare
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        with:
+          # Keep lifecycle writes checkout-free, including on failed-job reruns.
+          script: &preview-lifecycle |
+            const { owner, repo } = context.repo;
+            const repository = `${owner}/${repo}`;
+            const event = context.payload.pull_request;
+            const phase = process.env.PHASE;
+            core.setOutput('should-deploy', 'false');
+            if (!['prepare', 'finish'].includes(phase)) throw new Error('Invalid preview phase');
+            if (context.eventName !== 'pull_request' ||
+                event?.head?.repo?.full_name !== repository ||
+                [event?.user?.login, context.actor, process.env.TRIGGERING_ACTOR].includes('dependabot[bot]')) {
+              core.notice('Preview publication is limited to trusted same-repository pull requests.');
+              return;
+            }
+            const number = event.number;
+            const sha = event.head.sha;
+            const attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+            const positiveId = value => Number.isSafeInteger(value) && value > 0;
+            if (!positiveId(number) || !/^[a-f0-9]{40}$/.test(sha) ||
+                !positiveId(context.runId) || !positiveId(attempt)) {
+              throw new Error('Invalid PR or run identity');
+            }
+            const environment = `cloudflare-preview/pr-${number}`;
+            const task = 'cloudflare-preview';
+            const runPrefix = `${context.serverUrl}/${repository}/actions/runs/`;
+            const runUrl = runAttempt => `${runPrefix}${context.runId}/attempts/${runAttempt}`;
+            const owns = deployment =>
+              positiveId(deployment.id) && /^[a-f0-9]{40}$/.test(deployment.sha) &&
+              deployment.environment === environment && deployment.task === task &&
+              deployment.production_environment === false && deployment.transient_environment === true &&
+              deployment.payload?.source === 'cloudflare-preview-v1' && deployment.payload?.pr === number;
+            const readPR = async () => {
+              const { data } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+              if (data.number !== number || data.head?.repo?.full_name !== repository ||
+                  !['open', 'closed'].includes(data.state) || !/^[a-f0-9]{40}$/.test(data.head.sha)) {
+                throw new Error('Live PR identity does not match this repository');
+              }
+              return data;
+            };
+            const latestStatus = async id => {
+              const { data } = await github.rest.repos.listDeploymentStatuses({
+                owner, repo, deployment_id: id, per_page: 1
+              });
+              return data[0];
+            };
+            const status = (id, state, description, logUrl, url = '') =>
+              github.rest.repos.createDeploymentStatus({
+                owner, repo, deployment_id: id, state, description,
+                environment, environment_url: url, log_url: logUrl, auto_inactive: false
+              });
+            const records = (await github.paginate(github.rest.repos.listDeployments, {
+              owner, repo, task, environment, per_page: 100
+            })).filter(owns);
+            const retire = async (deployments, logUrl) => {
+              for (const deployment of deployments) {
+                if ((await latestStatus(deployment.id))?.state !== 'inactive') {
+                  await status(deployment.id, 'inactive', 'Preview superseded or PR closed', logUrl);
+                }
+              }
+            };
+            const lookupCount = async () => {
+              const { data } = await github.rest.repos.listDeployments({ owner, repo, sha, per_page: 6 });
+              return data.length;
+            };
+            let live = await readPR();
+            if (phase === 'prepare') {
+              if (live.state === 'closed') {
+                await retire(records, runUrl(attempt));
+                core.notice('Closed PR preview metadata retired; no provider deployment was deleted.');
+                return;
+              }
+              if (context.payload.action === 'closed') {
+                core.notice('Ignoring a stale close event for a reopened PR.');
+                return;
+              }
+              if (live.head.sha !== sha) {
+                await retire(records.filter(deployment => deployment.sha === sha), runUrl(attempt));
+                core.notice('Ignoring a superseded PR head.');
+                return;
+              }
+              let deployment = records.filter(record => record.sha === sha).sort((a, b) => a.id - b.id)[0];
+              if (deployment) {
+                const previous = await latestStatus(deployment.id);
+                const identity = previous?.log_url?.startsWith(runPrefix)
+                  ? previous.log_url.slice(runPrefix.length).match(/^(\d+)\/attempts\/(\d+)$/)
+                  : null;
+                if (identity && (Number(identity[1]) > context.runId ||
+                    (Number(identity[1]) === context.runId && Number(identity[2]) > attempt))) {
+                  core.notice('A newer run owns this head; ignoring the stale rerun.');
+                  return;
+                }
+              }
+              const count = await lookupCount();
+              if (count >= 6 || (!deployment && count >= 5)) {
+                throw new Error('Current head exceeds the bounded preview lookup; refusing to add metadata');
+              }
+              if (!deployment) {
+                const response = await github.rest.repos.createDeployment({
+                  owner, repo, ref: sha, task, environment, auto_merge: false, required_contexts: [],
+                  production_environment: false, transient_environment: true,
+                  description: `Cloudflare preview for PR #${number}`,
+                  payload: { source: 'cloudflare-preview-v1', pr: number }
+                });
+                deployment = response.data;
+                if (response.status !== 201 || !owns(deployment) || deployment.sha !== sha) {
+                  throw new Error('GitHub did not create the exact-head preview deployment');
+                }
+              }
+              core.setOutput('deployment-id', String(deployment.id));
+              core.setOutput('attempt', String(attempt));
+              await status(deployment.id, 'in_progress', 'Building the exact PR head', runUrl(attempt));
+              await retire(records.filter(record => record.id !== deployment.id), runUrl(attempt));
+              core.setOutput('should-deploy', 'true');
+              return;
+            }
+            const id = Number(process.env.DEPLOYMENT_ID);
+            const preparedAttempt = Number(process.env.PREPARED_ATTEMPT);
+            if (!positiveId(id) || !positiveId(preparedAttempt) || preparedAttempt > attempt ||
+                !records.some(record => record.id === id && record.sha === sha)) {
+              throw new Error('Preview finalizer does not identify an owned exact-head deployment');
+            }
+            const logUrl = runUrl(preparedAttempt);
+            if ((await latestStatus(id))?.log_url !== logUrl) {
+              core.notice('A different run owns this deployment; ignoring the stale finalizer.');
+              return;
+            }
+            if (live.state !== 'open' || live.head.sha !== sha) {
+              await status(id, 'inactive', 'Preview superseded or PR closed', logUrl);
+              return;
+            }
+            if (process.env.DEPLOY_RESULT !== 'success') {
+              const state = process.env.DEPLOY_RESULT === 'failure' ? 'failure' : 'error';
+              await status(id, state, 'Preview build or deployment did not complete successfully', logUrl);
+              return;
+            }
+            const url = process.env.PREVIEW_URL;
+            const providerId = process.env.CLOUDFLARE_DEPLOYMENT_ID;
+            if (process.env.VERIFIED_SHA !== sha ||
+                !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(providerId ?? '') ||
+                url !== `https://${providerId.slice(0, 8)}.shariq-dev.pages.dev` ||
+                await lookupCount() >= 6) {
+              await status(id, 'error', 'Missing or invalid verified Cloudflare preview evidence', logUrl);
+              throw new Error('Refusing success without bounded, exact-head Cloudflare preview evidence');
+            }
+            await retire(records.filter(record => record.id !== id), logUrl);
+            live = await readPR();
+            if (live.state !== 'open' || live.head.sha !== sha) {
+              await status(id, 'inactive', 'PR changed while preview was being finalized', logUrl);
+              return;
+            }
+            await status(id, 'success', 'Exact-head Cloudflare preview deployed', logUrl, url);
+            core.setOutput('preview-url', url);
+
   deploy:
+    needs: prepare-preview
+    if: >-
+      !cancelled() &&
+      (github.event_name != 'pull_request' ||
+       (needs.prepare-preview.result == 'success' && needs.prepare-preview.outputs.should-deploy == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 8
-
+    permissions:
+      contents: read
+    outputs:
+      preview-url: ${{ steps.verify.outputs.preview-url }}
+      verified-sha: ${{ steps.verify.outputs.verified-sha }}
+      cloudflare-deployment-id: ${{ steps.verify.outputs.cloudflare-deployment-id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify checked-out source
+        uses: actions/github-script@v7
+        with:
+          script: &deployment-provenance |
+            const sha = context.payload.pull_request?.head.sha ?? context.sha;
+            const branch = context.payload.pull_request?.head.ref ?? process.env.GITHUB_REF_NAME;
+            const { stdout } = await exec.getExecOutput('git', ['rev-parse', 'HEAD'], { silent: true });
+            if (!/^[a-f0-9]{40}$/.test(sha) || stdout.trim() !== sha) {
+              throw new Error('Checkout does not match the immutable deployment commit');
+            }
+            if (context.eventName !== 'pull_request' &&
+                (process.env.GITHUB_REF_TYPE !== 'branch' || context.ref !== `refs/heads/${branch}`)) {
+              throw new Error('Push and manual deployments require an unambiguous branch ref');
+            }
+            if (!/^[\p{L}\p{N}_@+][\p{L}\p{N}\p{M}._/@+-]*$/u.test(branch ?? '') ||
+                (context.eventName === 'pull_request' && branch.toLowerCase() === 'main')) {
+              throw new Error('Unsafe deployment branch or production branch selected by a PR');
+            }
+            core.setOutput('command', `pages deploy dist --project-name=shariq-dev --branch=${branch} --commit-hash=${sha}`);
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -36,6 +245,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Verify deployment source
+        id: provenance
+        uses: actions/github-script@v7
+        with:
+          script: *deployment-provenance
 
       - name: Enable incoming request cancellation
         env:
@@ -83,16 +298,92 @@ jobs:
           # Branch mapping:
           #   main      → production (shariq.dev)
           #   any other → preview deployment with its own URL
-          command: pages deploy dist --project-name=shariq-dev --branch=${{ github.head_ref || github.ref_name }}
+          command: ${{ steps.provenance.outputs.command }}
 
-      - name: Comment preview URL on PR
+      - name: Verify Cloudflare preview
+        id: verify
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DEPLOYMENT_ID: ${{ steps.deploy.outputs.pages-deployment-id }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          DEPLOYMENT_ENVIRONMENT: ${{ steps.deploy.outputs.pages-environment }}
         with:
           script: |
-            const url = "${{ steps.deploy.outputs.deployment-url }}";
-            if (!url) return;
-            github.rest.issues.createComment({
+            const id = process.env.DEPLOYMENT_ID;
+            const url = process.env.DEPLOYMENT_URL;
+            const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+            const sha = context.payload.pull_request.head.sha;
+            if (!/^[a-f0-9]{32}$/.test(account ?? '') ||
+                !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id ?? '') ||
+                url !== `https://${id.slice(0, 8)}.shariq-dev.pages.dev` ||
+                process.env.DEPLOYMENT_ENVIRONMENT !== 'preview') {
+              throw new Error('Wrangler did not return an immutable Cloudflare preview identity');
+            }
+            const response = await fetch(
+              `https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/shariq-dev/deployments/${id}`,
+              {
+                headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` },
+                signal: AbortSignal.timeout(30000),
+                redirect: 'error'
+              }
+            );
+            if (!response.ok) throw new Error(`Cloudflare verification failed: HTTP ${response.status}`);
+            const body = await response.json();
+            const deployment = body.result;
+            if (body.success !== true || deployment?.id !== id || deployment.url !== url ||
+                deployment.environment !== 'preview' ||
+                deployment.deployment_trigger?.metadata?.commit_hash !== sha ||
+                deployment.deployment_trigger?.metadata?.branch !== context.payload.pull_request.head.ref ||
+                deployment.latest_stage?.name !== 'deploy' || deployment.latest_stage?.status !== 'success') {
+              throw new Error('Cloudflare has not confirmed a successful deployment of this exact PR head');
+            }
+            core.setOutput('preview-url', url);
+            core.setOutput('verified-sha', sha);
+            core.setOutput('cloudflare-deployment-id', id);
+
+  finish-preview:
+    needs: [prepare-preview, deploy]
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.prepare-preview.outputs.deployment-id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      deployments: write
+      pull-requests: write
+    steps:
+      - name: Finalize preview metadata
+        id: metadata
+        uses: actions/github-script@v7
+        env:
+          PHASE: finish
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          DEPLOYMENT_ID: ${{ needs.prepare-preview.outputs.deployment-id }}
+          PREPARED_ATTEMPT: ${{ needs.prepare-preview.outputs.attempt }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          VERIFIED_SHA: ${{ needs.deploy.outputs.verified-sha }}
+          PREVIEW_URL: ${{ needs.deploy.outputs.preview-url }}
+          CLOUDFLARE_DEPLOYMENT_ID: ${{ needs.deploy.outputs.cloudflare-deployment-id }}
+        with:
+          script: *preview-lifecycle
+
+      - name: Comment preview URL on PR
+        if: steps.metadata.outputs.preview-url != ''
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.metadata.outputs.preview-url }}
+        with:
+          script: |
+            const url = process.env.PREVIEW_URL;
+            if (!/^https:\/\/[a-f0-9]{8}\.shariq-dev\.pages\.dev$/.test(url ?? '')) {
+              throw new Error('Missing verified preview URL');
+            }
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,

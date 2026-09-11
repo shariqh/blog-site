@@ -187,8 +187,38 @@ the requested same-repository branch.
 
 Deployment is automated by `.github/workflows/deploy.yml`. On push to
 `main`, the workflow builds and deploys to production
-(`shariq.dev`). PRs get preview deployments with their own URL, posted
-back as a PR comment.
+(`shariq.dev`). Same-repository PRs get preview deployments with their own
+URL, posted back as a PR comment. Fork and Dependabot PRs still run ordinary
+CI, but do not publish previews or enter the credential-bearing deploy job.
+Manual workflow runs retain the selected branch's production/preview mapping.
+Push/manual deployments require an explicit branch ref; tags cannot select
+production by sharing the name `main`.
+Deployment branch names may contain letters, numbers, combining marks, and
+`_`, `.`, `/`, `@`, `+`, or `-`; shell metacharacters are intentionally rejected
+before provider operations rather than interpolated into a command.
+
+PR previews build the immutable PR head, not Actions' synthetic merge commit.
+The separate CI workflow still tests the merge tree. Wrangler receives the
+verified head SHA, and the workflow checks the resulting deployment's ID,
+commit, branch, preview environment, successful stage, and immutable URL
+against Cloudflare before advertising success.
+
+Preview metadata is also available through GitHub's deployments API at the
+exact PR head SHA, under `cloudflare-preview/pr-<number>`. These deployments
+are explicitly transient and non-production. Reruns reuse one record per
+PR/head; the latest successful status contains the verified `environment_url`.
+Superseded records and closed PRs are marked inactive without deleting any
+Cloudflare deployment. Closed events never build or publish content.
+Failed or cancelled attempts cannot advertise success; a hard interruption
+can leave an in-progress record until the next rerun or PR lifecycle event.
+
+The existing global Cloudflare queue serializes the complete lifecycle,
+including metadata writes. Only checkout-free metadata jobs receive
+deployment-write permission; the build has a read-only GitHub token.
+An old rerun cannot overwrite a newer run's metadata. The workflow refuses
+to add records when unrelated deployments would exceed the consumer's
+five-record current-head lookup limit rather than deleting other providers'
+history.
 
 One-time setup (only needed when first wiring up the repo, or when
 rotating tokens):
