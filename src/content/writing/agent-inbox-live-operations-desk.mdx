@@ -1,0 +1,161 @@
+---
+title: 'Agent Inbox after v1: making human-agent handoffs reliable'
+date: '2026-09-07'
+tags:
+  - engineering
+  - agents
+  - mcp
+  - agent-inbox
+  - developer-tools
+summary: >-
+  Agent Inbox's post-v1 work separates saved answers from agent action:
+  plan-response wakeups, clearer status, keyboard controls, Linux packages,
+  and runtime fixes through v1.2.4, with lessons for human-in-the-loop tools.
+draft: false
+hero:
+  image: /static/images/blog/agent-inbox-live-operations-desk/cover.png
+  alt: >-
+    Abstract navy operations panels with clusters of colored indicator dots
+    beside an ochre margin.
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric, like a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+    Visual concept only: A calm dark operations surface viewed from slightly
+    above, with a disciplined grid of small rounded indicator lights arranged in
+    tight clusters. Use cream and ochre indicators with one terracotta cluster,
+    separated by precise navy panel borders. This is an abstract editorial
+    illustration, not a reproduction of the product interface. No text or
+    screens. Do not depict or quote any phrase from the article title or summary.
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm editorial feel. Do NOT render any readable
+    words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
+---
+
+An answer can be saved while the agent that needs it stays asleep.
+
+That is an awkward failure for a human-in-the-loop tool. You choose an option, the interface records your response, and it looks as though you have handed the work back. But storing the answer and getting the right coding session to act on it are separate jobs.
+
+The work since Agent Inbox's first desktop release has made that distinction much more explicit. It has also changed how the app presents activity, how quickly you can answer, and how it survives installation and upgrades. The common requirement is that the interface should describe the state the software can establish, without implying more.
+
+I covered the original motivation in [Terminal scroll is not a workflow](https://shariq.dev/blog/terminal-scroll-is-not-a-workflow/). This follow-up covers the first public desktop release, v1.0.1 on August 17, through [v1.2.4 on September 7](https://github.com/shariqh/agent-inbox/releases/tag/v1.2.4).
+
+## What was already there
+
+[The v1 baseline](https://github.com/shariqh/agent-inbox/blob/v1.0.1/README.md) already gave Claude Code and GitHub Copilot CLI a shared, cross-project inbox. Questions, notes, milestones, durable tracking boards, response choices, snooze, clarification, decline, and live presence were established features. So were dual-host Setup and a notarized universal macOS package with its own Node runtime.
+
+The architecture remains deliberately ordinary: a local stdio MCP server, SQLite in WAL mode, a Hono viewer, plain browser JavaScript, and Electron. Inbox makes no model calls. Agents use it to report work and collect responses; it does not become another agent or replace their planners.
+
+The post-launch work builds on those foundations rather than introducing boards or response buttons for the first time.
+
+## Saved, delivered, and acted on
+
+I now treat these as three distinct states:
+
+| State | What it establishes | What it does not establish |
+| --- | --- | --- |
+| Saved | The human's response is stored. | A waiting host has resumed. |
+| Delivered | An agent received the response through `pending`. | The intended session acted on it. |
+| Acted on | The agent recorded a result and acknowledged the handoff. | The whole project is finished or shipped. |
+
+Consider an illustrative migration review. An agent asks whether to retain an old database column for one release. You choose "Keep the old column." Saving that choice should not turn the migration green. The waiting session still needs to pick it up, reread the current plan, and revise the migration.
+
+After acting, it can move the row out of `blocked` and record an outcome such as "Migration revised to retain the column; code review still required." That closes this decision without pretending the migration has shipped.
+
+Stable row labels preserve history, but the action also needs an identity. A row might ask for a design decision today and a release approval later. A response to the first must not authorize the second. Revision-pinned actions and repeat delivery of still-blocked responses were already foundations of the design; v1.2.2 extended the wake paths and made the receipts clearer.
+
+This also affects the agent instructions. "Delivered" is not permission to forget the request. The agent must resolve the question or update the plan row with what happened. A short outcome is more useful here than a commit hash and a pasted review transcript.
+
+## The host still has to wake
+
+The missing path in [v1.2.2's handoff work](https://github.com/shariqh/agent-inbox/pull/132) was plan responses. Saving an answer on a blocked row did not consistently reach the wake mechanisms used for questions. Answers, clarification, decline, and "I've done my part" now reach those paths.
+
+For Copilot, a new blocked action returns a watcher command that the agent must launch in its own CLI session. The MCP server does not launch it. Each watcher follows that exact action, not every later use of the row. After a timeout or restart, a board read can re-arm watches for remaining blocked actions.
+
+The wake guidance also carries the original response project. An agent can use `pending({project: "..."})` to retrieve that answer without changing its current scope. Otherwise, a session that changed projects could wake and look in the wrong inbox.
+
+Claude's optional hooks include plan responses too. Each host session retains its own watcher, and a Stop continuation avoids waking repeatedly on the same unread response. One session receiving an answer should not remove another session's wake source.
+
+These mechanisms notify the host; they do not acknowledge the work. A disconnected host cannot be repaired by a database watcher, and a delivery receipt is not proof that the intended model session resumed. I would not turn a passing watcher fixture into that claim.
+
+The reusable lesson is to design both halves: instructions that tell the agent when a human decision is necessary, and a host mechanism that can bring the answer back. A prompt alone cannot wake a process.
+
+## Keep activity separate from attention
+
+The Live Operations Desk gives the app a new default view: reported agents, human attention, plans, ownership handoffs, activity, and recorded outcomes. Its charts use bounded local activity-claim history, rather than decorative trends.
+
+<Image src="/static/images/blog/agent-inbox-live-operations-desk/img3.png" alt="Historical v1.2.1 dashboard with reported-agent counts, human attention, plans, activity, ownership flow, and outcomes." />
+
+Historical v1.2.1 screenshot. The displayed counts illustrate the dashboard; they are not usage metrics or a census of every running agent.
+
+Parent managers and their reported children are represented in the counts. That is more useful than flattening a manager and its workers into one unexplained number, but the source still matters: Live shows connected MCP processes and work they report. A connection without a task report is unknown activity, not proof that nothing is running.
+
+The graphite surfaces, pink attention accents, dark and light appearances, compact navigation, and outcome ledger support that separation. An agent reporting progress should not compete with a decision only you can make. A failing build belongs in ongoing work unless a human has a concrete action that can unblock it.
+
+## Make the next action obvious
+
+The v1.2.3 cards lead with the human's next step instead of an internal tracking title. Explanations, warnings, consequences, and option tradeoffs stay near the response controls. The original title, technical background, and delivery timeline remain in Details & history.
+
+<Image src="/static/images/blog/agent-inbox-live-operations-desk/img2.png" alt="Historical v1.2.1 inbox with a release decision expanded beside the queue, showing its next step and response choices." />
+
+Historical v1.2.1 inspector, before the later action-first card revision and v1.2.4 shortcut tiles.
+
+Reorganizing a live interface also means preserving unfinished responses, focus, disclosures, and scrolling while it polls. A clearer card that loses your draft when another item changes would be a regression.
+
+v1.2.4 makes operation substantially more keyboard-driven. Press `F` to show short hints on visible controls, then type a hint to activate its control. Common actions have permanent key tiles, and `?` opens the guide. `G` sequences navigate, `R` focuses the current reply, and scoped `1`-`4` keys choose that card's options. Search, `J`/`K`, `Enter`, `Tab`, and `Escape` still work.
+
+Hints respect the active dialog, and letter shortcuts stay out of the way while you type. A replaced action loses its old hint instead of silently inheriting a keystroke intended for something else. That is the same action-identity problem as the watcher, expressed in the interface.
+
+Expanded inline cards now scroll with the page at intermediate widths. The fixed desktop inspector and full-screen phone card retain internal scrolling. The rule follows the layout rather than trapping every expanded card in another scroll area.
+
+## Installation is part of the workflow
+
+Native Linux x64 and arm64 AppImages and DEBs joined the universal macOS DMG after v1. The Linux packages include architecture-matched runtimes and Setup. The protected publication flow verifies all five package artifacts before exposing the release.
+
+The macOS app supports Apple silicon and Intel on macOS 13.5 or later. Linux support has explicit kernel, glibc, and desktop-library floors; the [installation guide](https://github.com/shariqh/agent-inbox/blob/v1.2.4/docs/INSTALL.md) documents them and the AppImage fallback when FUSE is unavailable. There is no Windows package or authenticated hosted mode.
+
+The less visible work is Setup hardening: shared host/runtime selection, constrained process and filesystem operations, and one shared setup lock. Install, upgrade, and rollback must not race each other. Managed registrations and hook changes are ownership-aware, preserving unrelated settings and instruction text.
+
+Setup copies runtimes outside the movable app bundle before registering them. Moving an AppImage should not invalidate the path an agent needs. That portable-runtime design existed on macOS at v1; the change is its cross-platform extension and stronger installation boundaries.
+
+## Check for updates without taking over
+
+The signed update checker first shipped in v1.2.0. v1.2.1 provided the next release for demonstrating detection.
+
+The release process generates a deterministic manifest and signs its exact bytes with Ed25519. The packaged client verifies it against pinned trusted public keys before offering the release. I keep this claim narrow: verified update metadata, not a promise that arbitrary future key rotations will be seamless.
+
+Manual Check for Updates is available in the packaged app. Automatic checks are off by default; enabling them schedules daily checks against GitHub without telemetry. A verified newer version produces a notification and a link to its release page. It does not download or install the package.
+
+<Image src="/static/images/blog/agent-inbox-live-operations-desk/img1.png" alt="Historical Settings view in Agent Inbox 1.2.0 detecting version 1.2.1, with automatic checks unchecked and a Review release button." />
+
+Historical update check: the running v1.2.0 app detects v1.2.1. This is not a v1.2.4 result.
+
+For a tool that mediates approval, checking and changing should remain visibly separate.
+
+## Replacing the program must preserve the work
+
+Two v1.2.4 fixes belong in the same story even though they sit below the feature list.
+
+The [blank-after-upgrade bug](https://github.com/shariqh/agent-inbox/pull/137) came from mixed cached frontend modules: a newer entrypoint could load an older dependency and leave an inert window. Viewer responses now use `Cache-Control: no-store`, and Electron clears HTTP cache before viewer navigation. Saved Inbox data and preferences are preserved. Older affected builds have a documented Force Reload recovery; deleting the database is not the remedy.
+
+The [native SQLite cleanup crash](https://github.com/shariqh/agent-inbox/pull/138) required matching build inputs. Downgrading the Node executable alone was insufficient when the addon had been built against the affected headers. The packaged runtime is held at Node 24.18.1, paired with an addon rebuilt against that exact verified header distribution. An allocation-driven failure check gates runtime publication. This is a compatibility mitigation, not an upstream Node fix or a permanent guarantee. The engineering evidence is linked for anyone maintaining a similar native dependency.
+
+I see both as correctness work. If an upgrade hides a saved decision behind a blank window, or the runtime needed to receive it crashes, better wording on the card cannot complete the handoff.
+
+## Use it, or borrow the handoff
+
+Agent Inbox is [public and MIT licensed](https://github.com/shariqh/agent-inbox). You can use, inspect, or adapt it without an Inbox subscription. The core has no model calls, hosted service, or telemetry. Optional PR-state lookups and update checks do use GitHub; the coding agents retain their own account requirements, costs, and data policies.
+
+To try it, download the matching package from [GitHub Releases](https://github.com/shariqh/agent-inbox/releases/latest), follow the installation guide, and open Setup for Claude Code, Copilot CLI, or both. Then start a fresh agent session in the project you are working on. The documented optional Claude hooks and launched Copilot watcher contracts provide the respective wake paths. A source/browser path remains available; the project is not published to npm.
+
+If you find an edge case, [report a reproduction or contribute](https://github.com/shariqh/agent-inbox/blob/v1.2.4/CONTRIBUTING.md). You do not need to install Inbox to apply the central rule: give a human action a stable identity, keep its answer durable, and distinguish saving it from delivering it and recording what happened next.
