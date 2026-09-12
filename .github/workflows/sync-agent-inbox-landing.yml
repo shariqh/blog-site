@@ -85,6 +85,7 @@ jobs:
           commit="$SOURCE_COMMIT"
           [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || exit 1
           branch="automation/agent-inbox-landing-$commit"
+          verified_head=""
           verify_delivery_ref() {
             local ref="$1"
             local expected_commit="$2"
@@ -311,6 +312,7 @@ jobs:
             head_sha="$(jq -r '.[0].head.sha' <<<"$pr")"
             verify_delivery_ref "$head_sha" "$SOURCE_COMMIT" "$SOURCE_SHA256"
             verify_pr_scope "$number"
+            verified_head="$head_sha"
             case "$state" in
               open)
                 action="open"
@@ -347,6 +349,7 @@ jobs:
             echo "action=$action"
             echo "branch=$branch"
             echo "pr-number=$number"
+            echo "verified-head=$verified_head"
           } >>"$GITHUB_OUTPUT"
 
       - name: Install dependencies
@@ -525,6 +528,9 @@ jobs:
           SHA-256: $SOURCE_SHA256"
             gh auth setup-git
             git push --set-upstream origin "$BRANCH"
+            verified_head="$(git rev-parse HEAD)"
+          else
+            verified_head="$(git rev-parse "origin/$BRANCH")"
           fi
           body="$RUNNER_TEMP/agent-inbox-landing-pr.md"
           cat >"$body" <<EOF
@@ -549,7 +555,10 @@ jobs:
             --title "Sync Agent Inbox landing ($short)" \
             --body-file "$body")"
           number="$(gh pr view "$url" --json number --jq '.number')"
-          echo "pr-number=$number" >>"$GITHUB_OUTPUT"
+          {
+            echo "pr-number=$number"
+            echo "verified-head=$verified_head"
+          } >>"$GITHUB_OUTPUT"
 
       - name: Ensure built-in Copilot review
         if: >-
@@ -557,22 +566,36 @@ jobs:
           steps.delivery.outputs.action == 'create' ||
           steps.delivery.outputs.action == 'recover'
         env:
+          BRANCH: ${{ steps.delivery.outputs.branch }}
+          EXISTING_HEAD: ${{ steps.delivery.outputs.verified-head }}
           EXISTING_PR: ${{ steps.delivery.outputs.pr-number }}
           GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          PUBLISHED_HEAD: ${{ steps.publish.outputs.verified-head }}
           PUBLISHED_PR: ${{ steps.publish.outputs.pr-number }}
         run: |
           set -euo pipefail
           PR_NUMBER="${PUBLISHED_PR:-$EXISTING_PR}"
+          EXPECTED_HEAD="${PUBLISHED_HEAD:-$EXISTING_HEAD}"
           [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || {
             echo "Missing delivery PR number" >&2
             exit 1
           }
-          author="$(gh pr view "$PR_NUMBER" --json author --jq '.author.login')"
-          [[ "$author" == "$GITHUB_REPOSITORY_OWNER" ]] || {
-            echo "Delivery PR must be owner-authored for the review workflow" >&2
+          [[ "$EXPECTED_HEAD" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Missing verified delivery head" >&2
             exit 1
           }
-          head="$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          head="$(jq -r '.head.sha' <<<"$pr")"
+          [[ "$(jq -r '.user.login' <<<"$pr")" == "$GITHUB_REPOSITORY_OWNER" &&
+             "$(jq -r '.state' <<<"$pr")" == "open" &&
+             "$(jq -r '.head.repo.full_name' <<<"$pr")" == "$GITHUB_REPOSITORY" &&
+             "$(jq -r '.head.ref' <<<"$pr")" == "$BRANCH" &&
+             "$(jq -r '.base.repo.full_name' <<<"$pr")" == "$GITHUB_REPOSITORY" &&
+             "$(jq -r '.base.ref' <<<"$pr")" == "main" &&
+             "$head" == "$EXPECTED_HEAD" ]] || {
+            echo "Delivery PR changed after verification" >&2
+            exit 1
+          }
           reviewed="$(
             gh api \
               --paginate \
@@ -589,3 +612,7 @@ jobs:
           else
             echo "Built-in Copilot already reviewed the current PR head."
           fi
+          [[ "$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')" == "$EXPECTED_HEAD" ]] || {
+            echo "Delivery PR changed while review was requested" >&2
+            exit 1
+          }

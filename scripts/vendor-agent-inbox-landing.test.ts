@@ -336,8 +336,13 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain('cmp --silent "$actual_metadata"');
     expect(workflow).toContain('cmp --silent "$staged_metadata"');
     expect(workflow).toContain("Git staging produced an invalid file mode");
+    expect(workflow).toContain("Delivery PR changed after verification");
+    expect(workflow).toContain(
+      "Delivery PR changed while review was requested",
+    );
     expect(workflow).toContain('--inspect "$open_commit"');
     expect(workflow).toContain("Delivery PR must not rename repository paths");
+    expect(workflow).toContain('echo "verified-head=$verified_head"');
     expect(workflow).toContain("Deferring this revision while sync PR");
     expect(workflow).toContain('echo "action=defer"');
     expect(workflow).toContain(
