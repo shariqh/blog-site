@@ -22,6 +22,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: main
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -34,6 +35,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || {
+            echo "Sync checkout must match origin/main" >&2
+            exit 1
+          }
           result="$(npm run --silent sync:agent-inbox-landing -- --json)"
           changed="$(jq -r '.changed' <<<"$result")"
           commit="$(jq -r '.commit' <<<"$result")"
@@ -360,9 +365,12 @@ jobs:
           }
           head="$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
           reviewed="$(
-            gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" |
+            gh api \
+              --paginate \
+              --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews?per_page=100" |
               jq --arg head "$head" \
-                '[.[] | select(
+                'flatten | [.[] | select(
                   .user.login == "copilot-pull-request-reviewer[bot]" and
                   .commit_id == $head
                 )] | length'

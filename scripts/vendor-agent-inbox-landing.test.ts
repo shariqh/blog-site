@@ -271,7 +271,9 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(sync.env).toBeUndefined();
     expect(step("Check out blog site").with).toMatchObject({
       "persist-credentials": false,
+      ref: "main",
     });
+    expect(workflow).toContain("Sync checkout must match origin/main");
     expect(step("Sync the latest landing revision").env).toEqual({
       GITHUB_TOKEN: "${{ github.token }}",
     });
@@ -286,6 +288,9 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(step("Ensure built-in Copilot review").env?.GH_TOKEN).toBe(
       "${{ secrets.AGENT_GH_TOKEN }}",
     );
+    expect(workflow).toContain("--paginate");
+    expect(workflow).toContain("--slurp");
+    expect(workflow).toContain("reviews?per_page=100");
     expect(workflow).not.toMatch(/\bgh pr merge\b/);
     expect(workflow).not.toMatch(/git push [^\n]*\bmain\b/);
   });
