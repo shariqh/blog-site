@@ -94,12 +94,19 @@ jobs:
             }
             state="$(jq -r '.[0].state' <<<"$pr")"
             number="$(jq -r '.[0].number' <<<"$pr")"
-            if [[ "$state" == "OPEN" ]]; then
-              action="open"
-            else
-              action="closed"
-              echo "A $state PR already records this upstream revision; not replacing it."
-            fi
+            case "$state" in
+              open)
+                action="open"
+                ;;
+              closed)
+                action="closed"
+                echo "A closed PR already records this upstream revision; not replacing it."
+                ;;
+              *)
+                echo "Unexpected delivery PR state: $state" >&2
+                exit 1
+                ;;
+            esac
           elif git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             action="recover"
             number=""

@@ -219,6 +219,8 @@ describe("Agent Inbox landing sync workflow", () => {
       'gh pr edit "$PR_NUMBER" --add-reviewer copilot-pull-request-reviewer',
     );
     expect(workflow).toContain("-f state=all");
+    expect(workflow).toContain("Unexpected delivery PR state");
+    expect(workflow).toMatch(/case "\$state" in\s+open\)/);
     expect(workflow).toContain('action="closed"');
     expect(workflow).toContain("Verify recoverable branch");
     expect(workflow).toContain("gh auth setup-git");
