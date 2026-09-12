@@ -333,7 +333,9 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain('verify_pr_scope "$number"');
     expect(workflow).toContain("Unexpected delivery PR path");
     expect(workflow).toContain("invalid file mode");
-    expect(workflow).toContain('"$metadata" == "$expected_metadata"');
+    expect(workflow).toContain('cmp --silent "$actual_metadata"');
+    expect(workflow).toContain('cmp --silent "$staged_metadata"');
+    expect(workflow).toContain("Git staging produced an invalid file mode");
     expect(workflow).toContain('--inspect "$open_commit"');
     expect(workflow).toContain("Delivery PR must not rename repository paths");
     expect(workflow).toContain("Deferring this revision while sync PR");
