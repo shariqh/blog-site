@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import matter from "gray-matter";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   resolveSourceCommit,
@@ -182,6 +183,24 @@ describe("Agent Inbox landing sync workflow", () => {
       ),
       "utf8",
     );
+    const parsed = matter(`---\n${workflow}\n---`).data as {
+      jobs: {
+        sync: {
+          env?: Record<string, string>;
+          steps: Array<{
+            name?: string;
+            env?: Record<string, string>;
+            with?: Record<string, string | boolean>;
+          }>;
+        };
+      };
+    };
+    const sync = parsed.jobs.sync;
+    const step = (name: string) => {
+      const found = sync.steps.find((candidate) => candidate.name === name);
+      if (!found) throw new Error(`Missing workflow step: ${name}`);
+      return found;
+    };
 
     expect(workflow).toContain('cron: "17 * * * *"');
     expect(workflow).toContain("workflow_dispatch:");
@@ -192,17 +211,35 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain(
       'branch="automation/agent-inbox-landing-${commit:0:12}"',
     );
+    expect(workflow).toContain('-f "head=$GITHUB_REPOSITORY_OWNER:$branch"');
     expect(workflow).toContain(
       "git add -- public/agent-inbox/index.html vendor/agent-inbox-landing.json",
     );
     expect(workflow).toContain(
       'gh pr edit "$PR_NUMBER" --add-reviewer copilot-pull-request-reviewer',
     );
-    expect(workflow).toContain("--state all");
+    expect(workflow).toContain("-f state=all");
     expect(workflow).toContain('action="closed"');
     expect(workflow).toContain("Verify recoverable branch");
-    expect(workflow).toContain(
-      '[[ "$author" == "$GITHUB_REPOSITORY_OWNER" ]]',
+    expect(workflow).toContain("gh auth setup-git");
+    expect(workflow).toContain('[[ "$author" == "$GITHUB_REPOSITORY_OWNER" ]]');
+    expect(sync.env).toBeUndefined();
+    expect(step("Check out blog site").with).toMatchObject({
+      "persist-credentials": false,
+    });
+    expect(step("Sync the latest landing revision").env).toEqual({
+      GITHUB_TOKEN: "${{ github.token }}",
+    });
+    expect(step("Install dependencies").env).toBeUndefined();
+    expect(step("Validate synchronized landing").env).toBeUndefined();
+    expect(step("Inspect existing delivery state").env?.GH_TOKEN).toBe(
+      "${{ secrets.AGENT_GH_TOKEN }}",
+    );
+    expect(step("Create or recover delivery pull request").env?.GH_TOKEN).toBe(
+      "${{ secrets.AGENT_GH_TOKEN }}",
+    );
+    expect(step("Ensure built-in Copilot review").env?.GH_TOKEN).toBe(
+      "${{ secrets.AGENT_GH_TOKEN }}",
     );
     expect(workflow).not.toMatch(/\bgh pr merge\b/);
     expect(workflow).not.toMatch(/git push [^\n]*\bmain\b/);

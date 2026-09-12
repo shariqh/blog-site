@@ -16,15 +16,12 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 12
-    env:
-      GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
     steps:
       - name: Check out blog site
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          token: ${{ secrets.AGENT_GH_TOKEN }}
+          persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
@@ -33,6 +30,8 @@ jobs:
 
       - name: Sync the latest landing revision
         id: sync
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           result="$(npm run --silent sync:agent-inbox-landing -- --json)"
@@ -62,6 +61,7 @@ jobs:
         id: delivery
         if: steps.sync.outputs.changed == 'true'
         env:
+          GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
           SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
         run: |
           set -euo pipefail
@@ -73,13 +73,25 @@ jobs:
           commit="$SOURCE_COMMIT"
           [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || exit 1
           branch="automation/agent-inbox-landing-${commit:0:12}"
-          pr="$(gh pr list \
-            --repo "$GITHUB_REPOSITORY" \
-            --state all \
-            --head "$branch" \
-            --limit 1 \
-            --json number,state)"
-          if [[ "$(jq 'length' <<<"$pr")" == "1" ]]; then
+          pr="$(gh api \
+            --method GET \
+            "repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=all \
+            -f "head=$GITHUB_REPOSITORY_OWNER:$branch" \
+            -f per_page=2)"
+          count="$(jq 'length' <<<"$pr")"
+          ((count <= 1)) || {
+            echo "Multiple delivery PRs found for the same repository branch" >&2
+            exit 1
+          }
+          if [[ "$count" == "1" ]]; then
+            head_repo="$(jq -r '.[0].head.repo.full_name' <<<"$pr")"
+            head_ref="$(jq -r '.[0].head.ref' <<<"$pr")"
+            [[ "$head_repo" == "$GITHUB_REPOSITORY" &&
+               "$head_ref" == "$branch" ]] || {
+              echo "Delivery PR does not belong to the expected repository branch" >&2
+              exit 1
+            }
             state="$(jq -r '.[0].state' <<<"$pr")"
             number="$(jq -r '.[0].number' <<<"$pr")"
             if [[ "$state" == "OPEN" ]]; then
@@ -190,6 +202,7 @@ jobs:
         env:
           ACTION: ${{ steps.delivery.outputs.action }}
           BRANCH: ${{ steps.delivery.outputs.branch }}
+          GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
           SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
           SOURCE_SHA256: ${{ steps.sync.outputs.sha256 }}
         run: |
@@ -205,6 +218,7 @@ jobs:
               -m "chore: sync Agent Inbox landing ($short)" \
               -m "Source commit: $SOURCE_COMMIT
           SHA-256: $SOURCE_SHA256"
+            gh auth setup-git
             git push --set-upstream origin "$BRANCH"
           fi
           body="$RUNNER_TEMP/agent-inbox-landing-pr.md"
@@ -238,6 +252,7 @@ jobs:
           steps.delivery.outputs.action != 'closed'
         env:
           EXISTING_PR: ${{ steps.delivery.outputs.pr-number }}
+          GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
           PUBLISHED_PR: ${{ steps.publish.outputs.pr-number }}
         run: |
           set -euo pipefail
