@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   resolveSourceCommit,
   syncAgentInboxLanding,
+  verifySourceLicense,
 } from "./vendor-agent-inbox-landing";
 
 const COMMIT = "b".repeat(40);
@@ -20,12 +21,19 @@ async function temporaryRoot(): Promise<string> {
 function mockGitHub(
   landing: Uint8Array,
   commit = COMMIT,
+  license = "MIT",
 ): { fetchImpl: typeof fetch; urls: string[] } {
   const urls: string[] = [];
   const fetchImpl: typeof fetch = async (input) => {
     const url = String(input);
     urls.push(url);
-    if (url.startsWith("https://api.github.com/")) {
+    if (new URL(url).pathname.endsWith("/license")) {
+      return Response.json({
+        path: "LICENSE",
+        license: { spdx_id: license },
+      });
+    }
+    if (new URL(url).pathname.endsWith("/commits")) {
       return Response.json([{ sha: commit }]);
     }
     return new Response(new TextDecoder().decode(landing));
@@ -95,6 +103,9 @@ describe("Agent Inbox landing sync", () => {
       )}\n`,
     );
     expect(urls[1]).toBe(
+      `https://api.github.com/repos/shariqh/agent-inbox/license?ref=${COMMIT}`,
+    );
+    expect(urls[2]).toBe(
       `https://raw.githubusercontent.com/shariqh/agent-inbox/${COMMIT}/marketing/index.html`,
     );
   });
@@ -151,10 +162,19 @@ describe("Agent Inbox landing sync", () => {
       "Failed to resolve the latest Agent Inbox landing commit",
     );
 
-    const rawFailure: typeof fetch = async (input) =>
-      String(input).startsWith("https://api.github.com/")
-        ? Response.json([{ sha: COMMIT }])
-        : new Response("missing", { status: 404 });
+    const rawFailure: typeof fetch = async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith("/commits")) {
+        return Response.json([{ sha: COMMIT }]);
+      }
+      if (path.endsWith("/license")) {
+        return Response.json({
+          path: "LICENSE",
+          license: { spdx_id: "MIT" },
+        });
+      }
+      return new Response("missing", { status: 404 });
+    };
     await expect(
       syncAgentInboxLanding({
         rootDir,
@@ -171,6 +191,57 @@ describe("Agent Inbox landing sync", () => {
     await expect(resolveSourceCommit(malformed, "")).rejects.toThrow(
       "GitHub did not return one valid commit",
     );
+  });
+
+  it("rejects an upstream revision without a verified MIT license", async () => {
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+      COMMIT,
+      "NOASSERTION",
+    );
+
+    await expect(verifySourceLicense(COMMIT, fetchImpl, "")).rejects.toThrow(
+      "is not published under the expected MIT license",
+    );
+  });
+
+  it("serializes concurrent updates and removes the lock afterward", async () => {
+    const rootDir = await temporaryRoot();
+    const landing = new TextEncoder().encode("<!doctype html>\n");
+    let releaseCommit: (() => void) | undefined;
+    let announceCommitLookup: (() => void) | undefined;
+    const commitLookupStarted = new Promise<void>((resolve) => {
+      announceCommitLookup = resolve;
+    });
+    const commitRelease = new Promise<void>((resolve) => {
+      releaseCommit = resolve;
+    });
+    const fetchImpl: typeof fetch = async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith("/commits")) {
+        announceCommitLookup?.();
+        await commitRelease;
+        return Response.json([{ sha: COMMIT }]);
+      }
+      if (path.endsWith("/license")) {
+        return Response.json({
+          path: "LICENSE",
+          license: { spdx_id: "MIT" },
+        });
+      }
+      return new Response(new TextDecoder().decode(landing));
+    };
+
+    const first = syncAgentInboxLanding({ rootDir, fetchImpl, token: "" });
+    await commitLookupStarted;
+    await expect(
+      syncAgentInboxLanding({ rootDir, fetchImpl, token: "" }),
+    ).rejects.toThrow("Another Agent Inbox landing sync is already running");
+    releaseCommit?.();
+    await first;
+    await expect(
+      readFile(join(rootDir, ".agent-inbox-landing-sync.lock")),
+    ).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
 
@@ -205,6 +276,12 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain('cron: "17 * * * *"');
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("secrets.AGENT_GH_TOKEN");
+    expect(workflow).toContain(
+      "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+    );
+    expect(workflow).toContain(
+      "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+    );
     expect(workflow).toContain(
       "npm run --silent sync:agent-inbox-landing -- --json",
     );

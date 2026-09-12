@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -7,9 +7,11 @@ const SOURCE_REPOSITORY = "shariqh/agent-inbox";
 const SOURCE_REPOSITORY_URL = `https://github.com/${SOURCE_REPOSITORY}`;
 const SOURCE_PATH = "marketing/index.html";
 const SOURCE_REF = "main";
-const LICENSE = "MIT";
+const SOURCE_LICENSE_PATH = "LICENSE";
+const EXPECTED_LICENSE = "MIT";
 const LANDING_PATH = "public/agent-inbox/index.html";
 const METADATA_PATH = "vendor/agent-inbox-landing.json";
+const LOCK_PATH = ".agent-inbox-landing-sync.lock";
 const FULL_SHA = /^[a-f0-9]{40}$/;
 
 export interface VendorMetadata {
@@ -34,6 +36,13 @@ interface SyncOptions {
   token?: string;
 }
 
+interface PlannedWrite {
+  relativePath: string;
+  path: string;
+  bytes: Uint8Array;
+  current?: Uint8Array;
+}
+
 function commitApiUrl(): URL {
   const url = new URL(
     `https://api.github.com/repos/${SOURCE_REPOSITORY}/commits`,
@@ -49,6 +58,14 @@ function rawSourceUrl(commit: string): URL {
   return new URL(
     `https://raw.githubusercontent.com/${SOURCE_REPOSITORY}/${commit}/${path}`,
   );
+}
+
+function licenseApiUrl(commit: string): URL {
+  const url = new URL(
+    `https://api.github.com/repos/${SOURCE_REPOSITORY}/license`,
+  );
+  url.searchParams.set("ref", commit);
+  return url;
 }
 
 function requestHeaders(token?: string): HeadersInit {
@@ -126,6 +143,39 @@ export async function fetchSourceBytes(
   return new Uint8Array(await response.arrayBuffer());
 }
 
+export async function verifySourceLicense(
+  commit: string,
+  fetchImpl: typeof fetch = fetch,
+  token = process.env.GITHUB_TOKEN,
+): Promise<string> {
+  if (!FULL_SHA.test(commit)) {
+    throw new Error(`Invalid Agent Inbox source commit: ${commit}`);
+  }
+  const response = await request(
+    fetchImpl,
+    licenseApiUrl(commit),
+    token,
+    "verify the Agent Inbox source license",
+  );
+  const payload: unknown = await response.json();
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("path" in payload) ||
+    payload.path !== SOURCE_LICENSE_PATH ||
+    !("license" in payload) ||
+    typeof payload.license !== "object" ||
+    payload.license === null ||
+    !("spdx_id" in payload.license) ||
+    payload.license.spdx_id !== EXPECTED_LICENSE
+  ) {
+    throw new Error(
+      `Agent Inbox commit ${commit} is not published under the expected ${EXPECTED_LICENSE} license`,
+    );
+  }
+  return EXPECTED_LICENSE;
+}
+
 function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -158,22 +208,102 @@ async function writeAtomic(path: string, bytes: Uint8Array): Promise<void> {
   }
 }
 
-async function writeIfChanged(
-  rootDir: string,
-  relativePath: string,
-  bytes: Uint8Array,
-): Promise<boolean> {
-  const path = resolve(rootDir, relativePath);
-  const current = await readOptional(path);
-  if (
+function equalBytes(
+  current: Uint8Array | undefined,
+  next: Uint8Array,
+): boolean {
+  return Boolean(
     current &&
-    current.byteLength === bytes.byteLength &&
-    current.every((value, index) => value === bytes[index])
-  ) {
-    return false;
+    current.byteLength === next.byteLength &&
+    current.every((value, index) => value === next[index]),
+  );
+}
+
+async function stageWrite(write: PlannedWrite): Promise<string> {
+  await mkdir(dirname(write.path), { recursive: true });
+  const temporary = `${write.path}.${process.pid}.${randomUUID()}.tmp`;
+  await writeFile(temporary, write.bytes);
+  return temporary;
+}
+
+async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
+  const staged: Array<{ write: PlannedWrite; temporary: string }> = [];
+  try {
+    for (const write of writes) {
+      staged.push({ write, temporary: await stageWrite(write) });
+    }
+  } catch (error) {
+    await Promise.all(
+      staged.map(({ temporary }) => rm(temporary, { force: true })),
+    );
+    throw error;
   }
-  await writeAtomic(path, bytes);
-  return true;
+
+  const replaced: PlannedWrite[] = [];
+  try {
+    for (const { write, temporary } of staged) {
+      await rename(temporary, write.path);
+      replaced.push(write);
+    }
+  } catch (error) {
+    const rollbackErrors: unknown[] = [];
+    for (const write of replaced.reverse()) {
+      try {
+        if (write.current) {
+          await writeAtomic(write.path, write.current);
+        } else {
+          await rm(write.path, { force: true });
+        }
+      } catch (rollbackError) {
+        rollbackErrors.push(rollbackError);
+      }
+    }
+    if (rollbackErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...rollbackErrors],
+        "Failed to update and roll back the Agent Inbox landing files",
+      );
+    }
+    throw error;
+  } finally {
+    await Promise.all(
+      staged.map(({ temporary }) => rm(temporary, { force: true })),
+    );
+  }
+}
+
+async function withSyncLock<T>(
+  rootDir: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  await mkdir(rootDir, { recursive: true });
+  const lockPath = resolve(rootDir, LOCK_PATH);
+  let lock;
+  try {
+    lock = await open(lockPath, "wx");
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "EEXIST"
+    ) {
+      throw new Error(
+        `Another Agent Inbox landing sync is already running (${lockPath})`,
+      );
+    }
+    throw error;
+  }
+
+  try {
+    await lock.writeFile(
+      `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`,
+    );
+    return await operation();
+  } finally {
+    await lock.close();
+    await rm(lockPath, { force: true });
+  }
 }
 
 export async function syncAgentInboxLanding({
@@ -181,30 +311,44 @@ export async function syncAgentInboxLanding({
   fetchImpl = fetch,
   token = process.env.GITHUB_TOKEN,
 }: SyncOptions = {}): Promise<SyncResult> {
-  const commit = await resolveSourceCommit(fetchImpl, token);
-  const landing = await fetchSourceBytes(commit, fetchImpl, token);
-  const digest = sha256(landing);
-  const metadata: VendorMetadata = {
-    repository: SOURCE_REPOSITORY_URL,
-    sourcePath: SOURCE_PATH,
-    sourceRef: SOURCE_REF,
-    commit,
-    sha256: digest,
-    license: LICENSE,
-  };
-  const metadataBytes = new TextEncoder().encode(
-    `${JSON.stringify(metadata, null, 2)}\n`,
-  );
-  const files: string[] = [];
+  return withSyncLock(rootDir, async () => {
+    const commit = await resolveSourceCommit(fetchImpl, token);
+    const license = await verifySourceLicense(commit, fetchImpl, token);
+    const landing = await fetchSourceBytes(commit, fetchImpl, token);
+    const digest = sha256(landing);
+    const metadata: VendorMetadata = {
+      repository: SOURCE_REPOSITORY_URL,
+      sourcePath: SOURCE_PATH,
+      sourceRef: SOURCE_REF,
+      commit,
+      sha256: digest,
+      license,
+    };
+    const metadataBytes = new TextEncoder().encode(
+      `${JSON.stringify(metadata, null, 2)}\n`,
+    );
+    const candidates = [
+      { relativePath: LANDING_PATH, bytes: landing },
+      { relativePath: METADATA_PATH, bytes: metadataBytes },
+    ];
+    const writes: PlannedWrite[] = [];
 
-  if (await writeIfChanged(rootDir, LANDING_PATH, landing)) {
-    files.push(LANDING_PATH);
-  }
-  if (await writeIfChanged(rootDir, METADATA_PATH, metadataBytes)) {
-    files.push(METADATA_PATH);
-  }
+    for (const candidate of candidates) {
+      const path = resolve(rootDir, candidate.relativePath);
+      const current = await readOptional(path);
+      if (!equalBytes(current, candidate.bytes)) {
+        writes.push({ ...candidate, path, current });
+      }
+    }
+    await replaceWrites(writes);
 
-  return { changed: files.length > 0, commit, sha256: digest, files };
+    return {
+      changed: writes.length > 0,
+      commit,
+      sha256: digest,
+      files: writes.map(({ relativePath }) => relativePath),
+    };
+  });
 }
 
 function isMainModule(): boolean {
