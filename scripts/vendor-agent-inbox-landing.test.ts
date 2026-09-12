@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import matter from "gray-matter";
@@ -204,66 +204,6 @@ describe("Agent Inbox landing sync", () => {
       "is not published under the expected MIT license",
     );
   });
-
-  it("serializes concurrent updates and removes the lock afterward", async () => {
-    const rootDir = await temporaryRoot();
-    const landing = new TextEncoder().encode("<!doctype html>\n");
-    let releaseCommit: (() => void) | undefined;
-    let announceCommitLookup: (() => void) | undefined;
-    const commitLookupStarted = new Promise<void>((resolve) => {
-      announceCommitLookup = resolve;
-    });
-    const commitRelease = new Promise<void>((resolve) => {
-      releaseCommit = resolve;
-    });
-    const fetchImpl: typeof fetch = async (input) => {
-      const path = new URL(String(input)).pathname;
-      if (path.endsWith("/commits")) {
-        announceCommitLookup?.();
-        await commitRelease;
-        return Response.json([{ sha: COMMIT }]);
-      }
-      if (path.endsWith("/license")) {
-        return Response.json({
-          path: "LICENSE",
-          license: { spdx_id: "MIT" },
-        });
-      }
-      return new Response(new TextDecoder().decode(landing));
-    };
-
-    const first = syncAgentInboxLanding({ rootDir, fetchImpl, token: "" });
-    await commitLookupStarted;
-    await expect(
-      syncAgentInboxLanding({ rootDir, fetchImpl, token: "" }),
-    ).rejects.toThrow("Another Agent Inbox landing sync is already running");
-    releaseCommit?.();
-    await first;
-    await expect(
-      readFile(join(rootDir, ".agent-inbox-landing-sync.lock")),
-    ).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("reclaims a stale lock before updating", async () => {
-    const rootDir = await temporaryRoot();
-    await writeFile(
-      join(rootDir, ".agent-inbox-landing-sync.lock"),
-      `${JSON.stringify({
-        pid: process.pid,
-        startedAt: "2000-01-01T00:00:00.000Z",
-      })}\n`,
-    );
-    const { fetchImpl } = mockGitHub(
-      new TextEncoder().encode("<!doctype html>\n"),
-    );
-
-    await expect(
-      syncAgentInboxLanding({ rootDir, fetchImpl, token: "" }),
-    ).resolves.toMatchObject({ changed: true });
-    await expect(
-      readFile(join(rootDir, ".agent-inbox-landing-sync.lock")),
-    ).rejects.toMatchObject({ code: "ENOENT" });
-  });
 });
 
 describe("Agent Inbox landing sync workflow", () => {
@@ -310,6 +250,7 @@ describe("Agent Inbox landing sync workflow", () => {
       'branch="automation/agent-inbox-landing-$commit"',
     );
     expect(workflow).toContain('-f "head=$GITHUB_REPOSITORY_OWNER:$branch"');
+    expect(workflow).toContain("-f base=main");
     expect(workflow).toContain(
       "git add -- public/agent-inbox/index.html vendor/agent-inbox-landing.json",
     );
@@ -323,6 +264,8 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain("Verify recoverable branch");
     expect(workflow).toContain("git/matching-refs/heads/$branch");
     expect(workflow).toContain('verify_delivery_ref "$head_sha"');
+    expect(workflow).toContain('verify_pr_scope "$number"');
+    expect(workflow).toContain("Unexpected delivery PR path");
     expect(workflow).toContain("gh auth setup-git");
     expect(workflow).toContain('[[ "$author" == "$GITHUB_REPOSITORY_OWNER" ]]');
     expect(sync.env).toBeUndefined();

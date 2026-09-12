@@ -1,13 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import {
-  mkdir,
-  open,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -19,8 +11,6 @@ const SOURCE_LICENSE_PATH = "LICENSE";
 const EXPECTED_LICENSE = "MIT";
 const LANDING_PATH = "public/agent-inbox/index.html";
 const METADATA_PATH = "vendor/agent-inbox-landing.json";
-const LOCK_PATH = ".agent-inbox-landing-sync.lock";
-const STALE_LOCK_MS = 30 * 60 * 1000;
 const FULL_SHA = /^[a-f0-9]{40}$/;
 
 export interface VendorMetadata {
@@ -281,161 +271,47 @@ async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
   }
 }
 
-async function withSyncLock<T>(
-  rootDir: string,
-  operation: () => Promise<T>,
-): Promise<T> {
-  await mkdir(rootDir, { recursive: true });
-  const lockPath = resolve(rootDir, LOCK_PATH);
-  let lock;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      lock = await open(lockPath, "wx");
-      break;
-    } catch (error) {
-      if (
-        typeof error !== "object" ||
-        error === null ||
-        !("code" in error) ||
-        error.code !== "EEXIST"
-      ) {
-        throw error;
-      }
-      if (attempt === 0 && (await staleLock(lockPath))) {
-        await rm(lockPath, { force: true });
-        continue;
-      }
-      throw new Error(
-        `Another Agent Inbox landing sync is already running (${lockPath})`,
-      );
-    }
-  }
-  if (!lock) throw new Error(`Failed to acquire sync lock: ${lockPath}`);
-
-  try {
-    await lock.writeFile(
-      `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`,
-    );
-    return await operation();
-  } finally {
-    await lock.close();
-    await rm(lockPath, { force: true });
-  }
-}
-
-async function staleLock(lockPath: string): Promise<boolean> {
-  let modifiedAt: number;
-  let content: string;
-  try {
-    const [details, bytes] = await Promise.all([
-      stat(lockPath),
-      readFile(lockPath, "utf8"),
-    ]);
-    modifiedAt = details.mtimeMs;
-    content = bytes;
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
-      return true;
-    }
-    throw error;
-  }
-
-  const fileAge = Date.now() - modifiedAt;
-  let owner: unknown;
-  try {
-    owner = JSON.parse(content);
-  } catch {
-    return fileAge >= STALE_LOCK_MS;
-  }
-  if (
-    typeof owner !== "object" ||
-    owner === null ||
-    !("pid" in owner) ||
-    !Number.isSafeInteger(owner.pid) ||
-    typeof owner.pid !== "number" ||
-    owner.pid <= 0 ||
-    !("startedAt" in owner) ||
-    typeof owner.startedAt !== "string"
-  ) {
-    return fileAge >= STALE_LOCK_MS;
-  }
-
-  const startedAt = Date.parse(owner.startedAt);
-  if (Number.isFinite(startedAt) && Date.now() - startedAt >= STALE_LOCK_MS) {
-    return true;
-  }
-  try {
-    process.kill(owner.pid, 0);
-    return false;
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ESRCH"
-    ) {
-      return true;
-    }
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "EPERM"
-    ) {
-      return false;
-    }
-    throw error;
-  }
-}
-
 export async function syncAgentInboxLanding({
   rootDir = process.cwd(),
   fetchImpl = fetch,
   token = process.env.GITHUB_TOKEN,
 }: SyncOptions = {}): Promise<SyncResult> {
-  return withSyncLock(rootDir, async () => {
-    const commit = await resolveSourceCommit(fetchImpl, token);
-    const license = await verifySourceLicense(commit, fetchImpl, token);
-    const landing = await fetchSourceBytes(commit, fetchImpl, token);
-    const digest = sha256(landing);
-    const metadata: VendorMetadata = {
-      repository: SOURCE_REPOSITORY_URL,
-      sourcePath: SOURCE_PATH,
-      sourceRef: SOURCE_REF,
-      commit,
-      sha256: digest,
-      license,
-    };
-    const metadataBytes = new TextEncoder().encode(
-      `${JSON.stringify(metadata, null, 2)}\n`,
-    );
-    const candidates = [
-      { relativePath: LANDING_PATH, bytes: landing },
-      { relativePath: METADATA_PATH, bytes: metadataBytes },
-    ];
-    const writes: PlannedWrite[] = [];
+  const commit = await resolveSourceCommit(fetchImpl, token);
+  const license = await verifySourceLicense(commit, fetchImpl, token);
+  const landing = await fetchSourceBytes(commit, fetchImpl, token);
+  const digest = sha256(landing);
+  const metadata: VendorMetadata = {
+    repository: SOURCE_REPOSITORY_URL,
+    sourcePath: SOURCE_PATH,
+    sourceRef: SOURCE_REF,
+    commit,
+    sha256: digest,
+    license,
+  };
+  const metadataBytes = new TextEncoder().encode(
+    `${JSON.stringify(metadata, null, 2)}\n`,
+  );
+  const candidates = [
+    { relativePath: LANDING_PATH, bytes: landing },
+    { relativePath: METADATA_PATH, bytes: metadataBytes },
+  ];
+  const writes: PlannedWrite[] = [];
 
-    for (const candidate of candidates) {
-      const path = resolve(rootDir, candidate.relativePath);
-      const current = await readOptional(path);
-      if (!equalBytes(current, candidate.bytes)) {
-        writes.push({ ...candidate, path, current });
-      }
+  for (const candidate of candidates) {
+    const path = resolve(rootDir, candidate.relativePath);
+    const current = await readOptional(path);
+    if (!equalBytes(current, candidate.bytes)) {
+      writes.push({ ...candidate, path, current });
     }
-    await replaceWrites(writes);
+  }
+  await replaceWrites(writes);
 
-    return {
-      changed: writes.length > 0,
-      commit,
-      sha256: digest,
-      files: writes.map(({ relativePath }) => relativePath),
-    };
-  });
+  return {
+    changed: writes.length > 0,
+    commit,
+    sha256: digest,
+    files: writes.map(({ relativePath }) => relativePath),
+  };
 }
 
 function isMainModule(): boolean {

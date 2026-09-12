@@ -106,10 +106,43 @@ jobs:
               exit 1
             }
           }
+          verify_pr_scope() {
+            local number="$1"
+            local files
+            files="$(
+              gh api \
+                --paginate \
+                --slurp \
+                "repos/$GITHUB_REPOSITORY/pulls/$number/files?per_page=100"
+            )"
+            mapfile -t changed < <(
+              jq -r 'flatten | .[].filename' <<<"$files" | sort -u
+            )
+            ((${#changed[@]} > 0)) || {
+              echo "Delivery PR has no changed files" >&2
+              exit 1
+            }
+            local has_metadata="false"
+            for path in "${changed[@]}"; do
+              [[ "$path" == "public/agent-inbox/index.html" ||
+                 "$path" == "vendor/agent-inbox-landing.json" ]] || {
+                echo "Unexpected delivery PR path: $path" >&2
+                exit 1
+              }
+              if [[ "$path" == "vendor/agent-inbox-landing.json" ]]; then
+                has_metadata="true"
+              fi
+            done
+            [[ "$has_metadata" == "true" ]] || {
+              echo "Delivery PR is missing provenance metadata" >&2
+              exit 1
+            }
+          }
           pr="$(gh api \
             --method GET \
             "repos/$GITHUB_REPOSITORY/pulls" \
             -f state=all \
+            -f base=main \
             -f "head=$GITHUB_REPOSITORY_OWNER:$branch" \
             -f per_page=2)"
           count="$(jq 'length' <<<"$pr")"
@@ -120,15 +153,20 @@ jobs:
           if [[ "$count" == "1" ]]; then
             head_repo="$(jq -r '.[0].head.repo.full_name' <<<"$pr")"
             head_ref="$(jq -r '.[0].head.ref' <<<"$pr")"
+            base_repo="$(jq -r '.[0].base.repo.full_name' <<<"$pr")"
+            base_ref="$(jq -r '.[0].base.ref' <<<"$pr")"
             [[ "$head_repo" == "$GITHUB_REPOSITORY" &&
-               "$head_ref" == "$branch" ]] || {
-              echo "Delivery PR does not belong to the expected repository branch" >&2
+               "$head_ref" == "$branch" &&
+               "$base_repo" == "$GITHUB_REPOSITORY" &&
+               "$base_ref" == "main" ]] || {
+              echo "Delivery PR does not match the expected repository branches" >&2
               exit 1
             }
             state="$(jq -r '.[0].state' <<<"$pr")"
             number="$(jq -r '.[0].number' <<<"$pr")"
             head_sha="$(jq -r '.[0].head.sha' <<<"$pr")"
             verify_delivery_ref "$head_sha"
+            verify_pr_scope "$number"
             case "$state" in
               open)
                 action="open"
