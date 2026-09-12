@@ -349,7 +349,7 @@ describe("Agent Inbox landing sync workflow", () => {
       'test("^automation/agent-inbox-landing-[a-f0-9]{40}$")',
     );
     expect(workflow).toContain("gh auth setup-git");
-    expect(workflow).toContain('[[ "$author" == "$GITHUB_REPOSITORY_OWNER" ]]');
+    expect(workflow).toContain('[[ "$author" == "$GITHUB_REPOSITORY_OWNER" &&');
     expect(sync.env).toBeUndefined();
     expect(step("Check out blog site").with).toMatchObject({
       "persist-credentials": false,
