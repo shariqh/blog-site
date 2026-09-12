@@ -187,6 +187,7 @@ describe("Agent Inbox landing sync", () => {
 
   it("bounds upstream responses and supplies an abort signal", async () => {
     let signal: AbortSignal | null | undefined;
+    let canceled = false;
     const oversized: typeof fetch = async (input, init) => {
       signal = init?.signal;
       const path = new URL(String(input)).pathname;
@@ -199,7 +200,16 @@ describe("Agent Inbox landing sync", () => {
           license: { spdx_id: "MIT" },
         });
       }
-      return new Response("x".repeat(1_000_001));
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(1_000_001));
+          },
+          cancel() {
+            canceled = true;
+          },
+        }),
+      );
     };
 
     await expect(
@@ -210,6 +220,7 @@ describe("Agent Inbox landing sync", () => {
       }),
     ).rejects.toThrow("response exceeds 1000000 bytes");
     expect(signal).toBeInstanceOf(AbortSignal);
+    expect(canceled).toBe(true);
   });
 
   it("rejects malformed commit API responses", async () => {
@@ -321,6 +332,8 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain('verify_delivery_ref "$head_sha"');
     expect(workflow).toContain('verify_pr_scope "$number"');
     expect(workflow).toContain("Unexpected delivery PR path");
+    expect(workflow).toContain("invalid file mode");
+    expect(workflow).toContain('"$metadata" == "$expected_metadata"');
     expect(workflow).toContain('--inspect "$open_commit"');
     expect(workflow).toContain("Delivery PR must not rename repository paths");
     expect(workflow).toContain("Deferring this revision while sync PR");

@@ -117,9 +117,20 @@ async function readLimitedBytes(
 ): Promise<Uint8Array> {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > maximum) {
-    throw new Error(
+    const sizeError = new Error(
       `Refusing ${purpose}: declared response size ${declaredLength} exceeds ${maximum} bytes`,
     );
+    if (response.body) {
+      try {
+        await response.body.cancel(sizeError);
+      } catch (cancelError) {
+        throw new AggregateError(
+          [sizeError, cancelError],
+          `Failed to cancel oversized response while attempting to ${purpose}`,
+        );
+      }
+    }
+    throw sizeError;
   }
   if (!response.body) {
     const bytes = new Uint8Array(await response.arrayBuffer());
@@ -132,17 +143,30 @@ async function readLimitedBytes(
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maximum) {
-      await reader.cancel(
-        `Response exceeded the ${maximum}-byte limit for ${purpose}`,
-      );
-      throw new Error(`Refusing ${purpose}: response exceeds ${maximum} bytes`);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maximum) {
+        throw new Error(
+          `Refusing ${purpose}: response exceeds ${maximum} bytes`,
+        );
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } catch (error) {
+    try {
+      await reader.cancel(error);
+    } catch (cancelError) {
+      throw new AggregateError(
+        [error, cancelError],
+        `Failed to cancel response while attempting to ${purpose}`,
+      );
+    }
+    throw error;
+  } finally {
+    reader.releaseLock();
   }
 
   const bytes = new Uint8Array(total);

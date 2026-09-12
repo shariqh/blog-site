@@ -119,9 +119,46 @@ jobs:
             if [[ -z "$expected_hash" ]]; then
               expected_hash="$metadata_hash"
             fi
+            expected_metadata="$(
+              jq -n \
+                --arg repository "https://github.com/shariqh/agent-inbox" \
+                --arg sourcePath "marketing/index.html" \
+                --arg sourceRef "main" \
+                --arg commit "$expected_commit" \
+                --arg sha256 "$expected_hash" \
+                --arg license "MIT" \
+                '{
+                  repository: $repository,
+                  sourcePath: $sourcePath,
+                  sourceRef: $sourceRef,
+                  commit: $commit,
+                  sha256: $sha256,
+                  license: $license
+                }'
+            )"
+            tree="$(
+              gh api \
+                "repos/$GITHUB_REPOSITORY/git/trees/$ref?recursive=1"
+            )"
+            for path in \
+              "public/agent-inbox/index.html" \
+              "vendor/agent-inbox-landing.json"; do
+              entry="$(
+                jq \
+                  --arg path "$path" \
+                  '[.tree[] | select(.path == $path)]' <<<"$tree"
+              )"
+              [[ "$(jq 'length' <<<"$entry")" == "1" &&
+                 "$(jq -r '.[0].type' <<<"$entry")" == "blob" &&
+                 "$(jq -r '.[0].mode' <<<"$entry")" == "100644" ]] || {
+                echo "Delivery ref contains an invalid file mode for $path" >&2
+                exit 1
+              }
+            done
             [[ "$landing_hash" == "$expected_hash" &&
                "$metadata_commit" == "$expected_commit" &&
-               "$metadata_hash" == "$expected_hash" ]] || {
+               "$metadata_hash" == "$expected_hash" &&
+               "$metadata" == "$expected_metadata" ]] || {
               echo "Existing delivery ref does not match the resolved source" >&2
               exit 1
             }
@@ -385,9 +422,41 @@ jobs:
             git show "origin/$BRANCH:vendor/agent-inbox-landing.json" |
               jq -r '.sha256'
           )"
+          metadata="$(
+            git show "origin/$BRANCH:vendor/agent-inbox-landing.json"
+          )"
+          expected_metadata="$(
+            jq -n \
+              --arg repository "https://github.com/shariqh/agent-inbox" \
+              --arg sourcePath "marketing/index.html" \
+              --arg sourceRef "main" \
+              --arg commit "$SOURCE_COMMIT" \
+              --arg sha256 "$SOURCE_SHA256" \
+              --arg license "MIT" \
+              '{
+                repository: $repository,
+                sourcePath: $sourcePath,
+                sourceRef: $sourceRef,
+                commit: $commit,
+                sha256: $sha256,
+                license: $license
+              }'
+          )"
+          for path in \
+            "public/agent-inbox/index.html" \
+            "vendor/agent-inbox-landing.json"; do
+            read -r mode type _ < <(
+              git ls-tree "origin/$BRANCH" -- "$path"
+            )
+            [[ "$mode" == "100644" && "$type" == "blob" ]] || {
+              echo "Recovery branch contains an invalid file mode for $path" >&2
+              exit 1
+            }
+          done
           [[ "$landing_hash" == "$SOURCE_SHA256" &&
              "$metadata_commit" == "$SOURCE_COMMIT" &&
-             "$metadata_hash" == "$SOURCE_SHA256" ]] || {
+             "$metadata_hash" == "$SOURCE_SHA256" &&
+             "$metadata" == "$expected_metadata" ]] || {
             echo "Recovery branch does not match the resolved source" >&2
             exit 1
           }
