@@ -4,21 +4,27 @@
 repository. It must remain unchanged so its source can be verified
 deterministically.
 
-- Repository: <https://github.com/shariqh/agent-inbox>
-- Source path: `marketing/index.html`
-- Commit: `a924a78e5539c63c92b110b6201d4245ff5e8c98`
-- SHA-256: `0105c90e8555fe219e43bcdf87382add01141030b85f23abaf648750eb717dcf`
+The machine-readable source commit, source path, and SHA-256 live in
+`vendor/agent-inbox-landing.json`.
 
-To update it, choose and review a new upstream commit, then copy the pinned Git
-object rather than the upstream worktree:
+`.github/workflows/sync-agent-inbox-landing.yml` checks hourly for the newest
+commit on Agent Inbox `main` that changed `marketing/index.html`. When the
+source bytes or provenance change, it opens one normal blog-site pull request.
+That pull request still runs CI, deploys a preview, receives both AI reviews,
+and requires a human merge before production changes.
+
+Only one generated landing sync PR is active at a time. If Agent Inbox changes
+again while one is open, the newer revision waits for the existing PR to be
+merged or closed, then receives its own reviewed PR.
+
+To check or refresh the vendored page locally:
 
 ```sh
-git -C /path/to/agent-inbox show <commit>:marketing/index.html > public/agent-inbox/index.html
-shasum -a 256 public/agent-inbox/index.html
+npm run sync:agent-inbox-landing
 ```
 
-Update the commit and hash here and in
-`src/lib/agent-inbox-landing.test.ts` in the same change.
+Normal Astro builds never fetch Agent Inbox or GitHub. The updater runs only
+when invoked directly or by its dedicated workflow.
 
 ## Upstream license
 

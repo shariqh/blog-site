@@ -1,0 +1,618 @@
+name: Sync Agent Inbox landing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-agent-inbox-landing.yml"
+      - "scripts/vendor-agent-inbox-landing.ts"
+      - "package.json"
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-agent-inbox-landing
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out blog site
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: main
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Sync the latest landing revision
+        id: sync
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || {
+            echo "Sync checkout must match origin/main" >&2
+            exit 1
+          }
+          result="$(npm run --silent sync:agent-inbox-landing -- --json)"
+          changed="$(jq -r '.changed' <<<"$result")"
+          commit="$(jq -r '.commit' <<<"$result")"
+          sha256="$(jq -r '.sha256' <<<"$result")"
+          [[ "$changed" == "true" || "$changed" == "false" ]] || {
+            echo "Invalid changed result" >&2
+            exit 1
+          }
+          [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Invalid source commit" >&2
+            exit 1
+          }
+          [[ "$sha256" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "Invalid source SHA-256" >&2
+            exit 1
+          }
+          echo "$result"
+          {
+            echo "changed=$changed"
+            echo "commit=$commit"
+            echo "sha256=$sha256"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Inspect existing delivery state
+        id: delivery
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
+          SOURCE_SHA256: ${{ steps.sync.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          actor="$(gh api user --jq '.login')"
+          [[ "$actor" == "$GITHUB_REPOSITORY_OWNER" ]] || {
+            echo "AGENT_GH_TOKEN must authenticate as $GITHUB_REPOSITORY_OWNER" >&2
+            exit 1
+          }
+          commit="$SOURCE_COMMIT"
+          [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          branch="automation/agent-inbox-landing-$commit"
+          verified_head=""
+          verify_delivery_ref() {
+            local ref="$1"
+            local expected_commit="$2"
+            local expected_hash="${3:-}"
+            [[ "$ref" =~ ^[a-f0-9]{40}$ ]] || {
+              echo "Invalid delivery ref" >&2
+              exit 1
+            }
+            local actual_metadata expected_metadata landing_hash metadata_commit metadata_hash
+            landing_hash="$(
+              gh api \
+                --method GET \
+                -H "Accept: application/vnd.github.raw+json" \
+                "repos/$GITHUB_REPOSITORY/contents/public/agent-inbox/index.html" \
+                -f "ref=$ref" |
+                sha256sum |
+                awk '{print $1}'
+            )"
+            actual_metadata="$RUNNER_TEMP/agent-inbox-metadata-$ref.json"
+            expected_metadata="$RUNNER_TEMP/agent-inbox-expected-$ref.json"
+            gh api \
+              --method GET \
+              -H "Accept: application/vnd.github.raw+json" \
+              "repos/$GITHUB_REPOSITORY/contents/vendor/agent-inbox-landing.json" \
+              -f "ref=$ref" >"$actual_metadata"
+            metadata_commit="$(jq -r '.commit' "$actual_metadata")"
+            metadata_hash="$(jq -r '.sha256' "$actual_metadata")"
+            [[ "$metadata_hash" =~ ^[a-f0-9]{64}$ ]] || {
+              echo "Existing delivery ref has invalid SHA-256 metadata" >&2
+              exit 1
+            }
+            if [[ -z "$expected_hash" ]]; then
+              expected_hash="$metadata_hash"
+            fi
+            jq -n \
+              --arg repository "https://github.com/shariqh/agent-inbox" \
+              --arg sourcePath "marketing/index.html" \
+              --arg sourceRef "main" \
+              --arg commit "$expected_commit" \
+              --arg sha256 "$expected_hash" \
+              --arg license "MIT" \
+              '{
+                repository: $repository,
+                sourcePath: $sourcePath,
+                sourceRef: $sourceRef,
+                commit: $commit,
+                sha256: $sha256,
+                license: $license
+              }' >"$expected_metadata"
+            cmp --silent "$actual_metadata" "$expected_metadata" || {
+              echo "Existing delivery ref has noncanonical metadata" >&2
+              exit 1
+            }
+            tree="$(
+              gh api \
+                "repos/$GITHUB_REPOSITORY/git/trees/$ref?recursive=1"
+            )"
+            for path in \
+              "public/agent-inbox/index.html" \
+              "vendor/agent-inbox-landing.json"; do
+              entry="$(
+                jq \
+                  --arg path "$path" \
+                  '[.tree[] | select(.path == $path)]' <<<"$tree"
+              )"
+              [[ "$(jq 'length' <<<"$entry")" == "1" &&
+                 "$(jq -r '.[0].type' <<<"$entry")" == "blob" &&
+                 "$(jq -r '.[0].mode' <<<"$entry")" == "100644" ]] || {
+                echo "Delivery ref contains an invalid file mode for $path" >&2
+                exit 1
+              }
+            done
+            [[ "$landing_hash" == "$expected_hash" &&
+               "$metadata_commit" == "$expected_commit" &&
+               "$metadata_hash" == "$expected_hash" ]] || {
+              echo "Existing delivery ref does not match the resolved source" >&2
+              exit 1
+            }
+          }
+          verify_pr_scope() {
+            local number="$1"
+            local files
+            files="$(
+              gh api \
+                --paginate \
+                --slurp \
+                "repos/$GITHUB_REPOSITORY/pulls/$number/files?per_page=100"
+            )"
+            renamed="$(
+              jq 'flatten | [.[] | select(
+                .status == "renamed" or
+                .previous_filename != null
+              )] | length' <<<"$files"
+            )"
+            [[ "$renamed" == "0" ]] || {
+              echo "Delivery PR must not rename repository paths" >&2
+              exit 1
+            }
+            mapfile -t changed < <(
+              jq -r 'flatten | .[].filename' <<<"$files" | sort -u
+            )
+            ((${#changed[@]} > 0)) || {
+              echo "Delivery PR has no changed files" >&2
+              exit 1
+            }
+            local has_metadata="false"
+            for path in "${changed[@]}"; do
+              [[ "$path" == "public/agent-inbox/index.html" ||
+                 "$path" == "vendor/agent-inbox-landing.json" ]] || {
+                echo "Unexpected delivery PR path: $path" >&2
+                exit 1
+              }
+              if [[ "$path" == "vendor/agent-inbox-landing.json" ]]; then
+                has_metadata="true"
+              fi
+            done
+            [[ "$has_metadata" == "true" ]] || {
+              echo "Delivery PR is missing provenance metadata" >&2
+              exit 1
+            }
+          }
+          open_sync="$(
+            gh api \
+              --paginate \
+              --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100"
+          )"
+          open_sync_count="$(
+            jq \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg owner "$GITHUB_REPOSITORY_OWNER" \
+              'flatten | [.[] | select(
+                .user.login == $owner and
+                .head.repo.full_name == $repo and
+                (.head.ref | test("^automation/agent-inbox-landing-[a-f0-9]{40}$"))
+              )] | length' <<<"$open_sync"
+          )"
+          ((open_sync_count <= 1)) || {
+            echo "Multiple Agent Inbox landing sync PRs are open" >&2
+            exit 1
+          }
+          if [[ "$open_sync_count" == "1" ]]; then
+            open_branch="$(
+              jq -r \
+                --arg repo "$GITHUB_REPOSITORY" \
+                --arg owner "$GITHUB_REPOSITORY_OWNER" \
+                'flatten | .[] | select(
+                  .user.login == $owner and
+                  .head.repo.full_name == $repo and
+                  (.head.ref | test("^automation/agent-inbox-landing-[a-f0-9]{40}$"))
+                ) | .head.ref' <<<"$open_sync"
+            )"
+            if [[ "$open_branch" != "$branch" ]]; then
+              number="$(
+                jq -r \
+                  --arg repo "$GITHUB_REPOSITORY" \
+                  --arg owner "$GITHUB_REPOSITORY_OWNER" \
+                  'flatten | .[] | select(
+                    .user.login == $owner and
+                    .head.repo.full_name == $repo and
+                    (.head.ref | test("^automation/agent-inbox-landing-[a-f0-9]{40}$"))
+                  ) | .number' <<<"$open_sync"
+              )"
+              open_head_sha="$(
+                jq -r \
+                  --arg repo "$GITHUB_REPOSITORY" \
+                  --arg owner "$GITHUB_REPOSITORY_OWNER" \
+                  'flatten | .[] | select(
+                    .user.login == $owner and
+                    .head.repo.full_name == $repo and
+                    (.head.ref | test("^automation/agent-inbox-landing-[a-f0-9]{40}$"))
+                  ) | .head.sha' <<<"$open_sync"
+              )"
+              open_commit="${open_branch#automation/agent-inbox-landing-}"
+              open_source="$(
+                npm run --silent sync:agent-inbox-landing -- \
+                  --inspect "$open_commit" \
+                  --json
+              )"
+              open_hash="$(jq -r '.sha256' <<<"$open_source")"
+              [[ "$open_hash" =~ ^[a-f0-9]{64}$ ]] || {
+                echo "Invalid deferred source SHA-256" >&2
+                exit 1
+              }
+              verify_delivery_ref "$open_head_sha" "$open_commit" "$open_hash"
+              verify_pr_scope "$number"
+              {
+                echo "action=defer"
+                echo "branch=$branch"
+                echo "pr-number=$number"
+              } >>"$GITHUB_OUTPUT"
+              echo "Deferring this revision while sync PR #$number is open."
+              exit 0
+            fi
+          fi
+          pr="$(gh api \
+            --method GET \
+            "repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=all \
+            -f base=main \
+            -f "head=$GITHUB_REPOSITORY_OWNER:$branch" \
+            -f per_page=2)"
+          count="$(jq 'length' <<<"$pr")"
+          ((count <= 1)) || {
+            echo "Multiple delivery PRs found for the same repository branch" >&2
+            exit 1
+          }
+          if [[ "$count" == "1" ]]; then
+            head_repo="$(jq -r '.[0].head.repo.full_name' <<<"$pr")"
+            head_ref="$(jq -r '.[0].head.ref' <<<"$pr")"
+            author="$(jq -r '.[0].user.login' <<<"$pr")"
+            base_repo="$(jq -r '.[0].base.repo.full_name' <<<"$pr")"
+            base_ref="$(jq -r '.[0].base.ref' <<<"$pr")"
+            [[ "$author" == "$GITHUB_REPOSITORY_OWNER" &&
+               "$head_repo" == "$GITHUB_REPOSITORY" &&
+               "$head_ref" == "$branch" &&
+               "$base_repo" == "$GITHUB_REPOSITORY" &&
+               "$base_ref" == "main" ]] || {
+              echo "Delivery PR does not match the expected repository branches" >&2
+              exit 1
+            }
+            state="$(jq -r '.[0].state' <<<"$pr")"
+            number="$(jq -r '.[0].number' <<<"$pr")"
+            head_sha="$(jq -r '.[0].head.sha' <<<"$pr")"
+            verify_delivery_ref "$head_sha" "$SOURCE_COMMIT" "$SOURCE_SHA256"
+            verify_pr_scope "$number"
+            verified_head="$head_sha"
+            case "$state" in
+              open)
+                action="open"
+                ;;
+              closed)
+                action="closed"
+                echo "A closed PR already records this upstream revision; not replacing it."
+                ;;
+              *)
+                echo "Unexpected delivery PR state: $state" >&2
+                exit 1
+                ;;
+            esac
+          else
+            refs="$(
+              gh api \
+                "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$branch"
+            )"
+            ref_count="$(
+              jq --arg ref "refs/heads/$branch" \
+                '[.[] | select(.ref == $ref)] | length' <<<"$refs"
+            )"
+            if [[ "$ref_count" == "1" ]]; then
+              action="recover"
+            elif [[ "$ref_count" == "0" ]]; then
+              action="create"
+            else
+              echo "Multiple exact delivery branch refs found" >&2
+              exit 1
+            fi
+            number=""
+          fi
+          {
+            echo "action=$action"
+            echo "branch=$branch"
+            echo "pr-number=$number"
+            echo "verified-head=$verified_head"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        if: >-
+          steps.delivery.outputs.action == 'create' ||
+          steps.delivery.outputs.action == 'recover'
+        run: npm ci
+
+      - name: Validate synchronized landing
+        if: >-
+          steps.delivery.outputs.action == 'create' ||
+          steps.delivery.outputs.action == 'recover'
+        run: |
+          npm test -- scripts/vendor-agent-inbox-landing.test.ts src/lib/agent-inbox-landing.test.ts
+          npm run astro check
+          npm run build
+
+      - name: Verify exact changed-file scope
+        if: steps.delivery.outputs.action == 'create'
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(
+            git status --porcelain=v1 --untracked-files=all |
+              sed 's/^...//' |
+              sort
+          )
+          ((${#changed[@]} > 0)) || {
+            echo "Sync reported a change but the worktree is clean" >&2
+            exit 1
+          }
+          for path in "${changed[@]}"; do
+            [[ "$path" == "public/agent-inbox/index.html" ||
+               "$path" == "vendor/agent-inbox-landing.json" ]] || {
+              echo "Unexpected changed path: $path" >&2
+              exit 1
+            }
+          done
+          printf '%s\n' "${changed[@]}"
+
+      - name: Verify recoverable branch
+        if: steps.delivery.outputs.action == 'recover'
+        env:
+          BRANCH: ${{ steps.delivery.outputs.branch }}
+          SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
+          SOURCE_SHA256: ${{ steps.sync.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          mapfile -t changed < <(
+            git diff --name-only "origin/main...origin/$BRANCH" | sort
+          )
+          ((${#changed[@]} > 0)) || {
+            echo "Recovery branch does not differ from main" >&2
+            exit 1
+          }
+          for path in "${changed[@]}"; do
+            [[ "$path" == "public/agent-inbox/index.html" ||
+               "$path" == "vendor/agent-inbox-landing.json" ]] || {
+              echo "Unexpected recovery branch path: $path" >&2
+              exit 1
+            }
+          done
+          landing_hash="$(
+            git show "origin/$BRANCH:public/agent-inbox/index.html" |
+              sha256sum |
+              awk '{print $1}'
+          )"
+          actual_metadata="$RUNNER_TEMP/recovery-metadata.json"
+          expected_metadata="$RUNNER_TEMP/recovery-expected.json"
+          git show \
+            "origin/$BRANCH:vendor/agent-inbox-landing.json" \
+            >"$actual_metadata"
+          jq -n \
+            --arg repository "https://github.com/shariqh/agent-inbox" \
+            --arg sourcePath "marketing/index.html" \
+            --arg sourceRef "main" \
+            --arg commit "$SOURCE_COMMIT" \
+            --arg sha256 "$SOURCE_SHA256" \
+            --arg license "MIT" \
+            '{
+              repository: $repository,
+              sourcePath: $sourcePath,
+              sourceRef: $sourceRef,
+              commit: $commit,
+              sha256: $sha256,
+              license: $license
+            }' >"$expected_metadata"
+          cmp --silent "$actual_metadata" "$expected_metadata" || {
+            echo "Recovery branch has noncanonical metadata" >&2
+            exit 1
+          }
+          metadata_commit="$(jq -r '.commit' "$actual_metadata")"
+          metadata_hash="$(jq -r '.sha256' "$actual_metadata")"
+          for path in \
+            "public/agent-inbox/index.html" \
+            "vendor/agent-inbox-landing.json"; do
+            read -r mode type _ < <(
+              git ls-tree "origin/$BRANCH" -- "$path"
+            )
+            [[ "$mode" == "100644" && "$type" == "blob" ]] || {
+              echo "Recovery branch contains an invalid file mode for $path" >&2
+              exit 1
+            }
+          done
+          [[ "$landing_hash" == "$SOURCE_SHA256" &&
+             "$metadata_commit" == "$SOURCE_COMMIT" &&
+             "$metadata_hash" == "$SOURCE_SHA256" ]] || {
+            echo "Recovery branch does not match the resolved source" >&2
+            exit 1
+          }
+
+      - name: Create or recover delivery pull request
+        id: publish
+        if: >-
+          steps.delivery.outputs.action == 'create' ||
+          steps.delivery.outputs.action == 'recover'
+        env:
+          ACTION: ${{ steps.delivery.outputs.action }}
+          BRANCH: ${{ steps.delivery.outputs.branch }}
+          GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
+          SOURCE_SHA256: ${{ steps.sync.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          short="${SOURCE_COMMIT:0:12}"
+          if [[ "$ACTION" == "create" ]]; then
+            git switch -c "$BRANCH"
+            git add -- public/agent-inbox/index.html vendor/agent-inbox-landing.json
+            staged_hash="$(
+              git show :public/agent-inbox/index.html |
+                sha256sum |
+                awk '{print $1}'
+            )"
+            [[ "$staged_hash" == "$SOURCE_SHA256" ]] || {
+              echo "Git staging changed the vendored landing bytes" >&2
+              exit 1
+            }
+            staged_metadata="$RUNNER_TEMP/staged-metadata.json"
+            expected_metadata="$RUNNER_TEMP/staged-expected.json"
+            git show :vendor/agent-inbox-landing.json >"$staged_metadata"
+            jq -n \
+              --arg repository "https://github.com/shariqh/agent-inbox" \
+              --arg sourcePath "marketing/index.html" \
+              --arg sourceRef "main" \
+              --arg commit "$SOURCE_COMMIT" \
+              --arg sha256 "$SOURCE_SHA256" \
+              --arg license "MIT" \
+              '{
+                repository: $repository,
+                sourcePath: $sourcePath,
+                sourceRef: $sourceRef,
+                commit: $commit,
+                sha256: $sha256,
+                license: $license
+              }' >"$expected_metadata"
+            cmp --silent "$staged_metadata" "$expected_metadata" || {
+              echo "Git staging produced noncanonical metadata" >&2
+              exit 1
+            }
+            for path in \
+              "public/agent-inbox/index.html" \
+              "vendor/agent-inbox-landing.json"; do
+              read -r mode _ < <(git ls-files --stage -- "$path")
+              [[ "$mode" == "100644" &&
+                 "$(git cat-file -t ":$path")" == "blob" ]] || {
+                echo "Git staging produced an invalid file mode for $path" >&2
+                exit 1
+              }
+            done
+            git config user.name "shariq-dev-agent"
+            git config user.email "agent@shariq.dev"
+            git commit \
+              -m "chore: sync Agent Inbox landing ($short)" \
+              -m "Source commit: $SOURCE_COMMIT
+          SHA-256: $SOURCE_SHA256"
+            gh auth setup-git
+            git push --set-upstream origin "$BRANCH"
+            verified_head="$(git rev-parse HEAD)"
+          else
+            verified_head="$(git rev-parse "origin/$BRANCH")"
+          fi
+          body="$RUNNER_TEMP/agent-inbox-landing-pr.md"
+          cat >"$body" <<EOF
+          ## Summary
+
+          - sync the hosted Agent Inbox landing page from \`marketing/index.html\`
+          - update the pinned source commit and SHA-256 metadata
+
+          ## Source
+
+          - Commit: \`$SOURCE_COMMIT\`
+          - SHA-256: \`$SOURCE_SHA256\`
+
+          This PR was generated by the scheduled landing-page sync. Normal CI,
+          preview deployment, and AI review gates apply; it is not merged
+          automatically.
+          EOF
+          url="$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "Sync Agent Inbox landing ($short)" \
+            --body-file "$body")"
+          number="$(gh pr view "$url" --json number --jq '.number')"
+          {
+            echo "pr-number=$number"
+            echo "verified-head=$verified_head"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Ensure built-in Copilot review
+        if: >-
+          steps.delivery.outputs.action == 'open' ||
+          steps.delivery.outputs.action == 'create' ||
+          steps.delivery.outputs.action == 'recover'
+        env:
+          BRANCH: ${{ steps.delivery.outputs.branch }}
+          EXISTING_HEAD: ${{ steps.delivery.outputs.verified-head }}
+          EXISTING_PR: ${{ steps.delivery.outputs.pr-number }}
+          GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          PUBLISHED_HEAD: ${{ steps.publish.outputs.verified-head }}
+          PUBLISHED_PR: ${{ steps.publish.outputs.pr-number }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${PUBLISHED_PR:-$EXISTING_PR}"
+          EXPECTED_HEAD="${PUBLISHED_HEAD:-$EXISTING_HEAD}"
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || {
+            echo "Missing delivery PR number" >&2
+            exit 1
+          }
+          [[ "$EXPECTED_HEAD" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Missing verified delivery head" >&2
+            exit 1
+          }
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          head="$(jq -r '.head.sha' <<<"$pr")"
+          [[ "$(jq -r '.user.login' <<<"$pr")" == "$GITHUB_REPOSITORY_OWNER" &&
+             "$(jq -r '.state' <<<"$pr")" == "open" &&
+             "$(jq -r '.head.repo.full_name' <<<"$pr")" == "$GITHUB_REPOSITORY" &&
+             "$(jq -r '.head.ref' <<<"$pr")" == "$BRANCH" &&
+             "$(jq -r '.base.repo.full_name' <<<"$pr")" == "$GITHUB_REPOSITORY" &&
+             "$(jq -r '.base.ref' <<<"$pr")" == "main" &&
+             "$head" == "$EXPECTED_HEAD" ]] || {
+            echo "Delivery PR changed after verification" >&2
+            exit 1
+          }
+          reviewed="$(
+            gh api \
+              --paginate \
+              --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews?per_page=100" |
+              jq --arg head "$head" \
+                'flatten | [.[] | select(
+                  .user.login == "copilot-pull-request-reviewer[bot]" and
+                  .commit_id == $head
+                )] | length'
+          )"
+          if [[ "$reviewed" == "0" ]]; then
+            gh pr edit "$PR_NUMBER" --add-reviewer copilot-pull-request-reviewer
+          else
+            echo "Built-in Copilot already reviewed the current PR head."
+          fi
+          [[ "$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')" == "$EXPECTED_HEAD" ]] || {
+            echo "Delivery PR changed while review was requested" >&2
+            exit 1
+          }
