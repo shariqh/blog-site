@@ -1,5 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -12,6 +20,7 @@ const EXPECTED_LICENSE = "MIT";
 const LANDING_PATH = "public/agent-inbox/index.html";
 const METADATA_PATH = "vendor/agent-inbox-landing.json";
 const LOCK_PATH = ".agent-inbox-landing-sync.lock";
+const STALE_LOCK_MS = 30 * 60 * 1000;
 const FULL_SHA = /^[a-f0-9]{40}$/;
 
 export interface VendorMetadata {
@@ -279,21 +288,29 @@ async function withSyncLock<T>(
   await mkdir(rootDir, { recursive: true });
   const lockPath = resolve(rootDir, LOCK_PATH);
   let lock;
-  try {
-    lock = await open(lockPath, "wx");
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "EEXIST"
-    ) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      lock = await open(lockPath, "wx");
+      break;
+    } catch (error) {
+      if (
+        typeof error !== "object" ||
+        error === null ||
+        !("code" in error) ||
+        error.code !== "EEXIST"
+      ) {
+        throw error;
+      }
+      if (attempt === 0 && (await staleLock(lockPath))) {
+        await rm(lockPath, { force: true });
+        continue;
+      }
       throw new Error(
         `Another Agent Inbox landing sync is already running (${lockPath})`,
       );
     }
-    throw error;
   }
+  if (!lock) throw new Error(`Failed to acquire sync lock: ${lockPath}`);
 
   try {
     await lock.writeFile(
@@ -303,6 +320,76 @@ async function withSyncLock<T>(
   } finally {
     await lock.close();
     await rm(lockPath, { force: true });
+  }
+}
+
+async function staleLock(lockPath: string): Promise<boolean> {
+  let modifiedAt: number;
+  let content: string;
+  try {
+    const [details, bytes] = await Promise.all([
+      stat(lockPath),
+      readFile(lockPath, "utf8"),
+    ]);
+    modifiedAt = details.mtimeMs;
+    content = bytes;
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return true;
+    }
+    throw error;
+  }
+
+  const fileAge = Date.now() - modifiedAt;
+  let owner: unknown;
+  try {
+    owner = JSON.parse(content);
+  } catch {
+    return fileAge >= STALE_LOCK_MS;
+  }
+  if (
+    typeof owner !== "object" ||
+    owner === null ||
+    !("pid" in owner) ||
+    !Number.isSafeInteger(owner.pid) ||
+    typeof owner.pid !== "number" ||
+    owner.pid <= 0 ||
+    !("startedAt" in owner) ||
+    typeof owner.startedAt !== "string"
+  ) {
+    return fileAge >= STALE_LOCK_MS;
+  }
+
+  const startedAt = Date.parse(owner.startedAt);
+  if (Number.isFinite(startedAt) && Date.now() - startedAt >= STALE_LOCK_MS) {
+    return true;
+  }
+  try {
+    process.kill(owner.pid, 0);
+    return false;
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ESRCH"
+    ) {
+      return true;
+    }
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "EPERM"
+    ) {
+      return false;
+    }
+    throw error;
   }
 }
 

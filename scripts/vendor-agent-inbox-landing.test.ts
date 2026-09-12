@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import matter from "gray-matter";
@@ -243,6 +243,27 @@ describe("Agent Inbox landing sync", () => {
       readFile(join(rootDir, ".agent-inbox-landing-sync.lock")),
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  it("reclaims a stale lock before updating", async () => {
+    const rootDir = await temporaryRoot();
+    await writeFile(
+      join(rootDir, ".agent-inbox-landing-sync.lock"),
+      `${JSON.stringify({
+        pid: process.pid,
+        startedAt: "2000-01-01T00:00:00.000Z",
+      })}\n`,
+    );
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+    );
+
+    await expect(
+      syncAgentInboxLanding({ rootDir, fetchImpl, token: "" }),
+    ).resolves.toMatchObject({ changed: true });
+    await expect(
+      readFile(join(rootDir, ".agent-inbox-landing-sync.lock")),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
 });
 
 describe("Agent Inbox landing sync workflow", () => {
@@ -286,7 +307,7 @@ describe("Agent Inbox landing sync workflow", () => {
       "npm run --silent sync:agent-inbox-landing -- --json",
     );
     expect(workflow).toContain(
-      'branch="automation/agent-inbox-landing-${commit:0:12}"',
+      'branch="automation/agent-inbox-landing-$commit"',
     );
     expect(workflow).toContain('-f "head=$GITHUB_REPOSITORY_OWNER:$branch"');
     expect(workflow).toContain(
@@ -300,6 +321,8 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toMatch(/case "\$state" in\s+open\)/);
     expect(workflow).toContain('action="closed"');
     expect(workflow).toContain("Verify recoverable branch");
+    expect(workflow).toContain("git/matching-refs/heads/$branch");
+    expect(workflow).toContain('verify_delivery_ref "$head_sha"');
     expect(workflow).toContain("gh auth setup-git");
     expect(workflow).toContain('[[ "$author" == "$GITHUB_REPOSITORY_OWNER" ]]');
     expect(sync.env).toBeUndefined();

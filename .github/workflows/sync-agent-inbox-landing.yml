@@ -63,6 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
           SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
+          SOURCE_SHA256: ${{ steps.sync.outputs.sha256 }}
         run: |
           set -euo pipefail
           actor="$(gh api user --jq '.login')"
@@ -72,7 +73,39 @@ jobs:
           }
           commit="$SOURCE_COMMIT"
           [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || exit 1
-          branch="automation/agent-inbox-landing-${commit:0:12}"
+          branch="automation/agent-inbox-landing-$commit"
+          verify_delivery_ref() {
+            local ref="$1"
+            [[ "$ref" =~ ^[a-f0-9]{40}$ ]] || {
+              echo "Invalid delivery ref" >&2
+              exit 1
+            }
+            local landing_hash metadata metadata_commit metadata_hash
+            landing_hash="$(
+              gh api \
+                --method GET \
+                -H "Accept: application/vnd.github.raw+json" \
+                "repos/$GITHUB_REPOSITORY/contents/public/agent-inbox/index.html" \
+                -f "ref=$ref" |
+                sha256sum |
+                awk '{print $1}'
+            )"
+            metadata="$(
+              gh api \
+                --method GET \
+                -H "Accept: application/vnd.github.raw+json" \
+                "repos/$GITHUB_REPOSITORY/contents/vendor/agent-inbox-landing.json" \
+                -f "ref=$ref"
+            )"
+            metadata_commit="$(jq -r '.commit' <<<"$metadata")"
+            metadata_hash="$(jq -r '.sha256' <<<"$metadata")"
+            [[ "$landing_hash" == "$SOURCE_SHA256" &&
+               "$metadata_commit" == "$SOURCE_COMMIT" &&
+               "$metadata_hash" == "$SOURCE_SHA256" ]] || {
+              echo "Existing delivery ref does not match the resolved source" >&2
+              exit 1
+            }
+          }
           pr="$(gh api \
             --method GET \
             "repos/$GITHUB_REPOSITORY/pulls" \
@@ -94,6 +127,8 @@ jobs:
             }
             state="$(jq -r '.[0].state' <<<"$pr")"
             number="$(jq -r '.[0].number' <<<"$pr")"
+            head_sha="$(jq -r '.[0].head.sha' <<<"$pr")"
+            verify_delivery_ref "$head_sha"
             case "$state" in
               open)
                 action="open"
@@ -107,11 +142,23 @@ jobs:
                 exit 1
                 ;;
             esac
-          elif git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-            action="recover"
-            number=""
           else
-            action="create"
+            refs="$(
+              gh api \
+                "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$branch"
+            )"
+            ref_count="$(
+              jq --arg ref "refs/heads/$branch" \
+                '[.[] | select(.ref == $ref)] | length' <<<"$refs"
+            )"
+            if [[ "$ref_count" == "1" ]]; then
+              action="recover"
+            elif [[ "$ref_count" == "0" ]]; then
+              action="create"
+            else
+              echo "Multiple exact delivery branch refs found" >&2
+              exit 1
+            fi
             number=""
           fi
           {
