@@ -266,7 +266,11 @@ describe("Agent Inbox landing sync workflow", () => {
     };
 
     expect(workflow).toContain('cron: "17 * * * *"');
-    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).not.toContain("workflow_dispatch:");
+    expect(workflow).toContain("branches: [main]");
+    expect(workflow).toContain(
+      '- ".github/workflows/sync-agent-inbox-landing.yml"',
+    );
     expect(workflow).toContain("secrets.AGENT_GH_TOKEN");
     expect(workflow).toContain(
       "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",

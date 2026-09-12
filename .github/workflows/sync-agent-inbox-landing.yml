@@ -1,9 +1,14 @@
 name: Sync Agent Inbox landing
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-agent-inbox-landing.yml"
+      - "scripts/vendor-agent-inbox-landing.ts"
+      - "package.json"
   schedule:
     - cron: "17 * * * *"
-  workflow_dispatch:
 
 permissions:
   contents: read
