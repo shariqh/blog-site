@@ -71,6 +71,7 @@ jobs:
         id: delivery
         if: steps.sync.outputs.changed == 'true'
         env:
+          GITHUB_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
           GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
           SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
           SOURCE_SHA256: ${{ steps.sync.outputs.sha256 }}
@@ -220,7 +221,17 @@ jobs:
                   ) | .head.sha' <<<"$open_sync"
               )"
               open_commit="${open_branch#automation/agent-inbox-landing-}"
-              verify_delivery_ref "$open_head_sha" "$open_commit"
+              open_source="$(
+                npm run --silent sync:agent-inbox-landing -- \
+                  --inspect "$open_commit" \
+                  --json
+              )"
+              open_hash="$(jq -r '.sha256' <<<"$open_source")"
+              [[ "$open_hash" =~ ^[a-f0-9]{64}$ ]] || {
+                echo "Invalid deferred source SHA-256" >&2
+                exit 1
+              }
+              verify_delivery_ref "$open_head_sha" "$open_commit" "$open_hash"
               verify_pr_scope "$number"
               {
                 echo "action=defer"

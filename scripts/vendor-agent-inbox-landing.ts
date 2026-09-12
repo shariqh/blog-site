@@ -32,6 +32,12 @@ export interface SyncResult {
   files: string[];
 }
 
+export interface SourceInspection {
+  commit: string;
+  sha256: string;
+  license: string;
+}
+
 interface SyncOptions {
   rootDir?: string;
   fetchImpl?: typeof fetch;
@@ -350,15 +356,40 @@ async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
   }
 }
 
+async function loadSourceRevision(
+  commit: string,
+  fetchImpl: typeof fetch,
+  token: string | undefined,
+): Promise<SourceInspection & { landing: Uint8Array }> {
+  const license = await verifySourceLicense(commit, fetchImpl, token);
+  const landing = await fetchSourceBytes(commit, fetchImpl, token);
+  return { commit, sha256: sha256(landing), license, landing };
+}
+
+export async function inspectSourceCommit(
+  commit: string,
+  fetchImpl: typeof fetch = fetch,
+  token = process.env.GITHUB_TOKEN,
+): Promise<SourceInspection> {
+  const { landing: _landing, ...inspection } = await loadSourceRevision(
+    commit,
+    fetchImpl,
+    token,
+  );
+  return inspection;
+}
+
 export async function syncAgentInboxLanding({
   rootDir = process.cwd(),
   fetchImpl = fetch,
   token = process.env.GITHUB_TOKEN,
 }: SyncOptions = {}): Promise<SyncResult> {
   const commit = await resolveSourceCommit(fetchImpl, token);
-  const license = await verifySourceLicense(commit, fetchImpl, token);
-  const landing = await fetchSourceBytes(commit, fetchImpl, token);
-  const digest = sha256(landing);
+  const {
+    landing,
+    license,
+    sha256: digest,
+  } = await loadSourceRevision(commit, fetchImpl, token);
   const metadata: VendorMetadata = {
     repository: SOURCE_REPOSITORY_URL,
     sourcePath: SOURCE_PATH,
@@ -401,17 +432,28 @@ function isMainModule(): boolean {
 }
 
 if (isMainModule()) {
-  syncAgentInboxLanding()
+  const inspectIndex = process.argv.indexOf("--inspect");
+  const operation =
+    inspectIndex >= 0
+      ? inspectSourceCommit(process.argv[inspectIndex + 1] ?? "")
+      : syncAgentInboxLanding();
+  operation
     .then((result) => {
       if (process.argv.includes("--json")) {
         console.log(JSON.stringify(result));
         return;
       }
-      console.log(
-        result.changed
-          ? `Updated Agent Inbox landing from ${result.commit}`
-          : `Agent Inbox landing already matches ${result.commit}`,
-      );
+      if ("changed" in result) {
+        console.log(
+          result.changed
+            ? `Updated Agent Inbox landing from ${result.commit}`
+            : `Agent Inbox landing already matches ${result.commit}`,
+        );
+      } else {
+        console.log(
+          `Agent Inbox landing ${result.commit} is ${result.license} with SHA-256 ${result.sha256}`,
+        );
+      }
     })
     .catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import matter from "gray-matter";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  inspectSourceCommit,
   resolveSourceCommit,
   syncAgentInboxLanding,
   verifySourceLicense,
@@ -231,6 +232,19 @@ describe("Agent Inbox landing sync", () => {
       "is not published under the expected MIT license",
     );
   });
+
+  it("independently inspects an exact source commit", async () => {
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+    );
+
+    await expect(inspectSourceCommit(COMMIT, fetchImpl, "")).resolves.toEqual({
+      commit: COMMIT,
+      sha256:
+        "335fca8574f060eea24ebcdae6b78f32414f5de03da1084fd0e73d710768e3a9",
+      license: "MIT",
+    });
+  });
 });
 
 describe("Agent Inbox landing sync workflow", () => {
@@ -307,6 +321,7 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain('verify_delivery_ref "$head_sha"');
     expect(workflow).toContain('verify_pr_scope "$number"');
     expect(workflow).toContain("Unexpected delivery PR path");
+    expect(workflow).toContain('--inspect "$open_commit"');
     expect(workflow).toContain("Delivery PR must not rename repository paths");
     expect(workflow).toContain("Deferring this revision while sync PR");
     expect(workflow).toContain('echo "action=defer"');
