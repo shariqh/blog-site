@@ -81,6 +81,8 @@ jobs:
           branch="automation/agent-inbox-landing-$commit"
           verify_delivery_ref() {
             local ref="$1"
+            local expected_commit="$2"
+            local expected_hash="${3:-}"
             [[ "$ref" =~ ^[a-f0-9]{40}$ ]] || {
               echo "Invalid delivery ref" >&2
               exit 1
@@ -104,9 +106,16 @@ jobs:
             )"
             metadata_commit="$(jq -r '.commit' <<<"$metadata")"
             metadata_hash="$(jq -r '.sha256' <<<"$metadata")"
-            [[ "$landing_hash" == "$SOURCE_SHA256" &&
-               "$metadata_commit" == "$SOURCE_COMMIT" &&
-               "$metadata_hash" == "$SOURCE_SHA256" ]] || {
+            [[ "$metadata_hash" =~ ^[a-f0-9]{64}$ ]] || {
+              echo "Existing delivery ref has invalid SHA-256 metadata" >&2
+              exit 1
+            }
+            if [[ -z "$expected_hash" ]]; then
+              expected_hash="$metadata_hash"
+            fi
+            [[ "$landing_hash" == "$expected_hash" &&
+               "$metadata_commit" == "$expected_commit" &&
+               "$metadata_hash" == "$expected_hash" ]] || {
               echo "Existing delivery ref does not match the resolved source" >&2
               exit 1
             }
@@ -120,6 +129,16 @@ jobs:
                 --slurp \
                 "repos/$GITHUB_REPOSITORY/pulls/$number/files?per_page=100"
             )"
+            renamed="$(
+              jq 'flatten | [.[] | select(
+                .status == "renamed" or
+                .previous_filename != null
+              )] | length' <<<"$files"
+            )"
+            [[ "$renamed" == "0" ]] || {
+              echo "Delivery PR must not rename repository paths" >&2
+              exit 1
+            }
             mapfile -t changed < <(
               jq -r 'flatten | .[].filename' <<<"$files" | sort -u
             )
@@ -152,10 +171,11 @@ jobs:
           open_sync_count="$(
             jq \
               --arg repo "$GITHUB_REPOSITORY" \
-              --arg prefix "automation/agent-inbox-landing-" \
+              --arg owner "$GITHUB_REPOSITORY_OWNER" \
               'flatten | [.[] | select(
+                .user.login == $owner and
                 .head.repo.full_name == $repo and
-                (.head.ref | startswith($prefix))
+                (.head.ref | test("^automation/agent-inbox-landing-[a-f0-9]{40}$"))
               )] | length' <<<"$open_sync"
           )"
           ((open_sync_count <= 1)) || {
@@ -166,22 +186,37 @@ jobs:
             open_branch="$(
               jq -r \
                 --arg repo "$GITHUB_REPOSITORY" \
-                --arg prefix "automation/agent-inbox-landing-" \
+                --arg owner "$GITHUB_REPOSITORY_OWNER" \
                 'flatten | .[] | select(
+                  .user.login == $owner and
                   .head.repo.full_name == $repo and
-                  (.head.ref | startswith($prefix))
+                  (.head.ref | test("^automation/agent-inbox-landing-[a-f0-9]{40}$"))
                 ) | .head.ref' <<<"$open_sync"
             )"
             if [[ "$open_branch" != "$branch" ]]; then
               number="$(
                 jq -r \
                   --arg repo "$GITHUB_REPOSITORY" \
-                  --arg prefix "automation/agent-inbox-landing-" \
+                  --arg owner "$GITHUB_REPOSITORY_OWNER" \
                   'flatten | .[] | select(
+                    .user.login == $owner and
                     .head.repo.full_name == $repo and
-                    (.head.ref | startswith($prefix))
+                    (.head.ref | test("^automation/agent-inbox-landing-[a-f0-9]{40}$"))
                   ) | .number' <<<"$open_sync"
               )"
+              open_head_sha="$(
+                jq -r \
+                  --arg repo "$GITHUB_REPOSITORY" \
+                  --arg owner "$GITHUB_REPOSITORY_OWNER" \
+                  'flatten | .[] | select(
+                    .user.login == $owner and
+                    .head.repo.full_name == $repo and
+                    (.head.ref | test("^automation/agent-inbox-landing-[a-f0-9]{40}$"))
+                  ) | .head.sha' <<<"$open_sync"
+              )"
+              open_commit="${open_branch#automation/agent-inbox-landing-}"
+              verify_delivery_ref "$open_head_sha" "$open_commit"
+              verify_pr_scope "$number"
               {
                 echo "action=defer"
                 echo "branch=$branch"
@@ -206,9 +241,11 @@ jobs:
           if [[ "$count" == "1" ]]; then
             head_repo="$(jq -r '.[0].head.repo.full_name' <<<"$pr")"
             head_ref="$(jq -r '.[0].head.ref' <<<"$pr")"
+            author="$(jq -r '.[0].user.login' <<<"$pr")"
             base_repo="$(jq -r '.[0].base.repo.full_name' <<<"$pr")"
             base_ref="$(jq -r '.[0].base.ref' <<<"$pr")"
-            [[ "$head_repo" == "$GITHUB_REPOSITORY" &&
+            [[ "$author" == "$GITHUB_REPOSITORY_OWNER" &&
+               "$head_repo" == "$GITHUB_REPOSITORY" &&
                "$head_ref" == "$branch" &&
                "$base_repo" == "$GITHUB_REPOSITORY" &&
                "$base_ref" == "main" ]] || {
@@ -218,7 +255,7 @@ jobs:
             state="$(jq -r '.[0].state' <<<"$pr")"
             number="$(jq -r '.[0].number' <<<"$pr")"
             head_sha="$(jq -r '.[0].head.sha' <<<"$pr")"
-            verify_delivery_ref "$head_sha"
+            verify_delivery_ref "$head_sha" "$SOURCE_COMMIT" "$SOURCE_SHA256"
             verify_pr_scope "$number"
             case "$state" in
               open)

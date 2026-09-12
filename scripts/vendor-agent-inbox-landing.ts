@@ -295,8 +295,13 @@ function equalBytes(
 async function stageWrite(write: PlannedWrite): Promise<string> {
   await mkdir(dirname(write.path), { recursive: true });
   const temporary = `${write.path}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(temporary, write.bytes);
-  return temporary;
+  try {
+    await writeFile(temporary, write.bytes);
+    return temporary;
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
 }
 
 async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
