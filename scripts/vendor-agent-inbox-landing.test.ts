@@ -184,6 +184,33 @@ describe("Agent Inbox landing sync", () => {
     ).rejects.toThrow("Failed to download the Agent Inbox landing page");
   });
 
+  it("bounds upstream responses and supplies an abort signal", async () => {
+    let signal: AbortSignal | null | undefined;
+    const oversized: typeof fetch = async (input, init) => {
+      signal = init?.signal;
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith("/commits")) {
+        return Response.json([{ sha: COMMIT }]);
+      }
+      if (path.endsWith("/license")) {
+        return Response.json({
+          path: "LICENSE",
+          license: { spdx_id: "MIT" },
+        });
+      }
+      return new Response("x".repeat(1_000_001));
+    };
+
+    await expect(
+      syncAgentInboxLanding({
+        rootDir: await temporaryRoot(),
+        fetchImpl: oversized,
+        token: "",
+      }),
+    ).rejects.toThrow("response exceeds 1000000 bytes");
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("rejects malformed commit API responses", async () => {
     const malformed: typeof fetch = async () =>
       Response.json([{ sha: "main" }]);

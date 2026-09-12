@@ -12,6 +12,9 @@ const EXPECTED_LICENSE = "MIT";
 const LANDING_PATH = "public/agent-inbox/index.html";
 const METADATA_PATH = "vendor/agent-inbox-landing.json";
 const FULL_SHA = /^[a-f0-9]{40}$/;
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_API_BYTES = 1_000_000;
+const MAX_LANDING_BYTES = 1_000_000;
 
 export interface VendorMetadata {
   repository: string;
@@ -84,7 +87,10 @@ async function request(
 ): Promise<Response> {
   let response: Response;
   try {
-    response = await fetchImpl(url, { headers: requestHeaders(token) });
+    response = await fetchImpl(url, {
+      headers: requestHeaders(token),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
   } catch (error) {
     throw new Error(`Failed to ${purpose} from ${url.toString()}`, {
       cause: error,
@@ -98,6 +104,64 @@ async function request(
   return response;
 }
 
+async function readLimitedBytes(
+  response: Response,
+  maximum: number,
+  purpose: string,
+): Promise<Uint8Array> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maximum) {
+    throw new Error(
+      `Refusing ${purpose}: declared response size ${declaredLength} exceeds ${maximum} bytes`,
+    );
+  }
+  if (!response.body) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > maximum) {
+      throw new Error(`Refusing ${purpose}: response exceeds ${maximum} bytes`);
+    }
+    return bytes;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maximum) {
+      await reader.cancel(
+        `Response exceeded the ${maximum}-byte limit for ${purpose}`,
+      );
+      throw new Error(`Refusing ${purpose}: response exceeds ${maximum} bytes`);
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+async function readJson(response: Response, purpose: string): Promise<unknown> {
+  const bytes = await readLimitedBytes(response, MAX_API_BYTES, purpose);
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    throw new Error(
+      `GitHub returned invalid JSON while attempting to ${purpose}`,
+      {
+        cause: error,
+      },
+    );
+  }
+}
+
 export async function resolveSourceCommit(
   fetchImpl: typeof fetch = fetch,
   token = process.env.GITHUB_TOKEN,
@@ -108,7 +172,10 @@ export async function resolveSourceCommit(
     token,
     "resolve the latest Agent Inbox landing commit",
   );
-  const payload: unknown = await response.json();
+  const payload = await readJson(
+    response,
+    "resolve the latest Agent Inbox landing commit",
+  );
   if (
     !Array.isArray(payload) ||
     payload.length !== 1 ||
@@ -139,7 +206,11 @@ export async function fetchSourceBytes(
     token,
     "download the Agent Inbox landing page",
   );
-  return new Uint8Array(await response.arrayBuffer());
+  return readLimitedBytes(
+    response,
+    MAX_LANDING_BYTES,
+    "download the Agent Inbox landing page",
+  );
 }
 
 export async function verifySourceLicense(
@@ -156,7 +227,10 @@ export async function verifySourceLicense(
     token,
     "verify the Agent Inbox source license",
   );
-  const payload: unknown = await response.json();
+  const payload = await readJson(
+    response,
+    "verify the Agent Inbox source license",
+  );
   if (
     typeof payload !== "object" ||
     payload === null ||
