@@ -228,6 +228,10 @@ describe("Agent Inbox landing sync workflow", () => {
       };
     };
     const sync = parsed.jobs.sync;
+    const attributes = await readFile(
+      new URL("../.gitattributes", import.meta.url),
+      "utf8",
+    );
     const step = (name: string) => {
       const found = sync.steps.find((candidate) => candidate.name === name);
       if (!found) throw new Error(`Missing workflow step: ${name}`);
@@ -253,6 +257,12 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain("-f base=main");
     expect(workflow).toContain(
       "git add -- public/agent-inbox/index.html vendor/agent-inbox-landing.json",
+    );
+    expect(workflow).toContain(
+      "Git staging changed the vendored landing bytes",
+    );
+    expect(attributes).toContain(
+      "public/agent-inbox/index.html -text diff=html",
     );
     expect(workflow).toContain(
       'gh pr edit "$PR_NUMBER" --add-reviewer copilot-pull-request-reviewer',

@@ -308,7 +308,15 @@ jobs:
           if [[ "$ACTION" == "create" ]]; then
             git switch -c "$BRANCH"
             git add -- public/agent-inbox/index.html vendor/agent-inbox-landing.json
-            git diff --cached --check
+            staged_hash="$(
+              git show :public/agent-inbox/index.html |
+                sha256sum |
+                awk '{print $1}'
+            )"
+            [[ "$staged_hash" == "$SOURCE_SHA256" ]] || {
+              echo "Git staging changed the vendored landing bytes" >&2
+              exit 1
+            }
             git config user.name "shariq-dev-agent"
             git config user.email "agent@shariq.dev"
             git commit \

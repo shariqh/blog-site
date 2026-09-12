@@ -26,6 +26,7 @@
 *.css             text
 *.htm             text diff=html
 *.html            text diff=html
+public/agent-inbox/index.html -text diff=html
 *.inc             text
 *.ini             text
 *.js              text
