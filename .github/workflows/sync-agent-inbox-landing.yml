@@ -1,0 +1,267 @@
+name: Sync Agent Inbox landing
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-agent-inbox-landing
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+    steps:
+      - name: Check out blog site
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AGENT_GH_TOKEN }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Sync the latest landing revision
+        id: sync
+        run: |
+          set -euo pipefail
+          result="$(npm run --silent sync:agent-inbox-landing -- --json)"
+          changed="$(jq -r '.changed' <<<"$result")"
+          commit="$(jq -r '.commit' <<<"$result")"
+          sha256="$(jq -r '.sha256' <<<"$result")"
+          [[ "$changed" == "true" || "$changed" == "false" ]] || {
+            echo "Invalid changed result" >&2
+            exit 1
+          }
+          [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Invalid source commit" >&2
+            exit 1
+          }
+          [[ "$sha256" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "Invalid source SHA-256" >&2
+            exit 1
+          }
+          echo "$result"
+          {
+            echo "changed=$changed"
+            echo "commit=$commit"
+            echo "sha256=$sha256"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Inspect existing delivery state
+        id: delivery
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
+        run: |
+          set -euo pipefail
+          actor="$(gh api user --jq '.login')"
+          [[ "$actor" == "$GITHUB_REPOSITORY_OWNER" ]] || {
+            echo "AGENT_GH_TOKEN must authenticate as $GITHUB_REPOSITORY_OWNER" >&2
+            exit 1
+          }
+          commit="$SOURCE_COMMIT"
+          [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          branch="automation/agent-inbox-landing-${commit:0:12}"
+          pr="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state all \
+            --head "$branch" \
+            --limit 1 \
+            --json number,state)"
+          if [[ "$(jq 'length' <<<"$pr")" == "1" ]]; then
+            state="$(jq -r '.[0].state' <<<"$pr")"
+            number="$(jq -r '.[0].number' <<<"$pr")"
+            if [[ "$state" == "OPEN" ]]; then
+              action="open"
+            else
+              action="closed"
+              echo "A $state PR already records this upstream revision; not replacing it."
+            fi
+          elif git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            action="recover"
+            number=""
+          else
+            action="create"
+            number=""
+          fi
+          {
+            echo "action=$action"
+            echo "branch=$branch"
+            echo "pr-number=$number"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        if: >-
+          steps.delivery.outputs.action == 'create' ||
+          steps.delivery.outputs.action == 'recover'
+        run: npm ci
+
+      - name: Validate synchronized landing
+        if: >-
+          steps.delivery.outputs.action == 'create' ||
+          steps.delivery.outputs.action == 'recover'
+        run: |
+          npm test -- scripts/vendor-agent-inbox-landing.test.ts src/lib/agent-inbox-landing.test.ts
+          npm run astro check
+          npm run build
+
+      - name: Verify exact changed-file scope
+        if: steps.delivery.outputs.action == 'create'
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(
+            git status --porcelain=v1 --untracked-files=all |
+              sed 's/^...//' |
+              sort
+          )
+          ((${#changed[@]} > 0)) || {
+            echo "Sync reported a change but the worktree is clean" >&2
+            exit 1
+          }
+          for path in "${changed[@]}"; do
+            [[ "$path" == "public/agent-inbox/index.html" ||
+               "$path" == "vendor/agent-inbox-landing.json" ]] || {
+              echo "Unexpected changed path: $path" >&2
+              exit 1
+            }
+          done
+          printf '%s\n' "${changed[@]}"
+
+      - name: Verify recoverable branch
+        if: steps.delivery.outputs.action == 'recover'
+        env:
+          BRANCH: ${{ steps.delivery.outputs.branch }}
+          SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
+          SOURCE_SHA256: ${{ steps.sync.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          mapfile -t changed < <(
+            git diff --name-only "origin/main...origin/$BRANCH" | sort
+          )
+          ((${#changed[@]} > 0)) || {
+            echo "Recovery branch does not differ from main" >&2
+            exit 1
+          }
+          for path in "${changed[@]}"; do
+            [[ "$path" == "public/agent-inbox/index.html" ||
+               "$path" == "vendor/agent-inbox-landing.json" ]] || {
+              echo "Unexpected recovery branch path: $path" >&2
+              exit 1
+            }
+          done
+          landing_hash="$(
+            git show "origin/$BRANCH:public/agent-inbox/index.html" |
+              sha256sum |
+              awk '{print $1}'
+          )"
+          metadata_commit="$(
+            git show "origin/$BRANCH:vendor/agent-inbox-landing.json" |
+              jq -r '.commit'
+          )"
+          metadata_hash="$(
+            git show "origin/$BRANCH:vendor/agent-inbox-landing.json" |
+              jq -r '.sha256'
+          )"
+          [[ "$landing_hash" == "$SOURCE_SHA256" &&
+             "$metadata_commit" == "$SOURCE_COMMIT" &&
+             "$metadata_hash" == "$SOURCE_SHA256" ]] || {
+            echo "Recovery branch does not match the resolved source" >&2
+            exit 1
+          }
+
+      - name: Create or recover delivery pull request
+        id: publish
+        if: >-
+          steps.delivery.outputs.action == 'create' ||
+          steps.delivery.outputs.action == 'recover'
+        env:
+          ACTION: ${{ steps.delivery.outputs.action }}
+          BRANCH: ${{ steps.delivery.outputs.branch }}
+          SOURCE_COMMIT: ${{ steps.sync.outputs.commit }}
+          SOURCE_SHA256: ${{ steps.sync.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          short="${SOURCE_COMMIT:0:12}"
+          if [[ "$ACTION" == "create" ]]; then
+            git switch -c "$BRANCH"
+            git add -- public/agent-inbox/index.html vendor/agent-inbox-landing.json
+            git diff --cached --check
+            git config user.name "shariq-dev-agent"
+            git config user.email "agent@shariq.dev"
+            git commit \
+              -m "chore: sync Agent Inbox landing ($short)" \
+              -m "Source commit: $SOURCE_COMMIT
+          SHA-256: $SOURCE_SHA256"
+            git push --set-upstream origin "$BRANCH"
+          fi
+          body="$RUNNER_TEMP/agent-inbox-landing-pr.md"
+          cat >"$body" <<EOF
+          ## Summary
+
+          - sync the hosted Agent Inbox landing page from \`marketing/index.html\`
+          - update the pinned source commit and SHA-256 metadata
+
+          ## Source
+
+          - Commit: \`$SOURCE_COMMIT\`
+          - SHA-256: \`$SOURCE_SHA256\`
+
+          This PR was generated by the scheduled landing-page sync. Normal CI,
+          preview deployment, and AI review gates apply; it is not merged
+          automatically.
+          EOF
+          url="$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "Sync Agent Inbox landing ($short)" \
+            --body-file "$body")"
+          number="$(gh pr view "$url" --json number --jq '.number')"
+          echo "pr-number=$number" >>"$GITHUB_OUTPUT"
+
+      - name: Ensure built-in Copilot review
+        if: >-
+          steps.sync.outputs.changed == 'true' &&
+          steps.delivery.outputs.action != 'closed'
+        env:
+          EXISTING_PR: ${{ steps.delivery.outputs.pr-number }}
+          PUBLISHED_PR: ${{ steps.publish.outputs.pr-number }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${PUBLISHED_PR:-$EXISTING_PR}"
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || {
+            echo "Missing delivery PR number" >&2
+            exit 1
+          }
+          author="$(gh pr view "$PR_NUMBER" --json author --jq '.author.login')"
+          [[ "$author" == "$GITHUB_REPOSITORY_OWNER" ]] || {
+            echo "Delivery PR must be owner-authored for the review workflow" >&2
+            exit 1
+          }
+          head="$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
+          reviewed="$(
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" |
+              jq --arg head "$head" \
+                '[.[] | select(
+                  .user.login == "copilot-pull-request-reviewer[bot]" and
+                  .commit_id == $head
+                )] | length'
+          )"
+          if [[ "$reviewed" == "0" ]]; then
+            gh pr edit "$PR_NUMBER" --add-reviewer copilot-pull-request-reviewer
+          else
+            echo "Built-in Copilot already reviewed the current PR head."
+          fi

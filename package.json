@@ -17,6 +17,7 @@
     "migrate:cms": "tsx scripts/agent/migrate-cms.ts",
     "post:thread": "tsx scripts/social/post-thread.ts",
     "preview": "astro preview",
+    "sync:agent-inbox-landing": "node scripts/vendor-agent-inbox-landing.ts",
     "test": "vitest run",
     "test:smoke": "playwright test",
     "test:watch": "vitest"
