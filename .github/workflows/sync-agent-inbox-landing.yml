@@ -143,6 +143,54 @@ jobs:
               exit 1
             }
           }
+          open_sync="$(
+            gh api \
+              --paginate \
+              --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100"
+          )"
+          open_sync_count="$(
+            jq \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg prefix "automation/agent-inbox-landing-" \
+              'flatten | [.[] | select(
+                .head.repo.full_name == $repo and
+                (.head.ref | startswith($prefix))
+              )] | length' <<<"$open_sync"
+          )"
+          ((open_sync_count <= 1)) || {
+            echo "Multiple Agent Inbox landing sync PRs are open" >&2
+            exit 1
+          }
+          if [[ "$open_sync_count" == "1" ]]; then
+            open_branch="$(
+              jq -r \
+                --arg repo "$GITHUB_REPOSITORY" \
+                --arg prefix "automation/agent-inbox-landing-" \
+                'flatten | .[] | select(
+                  .head.repo.full_name == $repo and
+                  (.head.ref | startswith($prefix))
+                ) | .head.ref' <<<"$open_sync"
+            )"
+            if [[ "$open_branch" != "$branch" ]]; then
+              number="$(
+                jq -r \
+                  --arg repo "$GITHUB_REPOSITORY" \
+                  --arg prefix "automation/agent-inbox-landing-" \
+                  'flatten | .[] | select(
+                    .head.repo.full_name == $repo and
+                    (.head.ref | startswith($prefix))
+                  ) | .number' <<<"$open_sync"
+              )"
+              {
+                echo "action=defer"
+                echo "branch=$branch"
+                echo "pr-number=$number"
+              } >>"$GITHUB_OUTPUT"
+              echo "Deferring this revision while sync PR #$number is open."
+              exit 0
+            fi
+          fi
           pr="$(gh api \
             --method GET \
             "repos/$GITHUB_REPOSITORY/pulls" \
@@ -353,8 +401,9 @@ jobs:
 
       - name: Ensure built-in Copilot review
         if: >-
-          steps.sync.outputs.changed == 'true' &&
-          steps.delivery.outputs.action != 'closed'
+          steps.delivery.outputs.action == 'open' ||
+          steps.delivery.outputs.action == 'create' ||
+          steps.delivery.outputs.action == 'recover'
         env:
           EXISTING_PR: ${{ steps.delivery.outputs.pr-number }}
           GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}

@@ -303,6 +303,8 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain('verify_delivery_ref "$head_sha"');
     expect(workflow).toContain('verify_pr_scope "$number"');
     expect(workflow).toContain("Unexpected delivery PR path");
+    expect(workflow).toContain("Deferring this revision while sync PR");
+    expect(workflow).toContain('echo "action=defer"');
     expect(workflow).toContain("gh auth setup-git");
     expect(workflow).toContain('[[ "$author" == "$GITHUB_REPOSITORY_OWNER" ]]');
     expect(sync.env).toBeUndefined();

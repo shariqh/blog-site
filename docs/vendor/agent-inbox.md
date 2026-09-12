@@ -13,6 +13,10 @@ source bytes or provenance change, it opens one normal blog-site pull request.
 That pull request still runs CI, deploys a preview, receives both AI reviews,
 and requires a human merge before production changes.
 
+Only one generated landing sync PR is active at a time. If Agent Inbox changes
+again while one is open, the newer revision waits for the existing PR to be
+merged or closed, then receives its own reviewed PR.
+
 To check or refresh the vendored page locally:
 
 ```sh
