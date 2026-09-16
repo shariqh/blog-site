@@ -43,7 +43,7 @@ hero:
   style: line-art
 ---
 
-Agent Inbox ships as a notarized universal macOS DMG, x64 and arm64 AppImages, and x64 and arm64 DEBs, packaged by hand without electron-builder. When I needed update checking, the obvious answer was Sparkle. Sparkle is Cocoa-only. WinSparkle is a separate DLL project. Linux has neither. What I needed wasn't a library; it was the trust contracts those tools encode, ported cleanly across all three platforms.
+Agent Inbox ships as a notarized universal macOS DMG, x64 and arm64 AppImages, and x64 and arm64 DEBs, packaged by hand without electron-builder. When I needed update checking, the obvious answer was Sparkle. Sparkle is Cocoa-only. WinSparkle is a separate DLL project. Linux has neither. What I needed wasn't a library; it was the trust contracts those tools encode, ported cleanly across the platforms Agent Inbox actually ships: macOS and Linux.
 
 
 
@@ -51,7 +51,7 @@ Agent Inbox ships as a notarized universal macOS DMG, x64 and arm64 AppImages, a
 
 
 
-The trust model I settled on: a deterministic manifest signed with Ed25519, a publisher that cannot undraft a release until it passes a three-way verification circuit, a client that verifies raw bytes before parsing anything, and a key rotation scheme that prevents bricking any installed version across a rotation event. Automatic download and install are Phase 2. This implementation checks, verifies, and notifies.
+The trust model I settled on: a deterministic manifest signed with Ed25519, a publisher that cannot undraft a release until it passes a three-way verification circuit, a client that verifies raw bytes before parsing anything, and a key rotation scheme that carries the new signing key to already-installed clients through one trusted transition release. Automatic download and install are Phase 2. This implementation checks, verifies, and notifies.
 
 ## Threat model
 
@@ -59,8 +59,8 @@ Before writing any code, I mapped the surfaces worth defending:
 
 - **Manifest integrity**: a tampered manifest redirects users to arbitrary binaries.
 - **Key compromise**: a leaked signing key lets an attacker mint valid manifests indefinitely.
-- **Rollback**: a manipulated version field downgrades a client to a known-vulnerable release.
-- **Rotation without bricking**: safely replacing a compromised or expiring key without orphaning installed clients.
+- **Downgrade**: a manipulated version field tricks a client into installing a release older than the one it's already running.
+- **Key rotation**: replacing a compromised or expiring key without orphaning clients that only trust the old one.
 - **Stale manifests**: a 180-day expiry renders any old manifest invalid regardless of its signature.
 - **MITM and redirects**: the client follows attacker-controlled redirects to untrusted hosts.
 - **Hostile HTTP bodies**: an oversized or infinitely-streaming response hangs the UI.
@@ -103,7 +103,7 @@ The contract:
 
 
 
-Rotation takes two sequential releases: one that adds the new key to `trustedKeyIds` (signed with the old key, so all existing clients can verify it), then one signed with the new key (which the predecessor already trusted). A client that fetches any signed release during the transition retains a valid path forward. No client is bricked by subsequent rotation.
+Rotation takes two sequential releases: one that adds the new key to `trustedKeyIds` and to the client's baked-in key registry, still signed with the old key so every already-installed client can verify it, then one signed with the new key alone. A client only carries the new key forward if it checks in while that bridging release is still the published latest, since checks always fetch the current release, never history. The signer emits one signature per manifest today rather than a dual-signed transition envelope, so that bridging window is the only safety net a client gets. Real dual-signing is follow-up work, not shipped.
 
 ## Client verification
 
