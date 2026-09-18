@@ -1,5 +1,5 @@
 ---
-title: '328 Downloads, Ten Users, and What I''m Going to Do About It'
+title: 328 Downloads, Ten Users, and What I'm Going to Do About It
 date: '2026-09-18'
 tags:
   - workflow
@@ -7,37 +7,17 @@ tags:
   - oris
   - analytics
   - indie-dev
-summary: >-
-  Oris 0.11 shipped. 328 downloads since July, ten active users: the download
-  and retention data is in, and I don't have a clean explanation for the gap.
+summary: "Oris 0.11 shipped. 328 downloads since July, ten active users: the download and retention data is in, and I don't have a clean explanation for the gap."
 draft: false
 hero:
   image: /static/images/blog/328-downloads-ten-users/cover.png
-  alt: >-
-    Cover illustration for "328 Downloads, Ten Users, and What I'm Going to Do
-    About It".
-  prompt: >-
-    Style: flat abstract shapes combined with loose hand-drawn single-weight
-    line-art (thin, confident strokes), minimal and geometric — a vintage
-    mid-century editorial spot illustration. Flat color fills, subtle paper
-    grain, no gradients, no 3D, no glossy realism.
+  alt: Cover illustration for "328 Downloads, Ten Users, and What I'm Going to Do About It".
+  prompt: |-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight line-art (thin, confident strokes), minimal and geometric — a vintage mid-century editorial spot illustration. Flat color fills, subtle paper grain, no gradients, no 3D, no glossy realism.
 
+    Visual concept only: Wide copper funnel photographed from directly above, a handful of smooth river stones gathered at its narrow neck, warm directional sidelight casting a curved shadow across pale linen, no text, no labels. Do not depict or quote any phrase from the article title or summary.
 
-    Visual concept only: Wide copper funnel photographed from directly above, a
-    handful of smooth river stones gathered at its narrow neck, warm directional
-    sidelight casting a curved shadow across pale linen, no text, no labels. Do
-    not depict or quote any phrase from the article title or summary.
-
-
-    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
-    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
-    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
-    NOT render any readable words, letters, numbers, captions, labels, interface
-    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
-    symbolic objects, and nonverbal diagrams because a title will be overlaid
-    afterward. No photorealistic human faces. Wide 3:2 landscape composition
-    with deliberate empty negative space in the LEFT third so a title can be
-    overlaid later.
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do NOT render any readable words, letters, numbers, captions, labels, interface text, signs, headlines, sentences, or paragraphs. Use only abstract shapes, symbolic objects, and nonverbal diagrams because a title will be overlaid afterward. No photorealistic human faces. Wide 3:2 landscape composition with deliberate empty negative space in the LEFT third so a title can be overlaid later.
   style: line-art
 ---
 
@@ -61,19 +41,19 @@ My own threshold for calling Oris 1.0-ready is ten or more weekly actives for fo
 
 When 328 came up, my immediate assumption was that most of it was noise. Bots, automated package crawlers, systems that sweep download links without any human ever being involved. The internet has a lot of that.
 
-The data argues against it. A scraper runs a burst and moves on; it doesn't come back 69 days in a row across ten weeks. The HEAD-to-GET ratio is 26 to 328, and crawlers lean heavily on HEAD requests to check file metadata without actually downloading anything. That ratio sits well within what you'd expect from real users. The country spread reads like people, too. Tor exit nodes and obvious cloud-region traffic add up to roughly four percent of requests, which is just the ambient noise of having a public URL.
+The data argues against it. A scraper runs a burst and moves on; it doesn't come back on 69 of 72 days across ten weeks. The HEAD-to-GET ratio is 26 to 328, and crawlers lean heavily on HEAD requests to check file metadata without actually downloading anything. That ratio sits well within what you'd expect from real users. The country spread reads like people, too. Tor exit nodes and obvious cloud-region traffic add up to roughly four percent of requests, which is just the ambient noise of having a public URL.
 
 So 328 downloads is real, or real enough that treating it as noise changes nothing useful about the decisions ahead.
 
 ## The gap is the actual subject
 
-Between 328 people who downloaded Oris and roughly ten who are still using it regularly, something happened. I don't know what. Maybe they installed it, tried it in one meeting, found it didn't fit their workflow, and moved on. Maybe some of them use it occasionally in ways my telemetry doesn't capture as active. Maybe the product doesn't yet address a clear enough problem for someone to keep returning to it.
+Between 328 downloads and roughly ten people who are still using it regularly, something happened. I don't know what. Maybe they installed it, tried it in one meeting, found it didn't fit their workflow, and moved on. Maybe some of them use it occasionally in ways my telemetry doesn't capture as active. Maybe the product doesn't yet address a clear enough problem for someone to keep returning to it.
 
 I could guess at answers here, and I've been doing that privately. I don't know. The gap between 328 and 10 is the actual subject of work for the next several months, and pretending I have it figured out already would be the wrong tone to start from.
 
 ## Why building billing first is still correct
 
-The obvious read of roughly ten daily users is that payment infrastructure is pointless and retention is the real problem. Retention is the real problem. That part is right. But building a billing layer is a separate question from whether it's worth building one now, and the answer to that second question doesn't actually depend on user count.
+The obvious read of roughly ten weekly users is that payment infrastructure is pointless and retention is the real problem. Retention is the real problem. That part is right. But building a billing layer is a separate question from whether it's worth building one now, and the answer to that second question doesn't actually depend on user count.
 
 Every week without a payment mechanism, I'm acquiring users who will later need to be converted from free to paid. The people who installed Oris today, the two or four who opened it this morning, are forming habits around a product they got for free. Converting a free habit to a paid one is harder than converting someone who understood the price upfront. If I run any kind of acquisition spend before billing exists, I'm not generating revenue, I'm generating free users I'll have to re-close later. That's a trap I'm already partially in, just at a scale where it's still cheap to fix.
 
