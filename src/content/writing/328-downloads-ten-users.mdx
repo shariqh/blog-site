@@ -1,0 +1,72 @@
+---
+title: 328 Downloads, Ten Users, and What I'm Going to Do About It
+date: '2026-09-18'
+tags:
+  - workflow
+  - build-in-public
+  - oris
+  - analytics
+  - indie-dev
+summary: "Oris 0.11 shipped. 328 downloads since July, ten active users: the download and retention data is in, and I don't have a clean explanation for the gap."
+draft: false
+hero:
+  image: /static/images/blog/328-downloads-ten-users/cover.png
+  alt: Cover illustration for "328 Downloads, Ten Users, and What I'm Going to Do About It".
+  prompt: |-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight line-art (thin, confident strokes), minimal and geometric — a vintage mid-century editorial spot illustration. Flat color fills, subtle paper grain, no gradients, no 3D, no glossy realism.
+
+    Visual concept only: Wide copper funnel photographed from directly above, a handful of smooth river stones gathered at its narrow neck, warm directional sidelight casting a curved shadow across pale linen, no text, no labels. Do not depict or quote any phrase from the article title or summary.
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do NOT render any readable words, letters, numbers, captions, labels, interface text, signs, headlines, sentences, or paragraphs. Use only abstract shapes, symbolic objects, and nonverbal diagrams because a title will be overlaid afterward. No photorealistic human faces. Wide 3:2 landscape composition with deliberate empty negative space in the LEFT third so a title can be overlaid later.
+  style: line-art
+---
+
+Today I shipped release 0.11 of Oris, a macOS app, and finally asked myself what it would actually take to start charging for this thing.
+
+The plan that came back surprised me, not because it was complicated but because the first step was something I should have done months ago. Before pricing tiers, before payment infrastructure, before anything: read the install numbers. The counter had been recording since July 1. Nobody had run the query. I'd shipped six releases, written about the app, pushed the download link across a few places, and never once looked at what was actually happening on the other side.
+
+So I looked.
+
+## What the data says
+
+328 downloads since July 7. Across 69 of the 72 days the link has been live, which means people found Oris on random Tuesdays, on a bank holiday, on a Saturday morning. Not every day, but close. The two biggest days were July 7 and 8, launch week, when 42 and 21 people downloaded it respectively. Since then it has leveled off into a quieter rhythm.
+
+
+
+The retention picture is different. Over the last twelve days, daily active installs have been running between 2 and 4. Last week logged 21 install-days total. That could mean four people using it constantly, or 21 people who each opened it once. Reality is probably somewhere between those. Call it ten.
+
+My own threshold for calling Oris 1.0-ready is ten or more weekly actives for four consecutive weeks. Right now I'm not there.
+
+## My first instinct was to doubt the downloads
+
+When 328 came up, my immediate assumption was that most of it was noise. Bots, automated package crawlers, systems that sweep download links without any human ever being involved. The internet has a lot of that.
+
+The data argues against it. A scraper runs a burst and moves on; it doesn't come back on 69 of 72 days across ten weeks. The HEAD-to-GET ratio is 26 to 328, and crawlers lean heavily on HEAD requests to check file metadata without actually downloading anything. That ratio sits well within what you'd expect from real users. The country spread reads like people, too. Tor exit nodes and obvious cloud-region traffic add up to roughly four percent of requests, which is just the ambient noise of having a public URL.
+
+So 328 downloads is real, or real enough that treating it as noise changes nothing useful about the decisions ahead.
+
+## The gap is the actual subject
+
+Between 328 downloads and roughly ten people who are still using it regularly, something happened. I don't know what. Maybe they installed it, tried it in one meeting, found it didn't fit their workflow, and moved on. Maybe some of them use it occasionally in ways my telemetry doesn't capture as active. Maybe the product doesn't yet address a clear enough problem for someone to keep returning to it.
+
+I could guess at answers here, and I've been doing that privately. I don't know. The gap between 328 and 10 is the actual subject of work for the next several months, and pretending I have it figured out already would be the wrong tone to start from.
+
+## Why building billing first is still correct
+
+The obvious read of roughly ten weekly users is that payment infrastructure is pointless and retention is the real problem. Retention is the real problem. That part is right. But building a billing layer is a separate question from whether it's worth building one now, and the answer to that second question doesn't actually depend on user count.
+
+Every week without a payment mechanism, I'm acquiring users who will later need to be converted from free to paid. The people who installed Oris today, the two or four who opened it this morning, are forming habits around a product they got for free. Converting a free habit to a paid one is harder than converting someone who understood the price upfront. If I run any kind of acquisition spend before billing exists, I'm not generating revenue, I'm generating free users I'll have to re-close later. That's a trap I'm already partially in, just at a scale where it's still cheap to fix.
+
+
+
+Building payments with ten users isn't revenue work. It's the cheapest possible moment to learn how a payment integration actually behaves. Find out what breaks in the webhook flow, what the Stripe dashboard looks like with one customer, how upgrades and cancellations behave. The same integration takes the same effort at a hundred users, except then a billing bug affects a hundred people and I'm debugging it under pressure.
+
+So both things are true: the funnel is the real problem, and building billing before spending on acquisition is still correct. Retention work and billing work don't compete, they sequence. Figure out the drop-off, have a mechanism to charge before spending on growth, and neither of those blocks the other.
+
+## Where 0.11 leaves things
+
+The app is signed, notarized, auto-updates correctly, and people are downloading it on 96% of days. That's not nothing, and I'm not being falsely modest. Getting a macOS app to that state takes real work.
+
+But 328 downloads and ten retained users is a gap I don't have a clean explanation for yet. "Nobody found it" is ruled out. "Everyone who found it kept using it" is also ruled out. What's in between those two facts is the question I'm carrying into the next build cycle.
+
+I don't have a tidy closing argument here. The data is specific enough now to be genuinely useful, and that's actually more than I had this morning.
