@@ -1,0 +1,96 @@
+---
+title: >-
+  328 download requests, 2 to 4 active installs a day, and why I'm still building
+date: '2026-09-18'
+tags:
+  - field-notes
+  - build-in-public
+  - oris
+  - analytics
+  - indie-dev
+summary: >-
+  After six releases, Oris has logged 328 download requests and 2 to 4 daily
+  active installs. The gap hurts, and it is finally specific enough to work on.
+draft: false
+hero:
+  image: /static/images/blog/328-downloads-ten-users/cover.png
+  alt: >-
+    Cover illustration for "328 download requests, 2 to 4 active installs a day,
+    and why I'm still building".
+  prompt: >-
+    Style: rich conceptual editorial illustration, like a Wired or New Yorker
+    feature spread, with one clear central metaphor. Painterly flat shading,
+    depth, texture, sophisticated. Constrained to the palette.
+
+
+    Visual concept only, inspired by this subject: After six releases, Oris has
+    logged 328 download requests and 2 to 4 daily active installs. The gap
+    hurts, and it is finally specific enough to work on.. Translate it into
+    objects and composition; do not depict or quote the prose.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: conceptual
+---
+
+When I shipped [Oris](https://orisnotes.com) 0.11, I closed the release checklist and asked myself the question I had been circling for months. When do I start charging for this?
+
+I expected the answer to involve pricing, Stripe, or some uncomfortable guess about what a meeting notes app is worth. Instead, I realized I had never looked at the install counter.
+
+That was embarrassing.
+
+By then I had pushed six releases. Oris had gone from a tool I used myself to a signed and notarized Mac app that records both sides of a meeting, transcribes on the machine, and delivers the note wherever the user keeps their work. I had rebuilt the engine in Swift because the old Python stack was too heavy for the product I wanted to ship. I had built automatic updates so a fix could reach someone without asking them to download the app again. Each release carried the same quiet hope that the product had crossed from something interesting into something another person would depend on.
+
+The counter had been running the whole time.
+
+## The counter had been running for 72 days
+
+The first query came back with 328 download requests since July 7. Requests landed on 69 of the 72 days in the window. The launch days were the largest, with 42 requests on July 7 and 21 on July 8, then the line settled into a smaller but persistent tail.
+
+For a few seconds, 328 felt good. It looked like momentum.
+
+It is also a request count, not a count of people. Someone can download more than once, automated traffic can exist, and the privacy choices in the analytics mean I do not keep a stable identity that follows a person across days. I do not need to turn every request into a human to get something useful from the number. Interest kept arriving after launch week. The message reached beyond the first announcement.
+
+Then I pulled the update data.
+
+Over the most recent twelve days, Oris showed between 2 and 4 active installs on a given day. The latest week produced 21 install-days. That does not mean 21 people, and it does not give me a defensible way to say there are ten regular users. The same install can appear on several days, while several installs can each appear once. My telemetry deliberately has no stable cross-day identifier, so it cannot turn those install-days into a weekly headcount.
+
+The metric is thinner than I wanted in another way. An active install means the app checked the update feed. It does not tell me that someone recorded a meeting, received a note, or came back and did it again.
+
+My gate for calling Oris 1.0-ready is ten or more weekly active users for four consecutive weeks. The data I have cannot prove I have crossed that line even once. Oris is not there.
+
+I stared at those two query results beside each other and felt the last few months get smaller. A download chart gives me an easy number to celebrate. The active-install count asks whether the product earned a place on anyone's Mac after the first burst of curiosity.
+
+That is the brutal part of building in public. Every release carries hope, even when I try to act detached about it. I remember the work behind the number. I remember the signing failures, the audio edge cases, the first-run permission problems, and the hours spent making updates safe. The counter does not care how hard any of that was. It shows 2 to 4 active installs a day.
+
+I am disappointed by that. I am also frustrated with myself for waiting this long to look.
+
+I do not know where people disappear. The current first run asks a lot before Oris proves its value. A new user chooses where notes should land, grants microphone and system audio permissions, waits for the local models to be ready, and then has to trust the app during a real meeting before the first useful note appears. Each step exists for a reason. Together, they may be too much distance between the download and the moment that makes the product click.
+
+Reliability may still be part of it. Oris can work in my meetings and still feel uncertain on someone else's audio device, permission state, or note destination. A first recording that looks stuck, misses the other side of the call, or lands somewhere confusing may be the only recording that person ever tries.
+
+The fit may be narrower than I think. Some people may only need meeting notes a few times a month. Others may like the result but forget to start a recording because Oris has not become part of the meeting habit yet. The meeting prompt in 0.11 is one attempt to reduce that friction, but I do not yet know whether it changes repeat use.
+
+These are hypotheses. The uncomfortable part is that my analytics stop before they can separate one from another.
+
+## The next release needs to find the drop-off
+
+The next job is to instrument the missing middle. I can already count a download request and a daily update poll. I need a privacy-respecting way to know whether a new install reaches its first successful capture and delivery, then whether it does that again. No audio, transcript, note path, or filename needs to leave the Mac. I need coarse events that tell me where the first-use path ends.
+
+I also need to watch people use it. The telemetry cannot identify anyone, so that means asking the people I can reach to show me their first recording and listening carefully when someone reports a problem. I will learn more from seeing where they pause than from asking whether they like the app.
+
+I am not going to buy growth while that path is a black box. More traffic would make the download number larger and leave the important question unanswered. The next product work has to shorten the distance from installing Oris to finishing a first successful meeting, then make the second meeting feel obvious.
+
+I am still going to finish billing before I pay for acquisition. At this size, I can learn how the payment flow, webhooks, upgrades, and cancellations behave without debugging them under pressure. Billing gives future acquisition somewhere real to go. It does not make anyone come back. The product work is finding and fixing the drop-off.
+
+The 328 requests tell me the problem and the message have some pull. The 2 to 4 daily active installs tell me Oris remains present on at least a few Macs after the launch spike. That is enough reason to keep building and nowhere near enough evidence to call the product healthy.
+
+I wish I had looked in July. I am looking now, before I buy growth or call 1.0 ready. The next release has a less flattering goal than another launch spike. It needs to help more of the people who already showed interest reach a second successful meeting.
