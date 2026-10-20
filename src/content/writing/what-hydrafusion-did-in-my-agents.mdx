@@ -10,7 +10,7 @@ tags:
 summary: >-
   I made Project HydraFusion the model for my Copilot CLI subagents for a
   release cycle, logged every model call, and re-ran four past code reviews to
-  compare it with Claude Opus.
+  compare it with Claude Opus and a local model.
 draft: false
 hero:
   image: /static/images/blog/what-hydrafusion-did-in-my-agents/cover.png
@@ -131,6 +131,19 @@ The two Opus-at-max runs of each review had the same prompt, the same commit and
 
 The model's prompt cache expires after five minutes without a call. When an agent blocks for ten minutes on a test run or a CI watch, its next call has to rewrite the entire context. One HydraFusion build spent 43% of its bill rewriting its cache after four long waits, and its follow-up turn spent 88%. For that build, keeping every wait under five minutes would have saved more than the switch to HydraFusion did.
 
+### A local model, for comparison
+
+I also run a local model box: two modded 20 GB RTX 3080s serving Qwen3.8 Flash-Next Coder, a 125B mixture-of-experts coding model with about 6B parameters active per token, quantised to 3.5 bits per weight. Since I had it, I gave it the same four reviews. It has no tools, so each review was a single pass over the same prompt, the PR description, the repository's CLAUDE.md and the full diff, with no way to run tests or open other files. I ran each review twice, with the model's thinking mode off and on.
+
+| Setup | Found (of 17) | Serious (of 8) | False alarms | Time per review |
+|---|---:|---:|---:|---:|
+| Local model, thinking off | 1 | 1 | 3 | About 40 s |
+| Local model, thinking on | 4.5 | 3 | 0 | 4 to 6 min |
+
+Without thinking, it was fast and confidently wrong. Three of its findings were false alarms, and two of those were labelled blockers: one claimed that letting the human stop an agent's watcher loses their answer, which is the documented design, and another proposed a fix that would itself have broken how ties are ordered.
+
+With thinking on, it raised no false alarms and found as many known issues as HydraFusion Max, with more of the serious ones. It caught the latent should-fix in the fourth review that, among the re-runs, only Opus at max had found. Like HydraFusion Max, it also flagged that a runtime copied outside Setup's folder gets a second set of hooks, a limit the PR documented and v1.4 later fixed ([#232](https://github.com/shariqh/agent-inbox/issues/232)). It still missed the subtle blocker that only Opus at max found. It cost no AIU, but a thinking review took four to six minutes on my hardware, and a single pass with no tools can't confirm anything by running it.
+
 ## GitHub's description next to what I saw
 
 | GitHub says | What I saw |
@@ -153,6 +166,7 @@ My subagents are now tiered. Agents that build features, and first reviews of ri
 ## Limits of this test
 
 - It's a small sample: four re-run reviews and a handful of live runs, with one run per setup.
+- The local model reviewed each change in a single pass with no tools, so unlike the agents it couldn't check its own claims by reading other files or running tests.
 - The machine was overloaded during the first batch of re-run reviews, so I didn't compare that batch's timings.
 - The list of known issues comes from one Opus review per pull request. The Opus-at-max re-runs show how much that matters, and it matters a lot.
 - This covers HydraFusion as a subagent model in Copilot CLI 1.0.100-1, on 20 October 2026. It may behave differently in the main chat, in VS Code, or after the next update.
