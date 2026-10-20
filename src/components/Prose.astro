@@ -71,6 +71,29 @@
   .prose hr {
     @apply my-12 border-0 border-t border-[color-mix(in_oklab,var(--fg)_15%,transparent)];
   }
+  /* Tables. rehypeTableScroll (astro.config.mjs) wraps each one in a
+     focusable .table-scroll region, so a table wider than the column scrolls
+     inside its own box, as code blocks do, instead of widening the page. */
+  .prose .table-scroll {
+    @apply my-6 overflow-x-auto rounded-lg border border-[color-mix(in_oklab,var(--fg)_15%,transparent)];
+  }
+  .prose table {
+    @apply w-full text-[0.9em] leading-normal;
+    font-variant-numeric: tabular-nums;
+  }
+  .prose th,
+  .prose td { @apply px-3 py-2 align-baseline sm:px-4; }
+  /* Keep code tokens whole; a table too wide for them scrolls instead. */
+  .prose table code { @apply whitespace-nowrap; }
+  /* Browsers center <th>. Start-align headers unless GFM set an alignment,
+     which MDX emits as an inline text-align (Markdown as an align attribute). */
+  .prose th:not([align]) { text-align: start; }
+  .prose thead th {
+    @apply border-b border-[color-mix(in_oklab,var(--fg)_20%,transparent)] bg-[var(--bg-soft)] align-bottom font-semibold;
+  }
+  .prose tbody tr + tr {
+    @apply border-t border-[color-mix(in_oklab,var(--fg)_10%,transparent)];
+  }
 </style>
 
 <script>
