@@ -1,5 +1,5 @@
 ---
-title: "What Project HydraFusion actually did in my coding agents"
+title: What Project HydraFusion actually did in my coding agents
 date: '2026-10-20'
 tags:
   - field-notes
@@ -7,8 +7,38 @@ tags:
   - llm-evaluation
   - code-review
   - developer-tools
-summary: "I ran Project HydraFusion as a Copilot CLI subagent for a release cycle and measured every call against the launch claims with 16 blind replay reviews."
+summary: >-
+  I ran Project HydraFusion as a Copilot CLI subagent for a release cycle and
+  measured every call against the launch claims with 16 blind replay reviews.
 draft: false
+hero:
+  image: /static/images/blog/what-hydrafusion-did-in-my-agents/cover.png
+  alt: >-
+    Cover illustration for "What Project HydraFusion actually did in my coding
+    agents".
+  prompt: >-
+    Style: rich conceptual editorial illustration, like a Wired or New Yorker
+    feature spread, with one clear central metaphor. Painterly flat shading,
+    depth, texture, sophisticated. Constrained to the palette.
+
+
+    Visual concept only: A branching river delta viewed from directly above,
+    most channels dry and dark, only the central channel still carrying water
+    and lit by low-angle golden light; abstract aerial composition, minimal warm
+    and dark palette, high contrast, no figures or text.. Do not depict or quote
+    any phrase from the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: conceptual
 ---
 
 I build [Agent Inbox](https://github.com/shariqh/agent-inbox) with a coordinator session in GitHub Copilot CLI. It hands work to subagents, one that builds each pull request and an independent one that reviews it. Until I tested Project HydraFusion this month, nearly all of those subagents ran on Claude Opus 5.5 at maximum reasoning effort. That's thorough, and it's expensive.
