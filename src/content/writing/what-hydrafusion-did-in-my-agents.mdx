@@ -1,0 +1,132 @@
+---
+title: "What Project HydraFusion actually did in my coding agents"
+date: '2026-10-20'
+tags:
+  - field-notes
+  - copilot-cli
+  - llm-evaluation
+  - code-review
+  - developer-tools
+summary: "I ran Project HydraFusion as a Copilot CLI subagent for a release cycle and measured every call against the launch claims with 16 blind replay reviews."
+draft: false
+---
+
+I build [Agent Inbox](https://github.com/shariqh/agent-inbox) with a coordinator session in GitHub Copilot CLI. It hands work to subagents, one that builds each pull request and an independent one that reviews it. Until I tested Project HydraFusion this month, nearly all of those subagents ran on Claude Opus 5.5 at maximum reasoning effort. That's thorough, and it's expensive.
+
+Then GitHub announced [Project HydraFusion](https://github.blog/ai-and-ml/github-copilot/project-hydrafusion-frontier-quality-via-multi-model-orchestration/), a research preview that picks a workflow for each request instead of a single model. The pitch fits a subagent setup well. Hand it a substantial, well-scoped task in a single prompt, and let it decide whether to solve it directly, cascade to a stronger model, or draft and have a different model family critique it.
+
+So for the v1.4 milestone I switched new subagents to HydraFusion and kept score against what the launch post and the [October 14 changelog](https://github.blog/changelog/2026-10-14-hydrafusion-updates-and-new-max-option/) say it does.
+
+## What GitHub says Project HydraFusion does
+
+- For each request it chooses one of three patterns. **Single** has one model solve it. **Cascade** has an efficient model draft, then a quality gate accept or escalate. **Critique** has one model draft, a critic from a different model family review, and the drafter revise.
+- It draws from a pool that includes Claude Opus 5.5, GPT-6 Astra, GPT-6.1 Sol and GPT-6 Luna.
+- It uses "medium effort for initial drafts and high effort for review".
+- **HydraFusion Max** "applies higher reasoning efforts where depth and thoroughness matter most".
+- In offline benchmarks against Claude Opus 5, with "all models evaluated at the same medium reasoning level", it scored between 1.5 points lower and 4.9 points higher on verified task quality, at 36–67% lower estimated cost.
+- Cost accounting covers every leg, including drafting, critique, revision, escalation, retry and fallback.
+
+
+
+## How I measured it
+
+Copilot CLI keeps a local event log for each session. Every model call has a usage record with the model name, reasoning effort, token counts and a cost breakdown per model. The session also writes running billed totals per model. Together, those show which model did the work, at what effort, and what it cost, without trusting anyone's summary.
+
+I collected two kinds of evidence.
+
+**Real work.** HydraFusion built one pull request for v1.4 (a second was still building as I wrote this), handled one follow-up turn on that build, and reviewed two pull requests. On one of those reviews I also ran an Opus 5.5 max-effort reviewer with the identical prompt at the same moment, as a control.
+
+**Matched replays.** Real work never repeats a task, so I replayed four code reviews that had already happened. For each pull request I took the original first-round review prompt word for word and the exact commit it reviewed, in an isolated copy with no GitHub access. The PR description was restored to how it read then, because every PR's description grew after review and would have leaked the answers. I ran four setups side by side.
+
+- `hydrafusion`;
+- `hydrafusion-max`;
+- Opus 5.5 at max effort, a re-run of the original setup;
+- Opus 5.5 at medium effort.
+
+The last one matters. My default was Opus at max, but GitHub's benchmarks compare against Opus at medium. Without a medium-effort arm, any saving could just be lower effort rather than orchestration.
+
+Each replay was scored against the original review's confirmed findings, 17 across the four pull requests, 8 of them blockers or should-fixes. I checked every new finding against the code before counting it.
+
+
+
+## What I saw
+
+### One model, one effort level
+
+Every HydraFusion call went to **Claude Opus 5.5 at medium effort**. That was 404 calls across 11 runs, including every `hydrafusion-max` run. No other model appeared in a usage record or a cost line item, and no call ran at high effort.
+
+The billing agrees. Over the three-hour window that covered all the replays, the session's billed totals moved for exactly one model, Opus 5.5, by the same amount as the sum of the per-call records, call for call. The billed totals for the GPT models didn't move. Complete accounting held, and it showed no hidden critic or escalation legs.
+
+So, from the client side, in Copilot CLI subagents during this preview, HydraFusion behaved like a **Single** workflow on Opus 5.5 at medium effort, every time. The launch post says it picks "the least complex workflow expected to meet its needs", so Single may simply have been its judgment for these tasks. But Max never chose differently either.
+
+### Cost
+
+| Setup | Total cost, 4 review replays | vs Opus max | vs Opus medium |
+|---|---:|---:|---:|
+| Opus 5.5, max effort | 1,933 | — | +275% |
+| Opus 5.5, medium effort | 515 | −73% | — |
+| `hydrafusion` | 593 | −69% | +15% |
+| `hydrafusion-max` | 545 | −72% | +6% |
+
+Cost is the AIU figure Copilot CLI records for each call, summed over each review's first turn.
+
+Against my old default, the saving is real. About 70% cheaper and twice as fast (about 10 minutes against 20). Against the article's own baseline, Opus at medium, there was no saving. That's what you'd expect if the work is Opus at medium.
+
+Builds saved less. HydraFusion's build of one pull request cost 19% less than an Opus-at-max build of its sibling. A long build's bill is mostly context, the model reading the same large conversation back on every call. Reasoning effort doesn't change that much.
+
+### Quality
+
+| Setup | Known findings caught (of 17) | Blockers and should-fixes (of 8) | False positives |
+|---|---:|---:|---:|
+| Opus 5.5, max effort | 10 | 5.5 | 0 |
+| Opus 5.5, medium effort | 6 | 4 | 0 |
+| `hydrafusion` | 6 | 3.5 | 0 |
+| `hydrafusion-max` | 4.5 | 2.5 | 1 |
+
+A finding raised only as an optional nit or design consideration counts half.
+
+HydraFusion's reviews were about as good as Opus at medium, which makes sense given what they ran on. They caught most of the ordinary should-fixes. Only Opus at max found the subtle one. An older copy of the app's server, still running during an upgrade, would carry a "stop waiting" choice over to the next question it raised. And even the Opus-at-max re-run rated that blocker as a nit.
+
+HydraFusion also found real issues the original reviews had missed. Two were worth filing:
+- a search box left focused in a background window kept re-downloading the full history ([#233](https://github.com/shariqh/agent-inbox/issues/233)), which the Opus-at-max re-run also caught;
+- a documented installer limit that was missing from the user docs ([#232](https://github.com/shariqh/agent-inbox/issues/232)).
+
+Max produced the only false positive of the trial. It "read the code path end to end" but missed an earlier check that made its scenario impossible.
+
+On fresh code, HydraFusion and Opus at max agreed. They reviewed the new issue poller from the identical prompt, side by side, and both said merge with no blockers. HydraFusion took 5 minutes and cost 106; Opus at max took 14 minutes and cost 358.
+
+### The biggest variable wasn't the model
+
+Two Opus-at-max runs of the same review, with the same prompt, the same commit and the same settings, found noticeably different sets of issues. The re-run caught only about 60% of what the original found, and found a real bug the original never mentioned. Any single review is a sample. That changed how I think about review budgets more than the HydraFusion numbers did.
+
+The other surprise was caching. The model's prompt cache expires after five minutes without a call. When an agent blocks for ten minutes on a test run or a CI watch, its next call has to re-write the entire context. One HydraFusion build spent 43% of its bill re-writing its cache after four long waits, and its follow-up turn spent 88%. For that build, keeping every wait under five minutes would have saved more than the switch to HydraFusion did.
+
+## Against the claims
+
+| Claim | What I saw |
+|---|---|
+| Picks Single, Cascade or Critique per request | Only Single, on one model, in every run |
+| Draws on four frontier models | Only Claude Opus 5.5 was used or billed |
+| Medium effort for drafts, high for review | Medium for every call; no high-effort stage |
+| Max applies higher effort | Identical to standard; slightly cheaper, with lower recall |
+| 36–67% cheaper than Opus at medium | No saving against Opus 5.5 at medium; 69–72% cheaper than Opus at max |
+| Near-frontier quality | Matched Opus at medium; about 60% of Opus at max's recall on known findings |
+| Complete accounting across legs | Held exactly, per call and per session |
+| Best on first-turn tasks; multi-turn still improving | The one follow-up turn worked fine; its cost was dominated by caching |
+
+None of this contradicts GitHub's benchmarks. Those were different tasks, a different baseline model and an offline harness. And HydraFusion is explicitly a research preview whose models, workflows and behavior may change. It does mean that, as a subagent model in Copilot CLI today, I couldn't observe the orchestration I was paying attention to.
+
+## What I changed
+
+My subagents are now tiered. Builders and first-round reviews of risky changes (storage, installers, Electron main, the updater, setup) stay on Opus 5.5 at max effort. Delta checks, low-risk reviews and routine tasks run on HydraFusion. Today that's Opus at medium in practice. If HydraFusion starts mixing models for those tasks, they'll pick it up without me changing anything. Every agent also keeps its waits under five minutes.
+
+
+
+## Caveats
+
+- It's a small sample, four replayed reviews and a handful of live runs, with one run per setup.
+- The machine was overloaded during the first replay batch, so I didn't compare that batch's timings.
+- The answer key comes from one Opus run. The Opus-at-max re-run is there to show how much that matters, and it matters a lot.
+- This covers HydraFusion as a Copilot CLI subagent model, version 1.0.100-1, on 20 October 2026. It may behave differently in the main chat, in VS Code, or after the next update.
+
+If you're trying HydraFusion, check your own usage records. They tell you which model actually did the work.
