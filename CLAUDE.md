@@ -39,10 +39,14 @@ via the footer.
 
 - Palette tokens (`ink`, `ink-soft`, `ochre`, `terracotta`, `paper`, `paper-soft`)
   are defined as Tailwind 4 `@theme` tokens in `src/styles/global.css`.
-  Dark mode inverts via a `.dark` class on `<html>`; default follows
-  `prefers-color-scheme`.
+  The page UI is light-only; dark mode was intentionally removed.
 - Typography: Fraunces (display, italic-serif), Inter (sans body),
   JetBrains Mono (eyebrows, code).
+- `Prose.astro` owns post typography, tables included. The rehype plugin
+  `src/lib/rehype-table-scroll.ts` (registered in `astro.config.mjs`) wraps each
+  Markdown table in a labeled, focusable `.table-scroll` region, so a wide table
+  scrolls inside its own box. Never set `display: block` on a `<table>`; it can
+  drop table semantics.
 
 ### Open Graph images
 

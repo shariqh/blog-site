@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 import remarkMath from "remark-math";
 import { remarkReadingTime } from "./src/lib/remark-reading-time.ts";
+import { rehypeTableScroll } from "./src/lib/rehype-table-scroll.ts";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
@@ -22,6 +23,9 @@ export default defineConfig({
     rehypePlugins: [
       rehypeSlug,
       [rehypeAutolinkHeadings, { behavior: "wrap" }],
+      // Before rehypeKatex, so table labels read math as its TeX source
+      // rather than KaTeX's MathML, annotation and HTML copies.
+      rehypeTableScroll,
       rehypeKatex,
     ],
     shikiConfig: {
