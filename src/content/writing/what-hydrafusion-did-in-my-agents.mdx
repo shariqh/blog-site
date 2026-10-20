@@ -93,12 +93,12 @@ From the client side, then, every HydraFusion request looked like a Single workf
 
 Here is the total cost of the four re-run reviews for each setup, counting each review's first turn:
 
-| Setup | Cost (AIU) | vs. Opus max | vs. Opus medium |
-|---|---:|---:|---:|
-| Opus 5.5, max effort | 1,933 | — | +275% |
-| Opus 5.5, medium effort | 515 | −73% | — |
-| HydraFusion | 593 | −69% | +15% |
-| HydraFusion Max | 545 | −72% | +6% |
+- Opus 5.5 at max effort: 1,933 AIU.
+- Opus 5.5 at medium effort: 515 AIU, 73% less than Opus at max.
+- HydraFusion: 593 AIU, 69% less than Opus at max but 15% more than Opus at medium.
+- HydraFusion Max: 545 AIU, 72% less than Opus at max but 6% more than Opus at medium.
+
+Put the other way round, Opus at max cost 275% more than Opus at medium for the same four reviews.
 
 Against my old default, HydraFusion was about 70% cheaper and twice as fast (about 10 minutes against 20). Against GitHub's own baseline, Opus at medium, there was no saving, which is what you'd expect when the work runs on Opus at medium.
 
@@ -108,18 +108,16 @@ Builds saved less. HydraFusion's build of one pull request cost 19% less than an
 
 This is how many of the 17 known issues each setup found, and how many of the 8 serious ones. An issue raised only as an optional nit or design consideration counts half.
 
-| Setup | Found (of 17) | Serious (of 8) | False alarms |
-|---|---:|---:|---:|
-| Opus 5.5, max effort | 10 | 5.5 | 0 |
-| Opus 5.5, medium effort | 6 | 4 | 0 |
-| HydraFusion | 6 | 3.5 | 0 |
-| HydraFusion Max | 4.5 | 2.5 | 1 |
+- Opus 5.5 at max effort found 10 of the 17, including 5.5 of the 8 serious ones, with no false alarms.
+- Opus 5.5 at medium effort found 6, including 4 serious ones, with no false alarms.
+- HydraFusion found 6, including 3.5 serious ones, with no false alarms.
+- HydraFusion Max found 4.5, including 2.5 serious ones, and raised the only false alarm.
 
 HydraFusion's reviews were about as good as Opus at medium, which makes sense given what they ran on. They caught most of the ordinary should-fixes. Only Opus at max found the subtle blocker: an older copy of the app's server, still running during an upgrade, would carry a "stop waiting" choice over to the next question it raised. Even the Opus-at-max re-run rated it only as a nit.
 
 HydraFusion also found real issues the original reviews had missed, and two were worth filing. A search box left focused in a background window kept re-downloading the full history ([#233](https://github.com/shariqh/agent-inbox/issues/233)), which the Opus-at-max re-run also caught. And a documented installer limit was missing from the user docs ([#232](https://github.com/shariqh/agent-inbox/issues/232)).
 
-Max produced the only false alarm of the test. It "read the code path end to end" but missed an earlier check that made its scenario impossible.
+Max's false alarm came from a review that "read the code path end to end" but missed an earlier check that made its scenario impossible.
 
 On new code, HydraFusion and Opus at max agreed. They reviewed the new issue poller from the identical prompt, side by side, and both said merge with no blockers. HydraFusion took 5 minutes and 106 AIU; Opus at max took 14 minutes and 358 AIU, more than three times as much.
 
@@ -133,16 +131,11 @@ The model's prompt cache expires after five minutes without a call. When an agen
 
 ## GitHub's description next to what I saw
 
-| GitHub says | What I saw |
-|---|---|
-| Picks Single, Cascade or Critique for each request | No escalation or critic ever ran; every request looked like Single on one model |
-| Draws on four frontier models | Only Claude Opus 5.5 was used or billed |
-| Medium effort for drafts, high for review | Medium effort for every call |
-| Max applies higher effort | Same model and effort as standard; slightly cheaper, and it found fewer issues |
-| 36–67% cheaper than Opus at medium | No saving against Opus 5.5 at medium; 69–72% cheaper than Opus at max |
-| Near-frontier quality | As good as Opus at medium; found 60% as many known issues as Opus at max |
-| Complete accounting across every leg | Held exactly, per call and per session |
-| Best on first-turn tasks; multi-turn still improving | The one follow-up turn worked; most of its cost was caching |
+GitHub says HydraFusion picks Single, Cascade or Critique for each request, draws on four frontier models, and uses medium effort for drafts and high effort for review. In my runs, no request ever escalated or used a critic, only Claude Opus 5.5 was used or billed, and every call ran at medium effort. Max is meant to apply higher effort, but it used the same model and effort as standard, cost slightly less and found fewer issues.
+
+On cost and quality, GitHub reports near-frontier quality at 36–67% lower cost than Opus at medium. I saw no saving against Opus 5.5 at medium, but 69–72% lower cost than Opus at max. The reviews were as good as Opus at medium, and found 60% as many known issues as Opus at max.
+
+The complete accounting across every leg held exactly, per call and per session. GitHub also says HydraFusion works best on first-turn tasks and that multi-turn work is still improving. My one follow-up turn worked, and most of its cost was caching.
 
 None of this contradicts GitHub's benchmarks. Those used different tasks, a different baseline model and an offline harness, and HydraFusion is explicitly a research preview whose models, workflows and behavior may change. It does mean that, as a subagent model in Copilot CLI today, I couldn't see the orchestration I was looking for.
 
