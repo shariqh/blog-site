@@ -51,7 +51,7 @@ That's the part I care about, and my own numbers make a case for it. When I ran 
 
 In my setup, during this preview, it never brought in a second model: every call I logged went to Opus 5.5 at medium effort. Even so, it cost about 70% less than my old default for reviews, mostly because medium effort is cheaper than max, so I've made it the default for routine work. If it starts mixing models, my agents pick that up without any change on my side.
 
-The surprise came from my own hardware. I gave the same four reviews to Qwen3.8 Flash-Next Coder, quantised and running on two consumer GPUs in my homelab, with no tools at all: it read the materials I gave it (the prompt, the PR description, the repository's CLAUDE.md and the diff) and nothing else. With its thinking mode on, it found 4.5 of the 17 known issues to HydraFusion's 6, raised no false alarms, and caught a serious issue that, of all the other re-runs, only Opus at max found. It cost no AIU.
+The surprise came from my own hardware. I gave the same four reviews to Qwen3.8 Flash-Next Coder, pruned and quantised to 3.5 bits and running on two consumer GPUs in my homelab, with no tools at all: it read the materials I gave it (the prompt, the PR description, the repository's CLAUDE.md and the diff) and nothing else. With its thinking mode on, it found 4.5 of the 17 known issues to HydraFusion's 6, raised no false alarms, and caught a serious issue that, of all the other re-runs, only Opus at max found. It cost no AIU.
 
 Here's how I measured all this, and what I found.
 
@@ -67,7 +67,7 @@ For the v1.4 milestone of Agent Inbox, I switched new subagents to HydraFusion a
 
 ## How I measured it
 
-Copilot CLI keeps a local log for every session. Each model call gets a usage record with the model name, the reasoning effort, token counts and a cost figure in AIU, the unit Copilot CLI's usage records use. I treat AIU as relative cost, not dollars. The session also keeps running billed totals per model. Together they show which model did the work, at what effort and for how much, without relying on anyone's summary.
+Copilot CLI keeps a local log for every session. Each model call gets a usage record with the model name, the reasoning effort, token counts and its cost in AIU, Copilot's AI units. One AIU is one GitHub AI credit, worth a cent, and every call's cost re-prices exactly from its token counts at [Copilot's published rates](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing). For Claude Opus 5.5 those are 400 AIU per million input tokens, 2,000 per million output tokens, 20 per million tokens read from the prompt cache and 500 per million written to it, so one AIU buys about 2,500 input tokens or 500 output tokens. The session also keeps running billed totals per model. Together they show which model did the work, at what effort and for how much, without relying on anyone's summary.
 
 I gathered two kinds of evidence.
 
@@ -109,6 +109,8 @@ Here is the total cost of the four re-run reviews for each setup, counting each 
 
 Against my old default, HydraFusion was about 70% cheaper and twice as fast (about 10 minutes against 20). Against GitHub's own baseline, Opus at medium, there was no saving, which is what you'd expect when the work runs on Opus at medium. For contrast, the local model cost 0 AIU for the same four reviews.
 
+At a cent per AIU, the four reviews cost about $19 on Opus at max, $5 on Opus at medium and $6 on HydraFusion. Almost all of that is the agents reading their own context back: HydraFusion's 593 AIU paid for about 9.5 million input tokens, 96% of them read from the prompt cache, and about 100,000 output tokens.
+
 Builds saved less. HydraFusion's build of one pull request cost 19% less than an Opus-at-max build of a similar pull request from the same design. Most of a long build's bill is context: the model reads the same large conversation back on every call, and reasoning effort doesn't change that much.
 
 ### How good the reviews were
@@ -121,8 +123,8 @@ This is how many of the 17 known issues each setup found, and how many of the 8 
 | Opus 5.5, medium effort | 6 | 4 | 0 |
 | HydraFusion | 6 | 3.5 | 0 |
 | HydraFusion Max | 4.5 | 2.5 | 1 |
-| Qwen3.8 Flash-Next Coder, local, thinking on | 4.5 | 3 | 0 |
-| Qwen3.8 Flash-Next Coder, local, thinking off | 1 | 1 | 3 |
+| Qwen3.8 Flash-Next Coder GSQ-RCO 3.5-bit (local), thinking on | 4.5 | 3 | 0 |
+| Qwen3.8 Flash-Next Coder GSQ-RCO 3.5-bit (local), thinking off | 1 | 1 | 3 |
 
 The two local rows are single passes with no tools, covered in their own section below.
 
@@ -144,14 +146,16 @@ The model's prompt cache expires after five minutes without a call. When an agen
 
 ## Qwen3.8 Flash-Next Coder on two GPUs at home
 
-I also run a local model box, and it produced the most interesting result of the test. The model is Qwen3.8 Flash-Next Coder in ISTA-DASLab's GSQ-RCO Coder build: a 125B mixture-of-experts coding model with about 6B parameters active per token, half its experts pruned and the weights quantised to 3.5 bits each. It runs on [Strata](https://github.com/Niko1221/Strata) across two modded 20 GB RTX 3080s, with a 256k-token context.
+I also run a local model box, and it produced the most interesting result of the test. The model is ISTA-DASLab's [Qwen3.8-Flash-Next GSQ-RCO Coder](https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF), a compressed build of Qwen3.8-Flash-Next. The base model is a 176.9B-parameter mixture of experts that sends each token through 10 of the 512 experts in every layer. This build removes half of each layer's experts with RCO, keeping the ones code, agentic tool use, vision and spatial reasoning depend on, and stores the remaining weights at 3.5 bits with GSQ. That leaves 29.6 GB of weights that must stay in memory plus a 28.8 GB n-gram lookup table, against 354 GB for the original at BF16, and ISTA-DASLab reports it keeps 95.7% of the base model's SWE-bench Verified score (79.2 against 82.8).
+
+The box has two modded 20 GB RTX 3080s. The GGUF files are made for llama.cpp, and I keep a llama.cpp setup as a fallback, but I serve the model with [Strata](https://github.com/Niko1221/Strata), a ggml-based engine. On this box Strata's GPU expert cache and multi-token-prediction drafting roughly double llama.cpp's speed: 126 to 137 tokens per second decoding code against 57, with the full 256k-token context against the 131k I run llama.cpp with. llama-swap loads whichever model a request names. In these reviews it read its prompts at about 3,000 tokens per second and wrote at 81 to 91.
 
 It has no tools, so it couldn't do what the agents did: open other files, run the tests or try a probe. Each review was a single pass over the same prompt, the PR description (plus the linked issue for two of them), the repository's CLAUDE.md and the full diff, between about 61,000 and 89,000 tokens of input. I ran each review twice, with its thinking mode off and on, and scored both against the same 17 known issues.
 
 | Setup | Found (of 17) | Serious (of 8) | False alarms | AIU, all four | Time per review |
 |---|---:|---:|---:|---:|---:|
-| Qwen3.8 Flash-Next Coder, thinking on | 4.5 | 3 | 0 | 0 | 4 to 6 min |
-| Qwen3.8 Flash-Next Coder, thinking off | 1 | 1 | 3 | 0 | About 40 s |
+| Qwen3.8 Flash-Next Coder GSQ-RCO 3.5-bit, thinking on | 4.5 | 3 | 0 | 0 | 4 to 6 min |
+| Qwen3.8 Flash-Next Coder GSQ-RCO 3.5-bit, thinking off | 1 | 1 | 3 | 0 | About 40 s |
 | HydraFusion | 6 | 3.5 | 0 | 593 | About 10 min |
 
 With thinking on, it came close to HydraFusion with far less to work with: no tools, one pass and no AIU. It raised no false alarms in four reviews. Its best catch was the serious issue in the fourth review. Setup's restart advice only counted sessions running an older build, so the planned "Match agents to vX" downgrade would have reported nothing to restart. Among the re-runs, only Opus at max found that one; HydraFusion, HydraFusion Max and Opus at medium all missed it.
