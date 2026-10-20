@@ -48,7 +48,7 @@ I build [Agent Inbox](https://github.com/shariqh/agent-inbox) with a coordinator
 
 That's the part I care about, and my own numbers make a case for it. When I ran the same Opus review twice, with the same prompt on the same commit, the two runs found different bugs. One model, run once, gives you one sample. That makes a second opinion from a different model family attractive for reviews, and spending deep reasoning only where a task needs it attractive for builds. HydraFusion promises both without me building the routing myself.
 
-In my setup, during this preview, it didn't route anything yet: every call I logged went to Opus 5.5 at medium effort. Even so, it cost about 70% less than my old default for reviews, mostly because medium effort is cheaper than max, so I've made it the default for routine work. If it starts mixing models, my agents pick that up without any change on my side. Here's how I measured all this, and what I found.
+In my setup, during this preview, it never brought in a second model: every call I logged went to Opus 5.5 at medium effort. Even so, it cost about 70% less than my old default for reviews, mostly because medium effort is cheaper than max, so I've made it the default for routine work. If it starts mixing models, my agents pick that up without any change on my side. Here's how I measured all this, and what I found.
 
 ## What GitHub says it does
 
@@ -87,7 +87,7 @@ Every HydraFusion call went to **Claude Opus 5.5 at medium effort**: 404 calls a
 
 The billing agrees. Over the three hours that covered all 16 review runs, the session's billed totals moved for exactly one model, Opus 5.5, and by exactly the sum of the per-call records. The totals for the GPT models didn't move. So the accounting really was complete, and it showed no hidden critic or escalation step.
 
-From the client side, then, HydraFusion behaved like a Single workflow on Opus 5.5 at medium effort, every time, as a Copilot CLI subagent during this preview. The announcement says it picks "the least complex workflow expected to meet its needs", so Single may simply have been its judgment for these tasks. But Max never chose differently either.
+From the client side, then, every HydraFusion request looked like a Single workflow on Opus 5.5 at medium effort. Usage records show the model and the effort, not the workflow's name, so I can't rule out a Cascade whose quality gate accepted the first draft. What I can say is that no request ever escalated to another model or brought in a critic from another family. The announcement says it picks "the least complex workflow expected to meet its needs", so that may simply have been its judgment for these tasks. But Max never chose differently either.
 
 ### What it cost
 
@@ -135,7 +135,7 @@ The model's prompt cache expires after five minutes without a call. When an agen
 
 | GitHub says | What I saw |
 |---|---|
-| Picks Single, Cascade or Critique for each request | Only Single, on one model, every time |
+| Picks Single, Cascade or Critique for each request | No escalation or critic ever ran; every request looked like Single on one model |
 | Draws on four frontier models | Only Claude Opus 5.5 was used or billed |
 | Medium effort for drafts, high for review | Medium effort for every call |
 | Max applies higher effort | Same model and effort as standard; slightly cheaper, and it found fewer issues |
