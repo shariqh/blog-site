@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Element, ElementContent, Root } from 'hast'
+import rehypeKatex from 'rehype-katex'
+import config from '../../astro.config.mjs'
 import { rehypeTableScroll } from './rehype-table-scroll'
 
 const text = (value: string): ElementContent => ({ type: 'text', value })
@@ -62,6 +64,30 @@ describe('rehypeTableScroll', () => {
     ).children.map((node) => (node as Element).properties.ariaLabel)
 
     expect(labels).toEqual(['Table 1: A, B', 'Table 2: A, B', 'Table 3'])
+  })
+
+  it('names math in a header by its TeX source, as remark-math emits it before KaTeX', () => {
+    const math: Element = {
+      type: 'element',
+      tagName: 'code',
+      properties: { className: ['language-math', 'math-inline'] },
+      children: [text('O(n^2)')],
+    }
+    const [wrapper] = transform(
+      table('Algorithm', [text('Time '), math]),
+    ).children
+
+    expect((wrapper as Element).properties.ariaLabel).toBe(
+      'Table 1: Algorithm, Time O(n^2)',
+    )
+  })
+
+  it('runs before rehypeKatex in the Astro config, while math is still TeX', () => {
+    const plugins: unknown[] = config.markdown?.rehypePlugins ?? []
+    const position = plugins.indexOf(rehypeTableScroll)
+
+    expect(position).toBeGreaterThanOrEqual(0)
+    expect(position).toBeLessThan(plugins.indexOf(rehypeKatex))
   })
 
   it('wraps tables nested inside other elements exactly once', () => {

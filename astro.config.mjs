@@ -23,8 +23,10 @@ export default defineConfig({
     rehypePlugins: [
       rehypeSlug,
       [rehypeAutolinkHeadings, { behavior: "wrap" }],
-      rehypeKatex,
+      // Before rehypeKatex, so table labels read math as its TeX source
+      // rather than KaTeX's MathML, annotation and HTML copies.
       rehypeTableScroll,
+      rehypeKatex,
     ],
     shikiConfig: {
       // Single dark theme: the site background is white, so a dark code block
