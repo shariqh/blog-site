@@ -676,6 +676,45 @@ for (const slug of SLUGS) {
   })
 }
 
+test('post tables sit in labeled scroll regions without widening the page', async ({
+  page,
+}) => {
+  // Read the built pages, so a Markdown table shown in a code block never counts.
+  const tableSlugs = SLUGS.filter((slug) =>
+    readFileSync(`dist/blog/${slug}/index.html`, 'utf8').includes('<table'),
+  )
+  test.skip(tableSlugs.length === 0, 'No published post has a table yet')
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  for (const slug of tableSlugs) {
+    await page.goto(`/blog/${slug}`)
+    const tables = page.locator('.prose table')
+    const count = await tables.count()
+    expect(count).toBeGreaterThan(0)
+    for (let index = 0; index < count; index++) {
+      const table = tables.nth(index)
+      const region = table.locator('xpath=..')
+      await expect(region).toHaveClass('table-scroll')
+      await expect(region).toHaveAttribute('role', 'region')
+      await expect(region).toHaveAttribute('tabindex', '0')
+      await expect(region).toHaveAttribute(
+        'aria-label',
+        new RegExp(`^Table ${index + 1}`),
+      )
+      await expect(region).toHaveCSS('overflow-x', 'auto')
+      await expect(table).toHaveCSS('display', 'table')
+      await expect(table).toHaveCSS('font-variant-numeric', 'tabular-nums')
+      await expect(table.locator('th').first()).toHaveCSS('font-weight', '600')
+    }
+
+    const widths = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+    }))
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport)
+  }
+})
+
 test('blog post uses the same-origin view proxy without responsive or console regressions', async ({
   page,
 }) => {

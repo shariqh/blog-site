@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 import remarkMath from "remark-math";
 import { remarkReadingTime } from "./src/lib/remark-reading-time.ts";
+import { rehypeTableScroll } from "./src/lib/rehype-table-scroll.ts";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
@@ -23,6 +24,7 @@ export default defineConfig({
       rehypeSlug,
       [rehypeAutolinkHeadings, { behavior: "wrap" }],
       rehypeKatex,
+      rehypeTableScroll,
     ],
     shikiConfig: {
       // Single dark theme: the site background is white, so a dark code block
