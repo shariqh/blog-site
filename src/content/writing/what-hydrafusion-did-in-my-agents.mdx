@@ -1,0 +1,196 @@
+---
+title: What Project HydraFusion actually did in my coding agents
+date: '2026-10-21'
+tags:
+  - field-notes
+  - copilot-cli
+  - llm-evaluation
+  - code-review
+  - developer-tools
+summary: >-
+  I made Project HydraFusion the model for my Copilot CLI subagents for a
+  release cycle, then re-ran four past code reviews against Claude Opus and
+  against Qwen3.8 Flash-Next Coder on two GPUs at home. The local model was the
+  surprise.
+draft: false
+hero:
+  image: /static/images/blog/what-hydrafusion-did-in-my-agents/cover.png
+  alt: >-
+    Cover illustration for "What Project HydraFusion actually did in my coding
+    agents".
+  prompt: >-
+    Style: rich conceptual editorial illustration, like a Wired or New Yorker
+    feature spread, with one clear central metaphor. Painterly flat shading,
+    depth, texture, sophisticated. Constrained to the palette.
+
+
+    Visual concept only: A branching river delta viewed from directly above,
+    most channels dry and dark, only the central channel still carrying water
+    and lit by low-angle golden light; abstract aerial composition, minimal warm
+    and dark palette, high contrast, no figures or text.. Do not depict or quote
+    any phrase from the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: conceptual
+---
+
+I build [Agent Inbox](https://github.com/shariqh/agent-inbox) with a coordinator session in GitHub Copilot CLI. It hands work to subagents: one builds each pull request, and an independent one reviews it. Until I tested Project HydraFusion this month, nearly all of those subagents ran on Claude Opus 5.5 at maximum reasoning effort. That's thorough, and it's expensive.
+
+[Project HydraFusion](https://github.blog/ai-and-ml/github-copilot/project-hydrafusion-frontier-quality-via-multi-model-orchestration/) changes who picks the model. Instead of me choosing one model for every job, it chooses a workflow for each request. It can answer directly, hand the work to a stronger model when a draft isn't good enough, or have a model from a different family critique the draft before it comes back. You give it a substantial, well-scoped task in a single prompt, and it decides how much model to spend on it.
+
+That's the part I care about, and my own numbers make a case for it. When I ran the same Opus review twice, with the same prompt on the same commit, the two runs found different bugs. One model, run once, gives you one sample. That makes a second opinion from a different model family attractive for reviews, and spending deep reasoning only where a task needs it attractive for builds. HydraFusion promises both without me building the routing myself.
+
+In my setup, during this preview, it never brought in a second model: every call I logged went to Opus 5.5 at medium effort. Even so, it cost about 70% less than my old default for reviews, mostly because medium effort is cheaper than max, so I've made it the default for routine work. If it starts mixing models, my agents pick that up without any change on my side.
+
+The surprise came from my own hardware. I gave the same four reviews to Qwen3.8 Flash-Next Coder, pruned and quantised to 3.5 bits and running on two consumer GPUs in my homelab, with no tools at all: it read the materials I gave it (the prompt, the PR description, the repository's CLAUDE.md and the diff) and nothing else. With its thinking mode on, it found 4.5 of the 17 known issues to HydraFusion's 6, raised no false alarms, and caught a serious issue that, of all the other re-runs, only Opus at max found. It cost no AIU.
+
+Here's how I measured all this, and what I found.
+
+## What GitHub says it does
+
+GitHub's announcement and the [October 14 changelog](https://github.blog/changelog/2026-10-14-hydrafusion-updates-and-new-max-option/) describe three workflows. In Single, one model solves the request. In Cascade, an efficient model drafts and a quality gate either accepts the draft or escalates. In Critique, one model drafts, a critic from a different model family reviews it, and the drafter revises.
+
+It draws on a pool that includes Claude Opus 5.5, GPT-6 Astra, GPT-6.1 Sol and GPT-6 Luna. It uses "medium effort for initial drafts and high effort for review", and the Max option "applies higher reasoning efforts where depth and thoroughness matter most".
+
+In GitHub's offline benchmarks against Claude Opus 5, with "all models evaluated at the same medium reasoning level", it scored between 1.5 points lower and 4.9 points higher on verified task quality, at 36–67% lower estimated cost. GitHub also says its cost accounting covers every leg: drafting, critique, revision, escalation, retry and fallback.
+
+For the v1.4 milestone of Agent Inbox, I switched new subagents to HydraFusion and checked what they actually did against that description.
+
+## How I measured it
+
+Copilot CLI keeps a local log for every session. Each model call gets a usage record with the model name, the reasoning effort, token counts and its cost in AIU, Copilot's AI units. One AIU is one GitHub AI credit, worth a cent, and every call's cost re-prices exactly from its token counts at [Copilot's published rates](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing). For Claude Opus 5.5 those are 400 AIU per million input tokens, 2,000 per million output tokens, 20 per million tokens read from the prompt cache and 500 per million written to it, so one AIU buys about 2,500 input tokens or 500 output tokens. The session also keeps running billed totals per model. Together they show which model did the work, at what effort and for how much, without relying on anyone's summary.
+
+I gathered two kinds of evidence.
+
+**Real work.** HydraFusion built one pull request for v1.4 (a second was still building as I wrote this), handled one follow-up turn on that build, and reviewed two pull requests. For one of those reviews I also ran an Opus 5.5 max-effort reviewer on the identical prompt at the same time, as a control.
+
+**Re-running old reviews.** Real work never repeats a task, so I took four code reviews that had already happened and ran them again. For each pull request I used the original review prompt word for word and the exact commit it had reviewed, in an isolated copy with no GitHub access. I restored each PR description to how it read at the time, because every description grew after the review and would have given the answers away. Each review then ran once per setup, 16 runs in all:
+
+- HydraFusion (`hydrafusion`);
+- HydraFusion Max (`hydrafusion-max`);
+- Opus 5.5 at max effort, a re-run of my original setup;
+- Opus 5.5 at medium effort.
+
+The last one matters. My default was Opus at max, but GitHub's benchmarks compare against Opus at medium. Without a medium-effort run, any saving could just be lower effort rather than orchestration.
+
+I also ran the same four reviews on Qwen3.8 Flash-Next Coder on my own hardware, twice each. It has no tools, so those runs were single passes over the same materials; [its own section](#qwen38-flash-next-coder-on-two-gpus-at-home) has the details.
+
+The original reviews had confirmed 17 issues across the four pull requests, 8 of them serious (blockers or should-fixes). I scored every run against that list, and checked every new finding against the code before counting it.
+
+## What I saw
+
+### Every call went to Opus at medium effort
+
+Every HydraFusion call went to **Claude Opus 5.5 at medium effort**: 404 calls across 11 runs, including every HydraFusion Max run. No other model appeared in a usage record or a cost line item, and no call ran at high effort.
+
+The billing agrees. Over the three hours that covered all 16 review runs, the session's billed totals moved for exactly one model, Opus 5.5, and by exactly the sum of the per-call records. The totals for the GPT models didn't move. So the accounting really was complete, and it showed no hidden critic or escalation step.
+
+From the client side, then, every HydraFusion request looked like a Single workflow on Opus 5.5 at medium effort. Usage records show the model and the effort, not the workflow's name, so I can't rule out a Cascade whose quality gate accepted the first draft. What I can say is that no request ever escalated to another model or brought in a critic from another family. The announcement says it picks "the least complex workflow expected to meet its needs", so that may simply have been its judgment for these tasks. But Max never chose differently either.
+
+### What it cost
+
+Here is the total cost of the four re-run reviews for each setup, counting each review's first turn:
+
+| Setup | Cost (AIU) | vs. Opus max | vs. Opus medium |
+|---|---:|---:|---:|
+| Opus 5.5, max effort | 1,933 | — | +275% |
+| Opus 5.5, medium effort | 515 | −73% | — |
+| HydraFusion | 593 | −69% | +15% |
+| HydraFusion Max | 545 | −72% | +6% |
+
+Against my old default, HydraFusion was about 70% cheaper and twice as fast (about 10 minutes against 20). Against GitHub's own baseline, Opus at medium, there was no saving, which is what you'd expect when the work runs on Opus at medium. For contrast, the local model cost 0 AIU for the same four reviews.
+
+At a cent per AIU, the four reviews cost about $19 on Opus at max, $5 on Opus at medium and $6 on HydraFusion. Almost all of that is the agents reading their own context back: HydraFusion's 593 AIU paid for about 9.5 million input tokens, 96% of them read from the prompt cache, and about 100,000 output tokens.
+
+Builds saved less. HydraFusion's build of one pull request cost 19% less than an Opus-at-max build of a similar pull request from the same design. Most of a long build's bill is context: the model reads the same large conversation back on every call, and reasoning effort doesn't change that much.
+
+### How good the reviews were
+
+This is how many of the 17 known issues each setup found, and how many of the 8 serious ones. An issue raised only as an optional nit or design consideration counts half.
+
+| Setup | Found (of 17) | Serious (of 8) | False alarms |
+|---|---:|---:|---:|
+| Opus 5.5, max effort | 10 | 5.5 | 0 |
+| Opus 5.5, medium effort | 6 | 4 | 0 |
+| HydraFusion | 6 | 3.5 | 0 |
+| HydraFusion Max | 4.5 | 2.5 | 1 |
+| Qwen3.8 Flash-Next Coder GSQ-RCO 3.5-bit (local), thinking on | 4.5 | 3 | 0 |
+| Qwen3.8 Flash-Next Coder GSQ-RCO 3.5-bit (local), thinking off | 1 | 1 | 3 |
+
+The two local rows are single passes with no tools, covered in their own section below.
+
+HydraFusion's reviews were about as good as Opus at medium, which makes sense given what they ran on. They caught most of the ordinary should-fixes. Only Opus at max found the subtle blocker: an older copy of the app's server, still running during an upgrade, would carry a "stop waiting" choice over to the next question it raised. Even the Opus-at-max re-run rated it only as a nit.
+
+HydraFusion also found real issues the original reviews had missed, and two were worth filing. A search box left focused in a background window kept re-downloading the full history ([#233](https://github.com/shariqh/agent-inbox/issues/233)), which the Opus-at-max re-run also caught. And a documented installer limit was missing from the user docs ([#232](https://github.com/shariqh/agent-inbox/issues/232)).
+
+Among the agents, Max produced the only false alarm. It "read the code path end to end" but missed an earlier check that made its scenario impossible.
+
+On new code, HydraFusion and Opus at max agreed. They reviewed the new issue poller from the identical prompt, side by side, and both said merge with no blockers. HydraFusion took 5 minutes and 106 AIU; Opus at max took 14 minutes and 358 AIU, more than three times as much.
+
+### Two runs of the same review disagreed
+
+The two Opus-at-max runs of each review had the same prompt, the same commit and the same settings, and still found different issues. Across the four reviews, the re-runs caught only about 60% of what the originals found, and found a real bug the originals never mentioned. So I now treat a single review as one sample rather than the full picture. That changed how I think about review budgets more than any HydraFusion number did, and it's the strongest argument I have for spreading reviews across more than one model.
+
+### Prompt caching
+
+The model's prompt cache expires after five minutes without a call. When an agent blocks for ten minutes on a test run or a CI watch, its next call has to rewrite the entire context. One HydraFusion build spent 43% of its bill rewriting its cache after four long waits, and its follow-up turn spent 88%. For that build, keeping every wait under five minutes would have saved more than the switch to HydraFusion did.
+
+## Qwen3.8 Flash-Next Coder on two GPUs at home
+
+I also run a local model box, and it produced the most interesting result of the test. The model is ISTA-DASLab's [Qwen3.8-Flash-Next GSQ-RCO Coder](https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF), a compressed build of Qwen3.8-Flash-Next. The base model is a 176.9B-parameter mixture of experts that sends each token through 10 of the 512 experts in every layer. This build removes half of each layer's experts with RCO, keeping the ones code, agentic tool use, vision and spatial reasoning depend on, and stores the remaining weights at 3.5 bits with GSQ. That leaves 29.6 GB of weights that must stay in memory plus a 28.8 GB n-gram lookup table, against 354 GB for the original at BF16, and ISTA-DASLab reports it keeps 95.7% of the base model's SWE-bench Verified score (79.2 against 82.8).
+
+The box has two modded 20 GB RTX 3080s. The GGUF files are made for llama.cpp, and I keep a llama.cpp setup as a fallback, but I serve the model with [Strata](https://github.com/Niko1221/Strata), a ggml-based engine. On this box Strata's GPU expert cache and multi-token-prediction drafting roughly double llama.cpp's speed: 126 to 137 tokens per second decoding code against 57, with the full 256k-token context against the 131k I run llama.cpp with. llama-swap loads whichever model a request names. In these reviews it read its prompts at about 3,000 tokens per second and wrote at 81 to 91.
+
+It has no tools, so it couldn't do what the agents did: open other files, run the tests or try a probe. Each review was a single pass over the same prompt, the PR description (plus the linked issue for two of them), the repository's CLAUDE.md and the full diff, between about 61,000 and 89,000 tokens of input. I ran each review twice, with its thinking mode off and on, and scored both against the same 17 known issues.
+
+| Setup | Found (of 17) | Serious (of 8) | False alarms | AIU, all four | Time per review |
+|---|---:|---:|---:|---:|---:|
+| Qwen3.8 Flash-Next Coder GSQ-RCO 3.5-bit, thinking on | 4.5 | 3 | 0 | 0 | 4 to 6 min |
+| Qwen3.8 Flash-Next Coder GSQ-RCO 3.5-bit, thinking off | 1 | 1 | 3 | 0 | About 40 s |
+| HydraFusion | 6 | 3.5 | 0 | 593 | About 10 min |
+
+With thinking on, it came close to HydraFusion with far less to work with: no tools, one pass and no AIU. It raised no false alarms in four reviews. Its best catch was the serious issue in the fourth review. Setup's restart advice only counted sessions running an older build, so the planned "Match agents to vX" downgrade would have reported nothing to restart. Among the re-runs, only Opus at max found that one; HydraFusion, HydraFusion Max and Opus at medium all missed it.
+
+It found more. A deleted checkout's leftover hooks blocked every install, with no flag to get past them. A retry for a deep link could force a repaint from inside the 3-second poll, past the guard that protects a held click, and the PR's own guard test missed it because the call went through another function. And, like HydraFusion Max, it flagged that a runtime copied outside Setup's folder gets a second set of hooks, a limit the PR documented and v1.4 later fixed ([#232](https://github.com/shariqh/agent-inbox/issues/232)).
+
+It still fell short in places. It found fewer known issues overall than HydraFusion, 4.5 against 6, and it missed the subtle cross-version blocker that only Opus at max found. Thinking made all the difference. Without it, the model was fast and confidently wrong: three of its findings were false alarms and two of those were labelled blockers. One claimed that letting the human stop an agent's watcher loses their answer, which is the documented design, and another proposed a fix that would itself have broken how ties are ordered. Thinking took it from 1 known issue to 4.5 and from three false alarms to none, at 17,600 to 25,200 generated tokens per review, most of them reasoning.
+
+That's a stronger result than I expected from a quantised model on consumer GPUs. It doesn't replace an agent that can open files and run tests, but as a free first pass it found real problems. The serious issue it shared only with Opus at max is exactly the kind of catch a second, different model is for.
+
+## GitHub's description next to what I saw
+
+| GitHub says | What I saw |
+|---|---|
+| Picks Single, Cascade or Critique for each request | No escalation or critic ever ran; every request looked like Single on one model |
+| Draws on four frontier models | Only Claude Opus 5.5 was used or billed |
+| Medium effort for drafts, high for review | Medium effort for every call |
+| Max applies higher effort | Same model and effort as standard; slightly cheaper, and it found fewer issues |
+| 36–67% cheaper than Opus at medium | No saving against Opus 5.5 at medium; 69–72% cheaper than Opus at max |
+| Near-frontier quality | As good as Opus at medium; found 60% as many known issues as Opus at max |
+| Complete accounting across every leg | Held exactly, per call and per session |
+| Best on first-turn tasks; multi-turn still improving | The one follow-up turn worked; most of its cost was caching |
+
+None of this contradicts GitHub's benchmarks. Those used different tasks, a different baseline model and an offline harness, and HydraFusion is explicitly a research preview whose models, workflows and behavior may change. It does mean that, as a subagent model in Copilot CLI today, I couldn't see the orchestration I was looking for.
+
+## What I changed
+
+My subagents are now tiered. Agents that build features, and first reviews of risky changes (the database, installers, the desktop app's main process, the updater and setup), stay on Opus 5.5 at max effort. Quick re-checks after a fix, low-risk reviews and routine tasks run on HydraFusion. Today that means Opus at medium in practice. If HydraFusion starts mixing models for those tasks, they'll pick it up without me changing anything, and that's the payoff I'm waiting for. Every agent also keeps its waits under five minutes.
+
+## Limits of this test
+
+- It's a small sample: four re-run reviews and a handful of live runs, with one run per setup.
+- The local model reviewed each change in a single pass with no tools, so unlike the agents it couldn't check its own claims by reading other files or running tests. Its quality numbers come from one run per thinking mode.
+- The machine was overloaded during the first batch of re-run reviews, so I didn't compare that batch's timings.
+- The list of known issues comes from one Opus review per pull request. The Opus-at-max re-runs show how much that matters, and it matters a lot.
+- This covers HydraFusion as a subagent model in Copilot CLI 1.0.100-1, on 20 October 2026. It may behave differently in the main chat, in VS Code, or after the next update.
+
+If you're trying HydraFusion, check your own usage records. They tell you which model actually did the work. And if you have a local model, give it a review you've already done and score it against what you know. Mine surprised me.
