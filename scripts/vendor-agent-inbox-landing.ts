@@ -1,20 +1,43 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import {
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const SOURCE_REPOSITORY = "shariqh/agent-inbox";
 const SOURCE_REPOSITORY_URL = `https://github.com/${SOURCE_REPOSITORY}`;
-const SOURCE_PATH = "marketing/index.html";
+const SOURCE_DIRECTORY = "marketing";
+const SOURCE_PATH = `${SOURCE_DIRECTORY}/index.html`;
+const SOURCE_MANIFEST_PATH = `${SOURCE_DIRECTORY}/vendor/manifest.json`;
 const SOURCE_REF = "main";
 const SOURCE_LICENSE_PATH = "LICENSE";
 const EXPECTED_LICENSE = "MIT";
-const LANDING_PATH = "public/agent-inbox/index.html";
+const LANDING_DIRECTORY = "public/agent-inbox";
+const LANDING_PATH = `${LANDING_DIRECTORY}/index.html`;
+const ASSET_DIRECTORY = `${LANDING_DIRECTORY}/vendor`;
 const METADATA_PATH = "vendor/agent-inbox-landing.json";
 const FULL_SHA = /^[a-f0-9]{40}$/;
+const SHA256 = /^[a-f0-9]{64}$/;
+// Relative to the page in both repositories. Every segment starts with a letter
+// or digit, so no path can climb out of the vendor directory.
+const ASSET_PATH = /^vendor(?:\/[A-Za-z0-9][A-Za-z0-9._-]*){1,4}$/;
+const MAX_ASSETS = 16;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_API_BYTES = 1_000_000;
 const MAX_LANDING_BYTES = 1_000_000;
+const MAX_ASSET_BYTES = 5_000_000;
+
+export interface VendorAsset {
+  path: string;
+  sha256: string;
+}
 
 export interface VendorMetadata {
   repository: string;
@@ -23,12 +46,14 @@ export interface VendorMetadata {
   commit: string;
   sha256: string;
   license: string;
+  assets?: VendorAsset[];
 }
 
 export interface SyncResult {
   changed: boolean;
   commit: string;
   sha256: string;
+  assets: VendorAsset[];
   files: string[];
 }
 
@@ -36,6 +61,7 @@ export interface SourceInspection {
   commit: string;
   sha256: string;
   license: string;
+  assets: VendorAsset[];
 }
 
 interface SyncOptions {
@@ -47,7 +73,8 @@ interface SyncOptions {
 interface PlannedWrite {
   relativePath: string;
   path: string;
-  bytes: Uint8Array;
+  // Absent when the file is removed.
+  bytes?: Uint8Array;
   current?: Uint8Array;
 }
 
@@ -56,13 +83,15 @@ function commitApiUrl(): URL {
     `https://api.github.com/repos/${SOURCE_REPOSITORY}/commits`,
   );
   url.searchParams.set("sha", SOURCE_REF);
-  url.searchParams.set("path", SOURCE_PATH);
+  // The landing is index.html plus its vendored files, so any change under
+  // marketing/ is a new revision.
+  url.searchParams.set("path", SOURCE_DIRECTORY);
   url.searchParams.set("per_page", "1");
   return url;
 }
 
-function rawSourceUrl(commit: string): URL {
-  const path = SOURCE_PATH.split("/").map(encodeURIComponent).join("/");
+function rawSourceUrl(commit: string, sourcePath = SOURCE_PATH): URL {
+  const path = sourcePath.split("/").map(encodeURIComponent).join("/");
   return new URL(
     `https://raw.githubusercontent.com/${SOURCE_REPOSITORY}/${commit}/${path}`,
   );
@@ -85,15 +114,14 @@ function requestHeaders(token?: string): HeadersInit {
   };
 }
 
-async function request(
+async function send(
   fetchImpl: typeof fetch,
   url: URL,
   token: string | undefined,
   purpose: string,
 ): Promise<Response> {
-  let response: Response;
   try {
-    response = await fetchImpl(url, {
+    return await fetchImpl(url, {
       headers: requestHeaders(token),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -102,12 +130,39 @@ async function request(
       cause: error,
     });
   }
+}
+
+function requireOk(response: Response, url: URL, purpose: string): Response {
   if (!response.ok) {
     throw new Error(
       `Failed to ${purpose} from ${url.toString()}: HTTP ${response.status}`,
     );
   }
   return response;
+}
+
+async function request(
+  fetchImpl: typeof fetch,
+  url: URL,
+  token: string | undefined,
+  purpose: string,
+): Promise<Response> {
+  return requireOk(await send(fetchImpl, url, token, purpose), url, purpose);
+}
+
+// Resolves to undefined for HTTP 404, how GitHub reports a path a commit lacks.
+async function requestOptional(
+  fetchImpl: typeof fetch,
+  url: URL,
+  token: string | undefined,
+  purpose: string,
+): Promise<Response | undefined> {
+  const response = await send(fetchImpl, url, token, purpose);
+  if (response.status === 404) {
+    await response.body?.cancel();
+    return undefined;
+  }
+  return requireOk(response, url, purpose);
 }
 
 async function readLimitedBytes(
@@ -243,6 +298,108 @@ export async function fetchSourceBytes(
   );
 }
 
+function parseVendorManifest(bytes: Uint8Array): VendorAsset[] {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+    );
+  } catch (error) {
+    throw new Error("The Agent Inbox vendor manifest is not valid JSON", {
+      cause: error,
+    });
+  }
+  const files =
+    typeof payload === "object" && payload !== null && "files" in payload
+      ? payload.files
+      : undefined;
+  if (
+    !Array.isArray(files) ||
+    files.length === 0 ||
+    files.length > MAX_ASSETS
+  ) {
+    throw new Error(
+      `The Agent Inbox vendor manifest must list 1 to ${MAX_ASSETS} files`,
+    );
+  }
+  const assets = files.map((entry: unknown, index) => {
+    if (
+      typeof entry !== "object" ||
+      entry === null ||
+      !("path" in entry) ||
+      typeof entry.path !== "string" ||
+      !ASSET_PATH.test(entry.path) ||
+      !("sha256" in entry) ||
+      typeof entry.sha256 !== "string" ||
+      !SHA256.test(entry.sha256)
+    ) {
+      throw new Error(
+        `The Agent Inbox vendor manifest has an invalid file entry at index ${index}`,
+      );
+    }
+    return { path: entry.path, sha256: entry.sha256 };
+  });
+  // Paths that differ only in case, or a file that is also another file's
+  // folder, cannot all be written.
+  const folded = assets.map(({ path }) => path.toLowerCase());
+  const conflict = folded.find(
+    (path, index) =>
+      folded.indexOf(path) !== index ||
+      folded.some((other) => other.startsWith(`${path}/`)),
+  );
+  if (conflict !== undefined) {
+    throw new Error(
+      `The Agent Inbox vendor manifest lists conflicting paths at ${conflict}`,
+    );
+  }
+  return assets.sort((a, b) =>
+    a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+  );
+}
+
+// Downloads each file the source commit's vendor manifest lists and checks it
+// against the manifest's SHA-256.
+async function fetchSourceAssets(
+  commit: string,
+  fetchImpl: typeof fetch,
+  token: string | undefined,
+): Promise<Array<VendorAsset & { bytes: Uint8Array }>> {
+  const purpose = "download the Agent Inbox vendor manifest";
+  const manifest = await requestOptional(
+    fetchImpl,
+    rawSourceUrl(commit, SOURCE_MANIFEST_PATH),
+    token,
+    purpose,
+  );
+  // A revision from before the landing vendored any files is index.html alone.
+  if (!manifest) return [];
+  const listed = parseVendorManifest(
+    await readLimitedBytes(manifest, MAX_API_BYTES, purpose),
+  );
+  const assets: Array<VendorAsset & { bytes: Uint8Array }> = [];
+  for (const asset of listed) {
+    const assetPurpose = `download the Agent Inbox vendored file ${asset.path}`;
+    const response = await request(
+      fetchImpl,
+      rawSourceUrl(commit, `${SOURCE_DIRECTORY}/${asset.path}`),
+      token,
+      assetPurpose,
+    );
+    const bytes = await readLimitedBytes(
+      response,
+      MAX_ASSET_BYTES,
+      assetPurpose,
+    );
+    if (sha256(bytes) !== asset.sha256) {
+      throw new Error(
+        `Agent Inbox vendored file ${asset.path} does not match its manifest SHA-256`,
+      );
+    }
+    assets.push({ ...asset, bytes });
+  }
+  return assets;
+}
+
 export async function verifySourceLicense(
   commit: string,
   fetchImpl: typeof fetch = fetch,
@@ -287,16 +444,47 @@ async function readOptional(path: string): Promise<Uint8Array | undefined> {
   try {
     return await readFile(path);
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
+    if (isMissing(error)) {
       return undefined;
     }
     throw error;
   }
+}
+
+function isMissing(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
+// Every file under the vendored directory, relative to rootDir.
+async function listVendoredFiles(rootDir: string): Promise<string[]> {
+  const directory = resolve(rootDir, ASSET_DIRECTORY);
+  let stats;
+  try {
+    stats = await lstat(directory);
+  } catch (error) {
+    if (isMissing(error)) return [];
+    throw error;
+  }
+  if (!stats.isDirectory()) {
+    throw new Error(`${ASSET_DIRECTORY} must be a directory`);
+  }
+  const entries = await readdir(directory, {
+    recursive: true,
+    withFileTypes: true,
+  });
+  return entries
+    .filter((entry) => !entry.isDirectory())
+    .map((entry) =>
+      relative(rootDir, join(entry.parentPath, entry.name))
+        .split(sep)
+        .join("/"),
+    )
+    .sort();
 }
 
 async function writeAtomic(path: string, bytes: Uint8Array): Promise<void> {
@@ -322,11 +510,11 @@ function equalBytes(
   );
 }
 
-async function stageWrite(write: PlannedWrite): Promise<string> {
-  await mkdir(dirname(write.path), { recursive: true });
-  const temporary = `${write.path}.${process.pid}.${randomUUID()}.tmp`;
+async function stageWrite(path: string, bytes: Uint8Array): Promise<string> {
+  await mkdir(dirname(path), { recursive: true });
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporary, write.bytes);
+    await writeFile(temporary, bytes);
     return temporary;
   } catch (error) {
     await rm(temporary, { force: true });
@@ -335,14 +523,21 @@ async function stageWrite(write: PlannedWrite): Promise<string> {
 }
 
 async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
-  const staged: Array<{ write: PlannedWrite; temporary: string }> = [];
+  const staged: Array<{ write: PlannedWrite; temporary?: string }> = [];
   try {
     for (const write of writes) {
-      staged.push({ write, temporary: await stageWrite(write) });
+      staged.push({
+        write,
+        temporary: write.bytes
+          ? await stageWrite(write.path, write.bytes)
+          : undefined,
+      });
     }
   } catch (error) {
     await Promise.all(
-      staged.map(({ temporary }) => rm(temporary, { force: true })),
+      staged.map(({ temporary }) =>
+        temporary ? rm(temporary, { force: true }) : undefined,
+      ),
     );
     throw error;
   }
@@ -350,7 +545,11 @@ async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
   const replaced: PlannedWrite[] = [];
   try {
     for (const { write, temporary } of staged) {
-      await rename(temporary, write.path);
+      if (temporary) {
+        await rename(temporary, write.path);
+      } else {
+        await rm(write.path);
+      }
       replaced.push(write);
     }
   } catch (error) {
@@ -375,7 +574,9 @@ async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
     throw error;
   } finally {
     await Promise.all(
-      staged.map(({ temporary }) => rm(temporary, { force: true })),
+      staged.map(({ temporary }) =>
+        temporary ? rm(temporary, { force: true }) : undefined,
+      ),
     );
   }
 }
@@ -384,10 +585,26 @@ async function loadSourceRevision(
   commit: string,
   fetchImpl: typeof fetch,
   token: string | undefined,
-): Promise<SourceInspection & { landing: Uint8Array }> {
+): Promise<
+  SourceInspection & {
+    landing: Uint8Array;
+    downloads: Array<VendorAsset & { bytes: Uint8Array }>;
+  }
+> {
   const license = await verifySourceLicense(commit, fetchImpl, token);
   const landing = await fetchSourceBytes(commit, fetchImpl, token);
-  return { commit, sha256: sha256(landing), license, landing };
+  const downloads = await fetchSourceAssets(commit, fetchImpl, token);
+  return {
+    commit,
+    sha256: sha256(landing),
+    license,
+    assets: downloads.map(({ path, sha256: digest }) => ({
+      path,
+      sha256: digest,
+    })),
+    landing,
+    downloads,
+  };
 }
 
 export async function inspectSourceCommit(
@@ -395,11 +612,11 @@ export async function inspectSourceCommit(
   fetchImpl: typeof fetch = fetch,
   token = process.env.GITHUB_TOKEN,
 ): Promise<SourceInspection> {
-  const { landing: _landing, ...inspection } = await loadSourceRevision(
-    commit,
-    fetchImpl,
-    token,
-  );
+  const {
+    landing: _landing,
+    downloads: _downloads,
+    ...inspection
+  } = await loadSourceRevision(commit, fetchImpl, token);
   return inspection;
 }
 
@@ -413,6 +630,8 @@ export async function syncAgentInboxLanding({
     landing,
     license,
     sha256: digest,
+    assets,
+    downloads,
   } = await loadSourceRevision(commit, fetchImpl, token);
   const metadata: VendorMetadata = {
     repository: SOURCE_REPOSITORY_URL,
@@ -421,12 +640,18 @@ export async function syncAgentInboxLanding({
     commit,
     sha256: digest,
     license,
+    // A source without vendored files keeps the original metadata shape.
+    ...(assets.length > 0 ? { assets } : {}),
   };
   const metadataBytes = new TextEncoder().encode(
     `${JSON.stringify(metadata, null, 2)}\n`,
   );
   const candidates = [
     { relativePath: LANDING_PATH, bytes: landing },
+    ...downloads.map(({ path, bytes }) => ({
+      relativePath: `${LANDING_DIRECTORY}/${path}`,
+      bytes,
+    })),
     { relativePath: METADATA_PATH, bytes: metadataBytes },
   ];
   const writes: PlannedWrite[] = [];
@@ -438,12 +663,20 @@ export async function syncAgentInboxLanding({
       writes.push({ ...candidate, path, current });
     }
   }
+  // Remove vendored files an earlier revision listed and this one does not.
+  const listed = new Set(candidates.map(({ relativePath }) => relativePath));
+  for (const relativePath of await listVendoredFiles(rootDir)) {
+    if (listed.has(relativePath)) continue;
+    const path = resolve(rootDir, relativePath);
+    writes.push({ relativePath, path, current: await readOptional(path) });
+  }
   await replaceWrites(writes);
 
   return {
     changed: writes.length > 0,
     commit,
     sha256: digest,
+    assets,
     files: writes.map(({ relativePath }) => relativePath),
   };
 }
@@ -477,6 +710,9 @@ if (isMainModule()) {
         console.log(
           `Agent Inbox landing ${result.commit} is ${result.license} with SHA-256 ${result.sha256}`,
         );
+        for (const asset of result.assets) {
+          console.log(`Vendored ${asset.path} has SHA-256 ${asset.sha256}`);
+        }
       }
     })
     .catch((error: unknown) => {

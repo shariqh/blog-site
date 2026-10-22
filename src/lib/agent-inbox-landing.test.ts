@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { active } from "./projects";
 
@@ -10,6 +12,7 @@ interface VendorMetadata {
   commit: string;
   sha256: string;
   license: string;
+  assets?: Array<{ path: string; sha256: string }>;
 }
 
 const metadata = JSON.parse(
@@ -18,10 +21,14 @@ const metadata = JSON.parse(
     "utf8",
   ),
 ) as VendorMetadata;
-const LANDING_PAGE = new URL(
-  "../../public/agent-inbox/index.html",
-  import.meta.url,
+const LANDING_DIRECTORY = fileURLToPath(
+  new URL("../../public/agent-inbox/", import.meta.url),
 );
+const LANDING_PAGE = join(LANDING_DIRECTORY, "index.html");
+
+function sha256(path: string): string {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
 
 describe("Agent Inbox landing page", () => {
   it("has valid source metadata", () => {
@@ -32,17 +39,49 @@ describe("Agent Inbox landing page", () => {
       commit: expect.stringMatching(/^[a-f0-9]{40}$/),
       sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
       license: "MIT",
+      // Present only when the source vendors files next to the page.
+      ...(metadata.assets && {
+        assets: metadata.assets.map(() => ({
+          path: expect.stringMatching(
+            /^vendor(?:\/[A-Za-z0-9][A-Za-z0-9._-]*){1,4}$/,
+          ),
+          sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        })),
+      }),
     });
+    expect(metadata.assets?.length).not.toBe(0);
   });
 
   it(`matches the pinned ${metadata.sourcePath} source bytes`, () => {
-    const bytes = readFileSync(LANDING_PAGE);
-    const actual = createHash("sha256").update(bytes).digest("hex");
-
     expect(
-      actual,
+      sha256(LANDING_PAGE),
       `Run npm run sync:agent-inbox-landing to refresh ${metadata.sourcePath} from ${metadata.repository} and update its provenance`,
     ).toBe(metadata.sha256);
+  });
+
+  it("holds exactly the page and its pinned vendored files", () => {
+    const files = readdirSync(LANDING_DIRECTORY, {
+      recursive: true,
+      withFileTypes: true,
+    })
+      .filter((entry) => !entry.isDirectory())
+      .map((entry) =>
+        relative(LANDING_DIRECTORY, join(entry.parentPath, entry.name))
+          .split("\\")
+          .join("/"),
+      )
+      .sort();
+    const assets = metadata.assets ?? [];
+
+    expect(files).toEqual(
+      ["index.html", ...assets.map(({ path }) => path)].sort(),
+    );
+    for (const asset of assets) {
+      expect(
+        sha256(join(LANDING_DIRECTORY, asset.path)),
+        `Run npm run sync:agent-inbox-landing to refresh ${asset.path}`,
+      ).toBe(asset.sha256);
+    }
   });
 
   it("uses the hosted landing page while retaining the source repository", () => {

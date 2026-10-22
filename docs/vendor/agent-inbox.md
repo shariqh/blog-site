@@ -4,11 +4,20 @@
 repository. It must remain unchanged so its source can be verified
 deterministically.
 
+The page may load files that Agent Inbox vendors next to it, such as the
+Three.js modules behind its hero. Agent Inbox lists them, each with its SHA-256,
+in `marketing/vendor/manifest.json`. The sync copies exactly the listed files
+from `marketing/<path>` to `public/agent-inbox/<path>`, refuses any whose bytes
+do not match the manifest, and removes vendored files a newer revision no longer
+lists. A revision without a manifest syncs `index.html` alone. Each vendored
+folder carries its own license, such as Three.js's MIT `LICENSE`.
+
 The machine-readable source commit, source path, and SHA-256 live in
-`vendor/agent-inbox-landing.json`.
+`vendor/agent-inbox-landing.json`, together with an `assets` list of each
+vendored file's path and SHA-256 when the revision has any.
 
 `.github/workflows/sync-agent-inbox-landing.yml` checks hourly for the newest
-commit on Agent Inbox `main` that changed `marketing/index.html`. When the
+commit on Agent Inbox `main` that changed anything under `marketing/`. When the
 source bytes or provenance change, it opens one normal blog-site pull request.
 That pull request still runs CI, deploys a preview, receives both AI reviews,
 and requires a human merge before production changes.
@@ -21,6 +30,14 @@ To check or refresh the vendored page locally:
 
 ```sh
 npm run sync:agent-inbox-landing
+```
+
+To check any Agent Inbox commit, such as an unmerged pull request's head, without
+writing anything, run the following. It downloads the page and every vendored
+file, verifies them, and prints their SHA-256s.
+
+```sh
+npm run sync:agent-inbox-landing -- --inspect <full commit SHA>
 ```
 
 Normal Astro builds never fetch Agent Inbox or GitHub. The updater runs only
