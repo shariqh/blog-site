@@ -10,6 +10,7 @@ import {
 } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { gunzipSync } from "node:zlib";
 
 const SOURCE_REPOSITORY = "shariqh/agent-inbox";
 const SOURCE_REPOSITORY_URL = `https://github.com/${SOURCE_REPOSITORY}`;
@@ -25,10 +26,27 @@ const ASSET_DIRECTORY = `${LANDING_DIRECTORY}/vendor`;
 const METADATA_PATH = "vendor/agent-inbox-landing.json";
 const FULL_SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
-// Relative to the page in both repositories. Every segment starts with a letter
-// or digit, so no path can climb out of the vendor directory.
-const ASSET_PATH = /^vendor(?:\/[A-Za-z0-9][A-Za-z0-9._-]*){1,4}$/;
+// Relative to the page in both repositories: a script, stylesheet or license at
+// most three folders below vendor/. Every segment starts with a letter or digit,
+// so no path can climb out of the vendor directory.
+const ASSET_PATH =
+  /^vendor(?:\/[A-Za-z0-9][A-Za-z0-9._-]*){0,3}\/(?:LICENSE|[A-Za-z0-9][A-Za-z0-9._-]*\.(?:js|mjs|css))$/;
+// Names that test runners collect, such as x.test.js, x.bench.js or vitest's
+// x.test-d.js type tests, are never vendored.
+const TEST_NAME = /\.(?:test|spec|bench(?:mark)?)(?:-d)?\./i;
 const MAX_ASSETS = 16;
+// The only npm package the landing vendors, and the file in its tarball behind
+// each vendored name. Vendoring anything else needs a reviewed change here.
+const NPM_REGISTRY = "https://registry.npmjs.org";
+const NPM_PACKAGE = "three";
+const NPM_FILES: Readonly<Record<string, string>> = {
+  "three.core.js": "package/build/three.core.js",
+  "three.module.js": "package/build/three.module.js",
+  LICENSE: "package/LICENSE",
+};
+const NPM_INTEGRITY = /^sha512-[A-Za-z0-9+/]{86}==$/;
+const MAX_TARBALL_BYTES = 32_000_000;
+const MAX_UNPACKED_BYTES = 128_000_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_API_BYTES = 1_000_000;
 const MAX_LANDING_BYTES = 1_000_000;
@@ -37,6 +55,19 @@ const MAX_ASSET_BYTES = 5_000_000;
 export interface VendorAsset {
   path: string;
   sha256: string;
+}
+
+// An npm release whose tarball matched the registry and held every vendored file.
+export interface NpmSource {
+  package: string;
+  integrity: string;
+}
+
+interface ManifestSource {
+  directory: string;
+  package: string;
+  version: string;
+  integrity: string;
 }
 
 export interface VendorMetadata {
@@ -54,6 +85,7 @@ export interface SyncResult {
   commit: string;
   sha256: string;
   assets: VendorAsset[];
+  npm: NpmSource[];
   files: string[];
 }
 
@@ -62,6 +94,7 @@ export interface SourceInspection {
   sha256: string;
   license: string;
   assets: VendorAsset[];
+  npm: NpmSource[];
 }
 
 interface SyncOptions {
@@ -116,12 +149,12 @@ function requestHeaders(token?: string): HeadersInit {
 async function send(
   fetchImpl: typeof fetch,
   url: URL,
-  token: string | undefined,
+  headers: HeadersInit,
   purpose: string,
 ): Promise<Response> {
   try {
     return await fetchImpl(url, {
-      headers: requestHeaders(token),
+      headers,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
@@ -146,7 +179,29 @@ async function request(
   token: string | undefined,
   purpose: string,
 ): Promise<Response> {
-  return requireOk(await send(fetchImpl, url, token, purpose), url, purpose);
+  return requireOk(
+    await send(fetchImpl, url, requestHeaders(token), purpose),
+    url,
+    purpose,
+  );
+}
+
+// The npm registry never receives the GitHub token.
+async function requestNpm(
+  fetchImpl: typeof fetch,
+  url: URL,
+  purpose: string,
+): Promise<Response> {
+  return requireOk(
+    await send(
+      fetchImpl,
+      url,
+      { "User-Agent": "shariqh-blog-site-agent-inbox-sync" },
+      purpose,
+    ),
+    url,
+    purpose,
+  );
 }
 
 // Resolves to undefined for HTTP 404, how GitHub reports a path a commit lacks.
@@ -156,7 +211,7 @@ async function requestOptional(
   token: string | undefined,
   purpose: string,
 ): Promise<Response | undefined> {
-  const response = await send(fetchImpl, url, token, purpose);
+  const response = await send(fetchImpl, url, requestHeaders(token), purpose);
   if (response.status === 404) {
     await response.body?.cancel();
     return undefined;
@@ -297,7 +352,18 @@ export async function fetchSourceBytes(
   );
 }
 
-function parseVendorManifest(bytes: Uint8Array): VendorAsset[] {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function npmTarballUrl(version: string): string {
+  return `${NPM_REGISTRY}/${NPM_PACKAGE}/-/${NPM_PACKAGE}-${version}.tgz`;
+}
+
+function parseVendorManifest(bytes: Uint8Array): {
+  assets: VendorAsset[];
+  sources: Map<string, ManifestSource>;
+} {
   let payload: unknown;
   try {
     payload = JSON.parse(
@@ -308,27 +374,22 @@ function parseVendorManifest(bytes: Uint8Array): VendorAsset[] {
       cause: error,
     });
   }
-  const files =
-    typeof payload === "object" && payload !== null && "files" in payload
-      ? payload.files
-      : undefined;
   if (
-    !Array.isArray(files) ||
-    files.length === 0 ||
-    files.length > MAX_ASSETS
+    !isRecord(payload) ||
+    !Array.isArray(payload.files) ||
+    payload.files.length === 0 ||
+    payload.files.length > MAX_ASSETS
   ) {
     throw new Error(
       `The Agent Inbox vendor manifest must list 1 to ${MAX_ASSETS} files`,
     );
   }
-  const assets = files.map((entry: unknown, index) => {
+  const assets = payload.files.map((entry: unknown, index: number) => {
     if (
-      typeof entry !== "object" ||
-      entry === null ||
-      !("path" in entry) ||
+      !isRecord(entry) ||
       typeof entry.path !== "string" ||
       !ASSET_PATH.test(entry.path) ||
-      !("sha256" in entry) ||
+      TEST_NAME.test(entry.path) ||
       typeof entry.sha256 !== "string" ||
       !SHA256.test(entry.sha256)
     ) {
@@ -351,18 +412,174 @@ function parseVendorManifest(bytes: Uint8Array): VendorAsset[] {
       `The Agent Inbox vendor manifest lists conflicting paths at ${conflict}`,
     );
   }
-  return assets.sort((a, b) =>
-    a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
-  );
+
+  // Each folder names the npm release its files come from.
+  const sources = new Map<string, ManifestSource>();
+  const listedSources: unknown[] = Array.isArray(payload.sources)
+    ? payload.sources
+    : [];
+  listedSources.forEach((entry, index) => {
+    const version =
+      isRecord(entry) && typeof entry.package === "string"
+        ? /^three@(\d+\.\d+\.\d+)$/.exec(entry.package)?.[1]
+        : undefined;
+    const directory = `vendor/${NPM_PACKAGE}-${version}`;
+    if (
+      !isRecord(entry) ||
+      version === undefined ||
+      entry.directory !== directory ||
+      entry.tarball !== npmTarballUrl(version) ||
+      typeof entry.integrity !== "string" ||
+      !NPM_INTEGRITY.test(entry.integrity) ||
+      sources.has(directory)
+    ) {
+      throw new Error(
+        `The Agent Inbox vendor manifest has an invalid npm source at index ${index}`,
+      );
+    }
+    sources.set(directory, {
+      directory,
+      package: `${NPM_PACKAGE}@${version}`,
+      version,
+      integrity: entry.integrity,
+    });
+  });
+  for (const { path } of assets) {
+    const slash = path.lastIndexOf("/");
+    if (
+      !sources.has(path.slice(0, slash)) ||
+      !Object.hasOwn(NPM_FILES, path.slice(slash + 1))
+    ) {
+      throw new Error(
+        `Agent Inbox vendored file ${path} is not a ${NPM_PACKAGE} release file the sync can check against npm`,
+      );
+    }
+  }
+  return {
+    assets: assets.sort((a, b) =>
+      a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+    ),
+    sources,
+  };
 }
 
-// Downloads each file the source commit's vendor manifest lists and checks it
-// against the manifest's SHA-256.
+// Reads the wanted files from a tar archive by their header names. Each must
+// be a plain file listed once, because tar tools disagree about which of two
+// copies wins. Headers that rename the next entry (PAX, GNU long names) are not
+// read, so a file named only through one is never found and the check fails.
+function readTarFiles(
+  archive: Uint8Array,
+  wanted: ReadonlySet<string>,
+): Map<string, Uint8Array> {
+  const decoder = new TextDecoder();
+  const files = new Map<string, Uint8Array>();
+  let offset = 0;
+  while (offset + 512 <= archive.length) {
+    const header = archive.subarray(offset, offset + 512);
+    if (header.every((byte) => byte === 0)) break;
+    const text = (start: number, length: number) => {
+      const field = header.subarray(start, start + length);
+      const end = field.indexOf(0);
+      return decoder.decode(end === -1 ? field : field.subarray(0, end));
+    };
+    const size = Number.parseInt(text(124, 12).trim() || "0", 8);
+    const start = offset + 512;
+    if (!Number.isSafeInteger(size) || start + size > archive.length) {
+      throw new Error("The npm tarball has a damaged entry");
+    }
+    const prefix = text(345, 155);
+    const name = prefix ? `${prefix}/${text(0, 100)}` : text(0, 100);
+    if (wanted.has(name)) {
+      if ((text(156, 1) || "0") !== "0" || files.has(name)) {
+        throw new Error(
+          `The npm tarball holds ${name} more than once or not as a plain file`,
+        );
+      }
+      files.set(name, archive.subarray(start, start + size));
+    }
+    offset = start + Math.ceil(size / 512) * 512;
+  }
+  return files;
+}
+
+// Requires each vendored file to equal the same file in the npm release its
+// folder names, after checking that release's tarball against the registry.
+async function verifyNpmSources(
+  downloads: Array<VendorAsset & { bytes: Uint8Array }>,
+  sources: ReadonlyMap<string, ManifestSource>,
+  fetchImpl: typeof fetch,
+): Promise<NpmSource[]> {
+  const verified: NpmSource[] = [];
+  for (const source of sources.values()) {
+    const assets = downloads.filter(({ path }) =>
+      path.startsWith(`${source.directory}/`),
+    );
+    if (assets.length === 0) continue;
+    const purpose = `check the vendored files against npm ${source.package}`;
+    const release = await readJson(
+      await requestNpm(
+        fetchImpl,
+        new URL(`${NPM_REGISTRY}/${NPM_PACKAGE}/${source.version}`),
+        purpose,
+      ),
+      purpose,
+    );
+    const dist =
+      isRecord(release) && isRecord(release.dist) ? release.dist : undefined;
+    if (
+      !isRecord(release) ||
+      release.name !== NPM_PACKAGE ||
+      release.version !== source.version ||
+      dist?.tarball !== npmTarballUrl(source.version) ||
+      dist.integrity !== source.integrity
+    ) {
+      throw new Error(
+        `The npm registry does not list ${source.package} with the vendor manifest's tarball and integrity`,
+      );
+    }
+    const tarball = await readLimitedBytes(
+      await requestNpm(
+        fetchImpl,
+        new URL(npmTarballUrl(source.version)),
+        purpose,
+      ),
+      MAX_TARBALL_BYTES,
+      purpose,
+    );
+    const integrity = `sha512-${createHash("sha512").update(tarball).digest("base64")}`;
+    if (integrity !== source.integrity) {
+      throw new Error(
+        `The npm tarball for ${source.package} does not match the registry's integrity`,
+      );
+    }
+    const files = readTarFiles(
+      gunzipSync(tarball, { maxOutputLength: MAX_UNPACKED_BYTES }),
+      new Set(Object.values(NPM_FILES)),
+    );
+    for (const asset of assets) {
+      const member = NPM_FILES[asset.path.slice(source.directory.length + 1)]!;
+      const bytes = files.get(member);
+      if (!bytes || sha256(bytes) !== asset.sha256) {
+        throw new Error(
+          `Agent Inbox vendored file ${asset.path} does not match ${member} in npm ${source.package}`,
+        );
+      }
+    }
+    verified.push({ package: source.package, integrity: source.integrity });
+  }
+  return verified;
+}
+
+// Downloads each file the source commit's vendor manifest lists, checks it
+// against the manifest's SHA-256, then against the npm release it names.
 async function fetchSourceAssets(
   commit: string,
   fetchImpl: typeof fetch,
   token: string | undefined,
-): Promise<Array<VendorAsset & { bytes: Uint8Array }>> {
+): Promise<{
+  downloads: Array<VendorAsset & { bytes: Uint8Array }>;
+  npm: NpmSource[];
+}> {
   const purpose = "download the Agent Inbox vendor manifest";
   const manifest = await requestOptional(
     fetchImpl,
@@ -371,11 +588,11 @@ async function fetchSourceAssets(
     purpose,
   );
   // A revision from before the landing vendored any files is index.html alone.
-  if (!manifest) return [];
-  const listed = parseVendorManifest(
+  if (!manifest) return { downloads: [], npm: [] };
+  const { assets: listed, sources } = parseVendorManifest(
     await readLimitedBytes(manifest, MAX_API_BYTES, purpose),
   );
-  const assets: Array<VendorAsset & { bytes: Uint8Array }> = [];
+  const downloads: Array<VendorAsset & { bytes: Uint8Array }> = [];
   for (const asset of listed) {
     const assetPurpose = `download the Agent Inbox vendored file ${asset.path}`;
     const response = await request(
@@ -394,9 +611,12 @@ async function fetchSourceAssets(
         `Agent Inbox vendored file ${asset.path} does not match its manifest SHA-256`,
       );
     }
-    assets.push({ ...asset, bytes });
+    downloads.push({ ...asset, bytes });
   }
-  return assets;
+  return {
+    downloads,
+    npm: await verifyNpmSources(downloads, sources, fetchImpl),
+  };
 }
 
 export async function verifySourceLicense(
@@ -676,7 +896,7 @@ async function loadSourceRevision(
 > {
   const license = await verifySourceLicense(commit, fetchImpl, token);
   const landing = await fetchSourceBytes(commit, fetchImpl, token);
-  const downloads = await fetchSourceAssets(commit, fetchImpl, token);
+  const { downloads, npm } = await fetchSourceAssets(commit, fetchImpl, token);
   return {
     commit,
     sha256: sha256(landing),
@@ -685,6 +905,7 @@ async function loadSourceRevision(
       path,
       sha256: digest,
     })),
+    npm,
     landing,
     downloads,
   };
@@ -714,6 +935,7 @@ export async function syncAgentInboxLanding({
     license,
     sha256: digest,
     assets,
+    npm,
     downloads,
   } = await loadSourceRevision(commit, fetchImpl, token);
   const metadata: VendorMetadata = {
@@ -779,6 +1001,7 @@ export async function syncAgentInboxLanding({
     commit,
     sha256: digest,
     assets,
+    npm,
     files,
   };
 }
@@ -814,6 +1037,11 @@ if (isMainModule()) {
         );
         for (const asset of result.assets) {
           console.log(`Vendored ${asset.path} has SHA-256 ${asset.sha256}`);
+        }
+        for (const source of result.npm) {
+          console.log(
+            `Every vendored file matches npm ${source.package} (${source.integrity})`,
+          );
         }
       }
     })

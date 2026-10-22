@@ -4,13 +4,33 @@
 repository. It must remain unchanged so its source can be verified
 deterministically.
 
-The page may load files that Agent Inbox vendors next to it, such as the
-Three.js modules behind its hero. Agent Inbox lists them, each with its SHA-256,
-in `marketing/vendor/manifest.json`. The sync copies exactly the listed files
-from `marketing/<path>` to `public/agent-inbox/<path>`, refuses any whose bytes
-do not match the manifest, and removes vendored files a newer revision no longer
-lists. A revision without a manifest syncs `index.html` alone. Each vendored
-folder carries its own license, such as Three.js's MIT `LICENSE`.
+The page may load files that Agent Inbox vendors next to it: the Three.js
+modules behind its hero. Agent Inbox lists them, each with its SHA-256, in
+`marketing/vendor/manifest.json`, and names the npm release each folder comes
+from. The sync copies exactly the listed files from `marketing/<path>` to
+`public/agent-inbox/<path>` and removes vendored files a newer revision no
+longer lists. A revision without a manifest syncs `index.html` alone. It
+refuses any revision where:
+
+- a listed file's bytes differ from the manifest's SHA-256;
+- a path is not a script (`.js`, `.mjs`), stylesheet (`.css`) or `LICENSE` under
+  `vendor/`, or has a name test runners collect, such as `x.test.js`;
+- a file is not one it can match to npm: only `three.module.js`,
+  `three.core.js` and `LICENSE` in a `vendor/three-<version>/` folder whose
+  manifest entry names `three@<version>`;
+- the npm check fails. The sync fetches that release from
+  registry.npmjs.org, requires the registry's `dist.tarball` and
+  `dist.integrity` to equal the manifest's, checks the downloaded tarball's
+  SHA-512 against that integrity, and requires each vendored file to be
+  byte-identical to `package/build/three.module.js`,
+  `package/build/three.core.js` or `package/LICENSE` in it.
+
+An Agent Inbox commit therefore cannot change a vendored file and its manifest
+hash together: the bytes must still equal the published npm release. Vendoring
+any other package or file needs a reviewed change to
+`scripts/vendor-agent-inbox-landing.ts`. Each vendored folder carries its own
+license, such as Three.js's MIT `LICENSE`. Vitest excludes `public/**`, so
+nothing synced there can run as a test.
 
 The machine-readable source commit, source path, and SHA-256 live in
 `vendor/agent-inbox-landing.json`, together with an `assets` list of each
@@ -20,7 +40,18 @@ vendored file's path and SHA-256 when the revision has any.
 commit on Agent Inbox `main` that changed anything under `marketing/`. When the
 source bytes or provenance change, it opens one normal blog-site pull request.
 That pull request still runs CI, deploys a preview, receives both AI reviews,
-and requires a human merge before production changes.
+and requires a human merge before production changes. Its body lists each
+vendored file's SHA-256 and the npm release they matched.
+
+The workflow keeps the owner token away from synced code. Its `sync` job runs
+with a read-only `GITHUB_TOKEN` (`contents: read`, `pull-requests: read`) and
+does everything that executes code: the sync script and its npm check,
+`npm ci`, the tests, `astro check` and the build. It uploads the synced files
+before installing dependencies. Only the `publish` job sees `AGENT_GH_TOKEN`,
+and it runs no npm, Node, test or build tooling and no Git hooks
+(`core.hooksPath=/dev/null`). It checks the artifact holds exactly the expected
+files and their hashes, then commits, pushes the automation branch and opens or
+tends the pull request.
 
 Only one generated landing sync PR is active at a time. If Agent Inbox changes
 again while one is open, the newer revision waits for the existing PR to be

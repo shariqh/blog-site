@@ -12,6 +12,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import matter from "gray-matter";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -34,19 +35,105 @@ function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
-// Source files under marketing/vendor/ plus a manifest that lists them, in
-// reverse order so the sync has to sort them.
+// A gzipped tar archive of plain files, laid out like an npm tarball.
+function npmTarball(files: Record<string, string>): Uint8Array<ArrayBuffer> {
+  const encoder = new TextEncoder();
+  const blocks: Uint8Array[] = [];
+  for (const [name, text] of Object.entries(files)) {
+    const data = encoder.encode(text);
+    const header = new Uint8Array(512);
+    const field = (offset: number, value: string) =>
+      header.set(encoder.encode(value), offset);
+    field(0, name);
+    field(100, "0000644\0");
+    field(124, `${data.length.toString(8).padStart(11, "0")}\0`);
+    field(156, "0");
+    field(257, "ustar\u000000");
+    blocks.push(header, data, new Uint8Array(-data.length & 511));
+  }
+  blocks.push(new Uint8Array(1024));
+  return new Uint8Array(gzipSync(Buffer.concat(blocks)));
+}
+
+const NPM_FILES: Record<string, string> = {
+  LICENSE: "package/LICENSE",
+  "three.core.js": "package/build/three.core.js",
+  "three.module.js": "package/build/three.module.js",
+};
+
+interface Source {
+  // Files under marketing/, keyed by their path from there.
+  vendor?: Record<string, string>;
+  // npm registry responses by URL.
+  registry?: Record<string, () => Response>;
+}
+
+// Vendored files and a manifest that lists them, in reverse order so the sync
+// has to sort them, and names the npm release behind each folder. The registry
+// serves that release, holding `npmFiles` (by default the vendored files).
 function vendored(
   files: Record<string, string>,
-  listed = Object.keys(files).map((path) => ({
-    path,
-    sha256: sha256(files[path]),
-  })),
-): Record<string, string> {
+  {
+    listed = Object.keys(files).map((path) => ({
+      path,
+      sha256: sha256(files[path]),
+    })),
+    npmFiles = files,
+  }: {
+    listed?: Array<{ path: string; sha256: string }>;
+    npmFiles?: Record<string, string>;
+  } = {},
+): Required<Source> {
+  const registry: Record<string, () => Response> = {};
+  const versions = new Set(
+    Object.keys(files).flatMap(
+      (path) => /^vendor\/three-(\d+\.\d+\.\d+)\//.exec(path)?.[1] ?? [],
+    ),
+  );
+  const sources = [...versions].map((version) => {
+    const directory = `vendor/three-${version}`;
+    const members = Object.entries(npmFiles).flatMap(([path, text]) => {
+      const member = NPM_FILES[path.slice(directory.length + 1)];
+      return path.startsWith(`${directory}/`) && member ? [[member, text]] : [];
+    });
+    const archive = npmTarball({
+      "package/package.json": JSON.stringify({ name: "three", version }),
+      ...Object.fromEntries(members),
+    });
+    const tarball = `https://registry.npmjs.org/three/-/three-${version}.tgz`;
+    const integrity = `sha512-${createHash("sha512").update(archive).digest("base64")}`;
+    registry[`https://registry.npmjs.org/three/${version}`] = () =>
+      Response.json({ name: "three", version, dist: { tarball, integrity } });
+    registry[tarball] = () => new Response(archive);
+    return {
+      directory,
+      package: `three@${version}`,
+      tarball,
+      integrity,
+      license: "MIT",
+    };
+  });
   return {
-    ...files,
-    "vendor/manifest.json": JSON.stringify({ files: [...listed].reverse() }),
+    vendor: {
+      ...files,
+      "vendor/manifest.json": JSON.stringify({
+        files: [...listed].reverse(),
+        sources,
+      }),
+    },
+    registry,
   };
+}
+
+// The manifest vendored() writes for these files.
+function manifestOf(files: Record<string, string>) {
+  return JSON.parse(vendored(files).vendor["vendor/manifest.json"]);
+}
+
+// The THREE_186 manifest with its npm source changed.
+function withSource(change: Record<string, string>) {
+  const manifest = manifestOf(THREE_186);
+  return { ...manifest, sources: [{ ...manifest.sources[0], ...change }] };
 }
 
 // Every entry under public/agent-inbox, with links and other non-files marked.
@@ -75,13 +162,22 @@ function mockGitHub(
   landing: Uint8Array,
   commit = COMMIT,
   license = "MIT",
-  vendor: Record<string, string> = {},
-): { fetchImpl: typeof fetch; urls: string[] } {
+  { vendor = {}, registry = {} }: Source = {},
+): {
+  fetchImpl: typeof fetch;
+  urls: string[];
+  registryHeaders: Headers[];
+} {
   const urls: string[] = [];
-  const fetchImpl: typeof fetch = async (input) => {
+  const registryHeaders: Headers[] = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
     const url = String(input);
     urls.push(url);
-    const { pathname } = new URL(url);
+    const { hostname, pathname } = new URL(url);
+    if (hostname === "registry.npmjs.org") {
+      registryHeaders.push(new Headers(init?.headers));
+      return registry[url]?.() ?? new Response("Not found", { status: 404 });
+    }
     if (pathname.endsWith("/license")) {
       return Response.json({
         path: "LICENSE",
@@ -103,7 +199,7 @@ function mockGitHub(
     }
     return new Response("Not found", { status: 404 });
   };
-  return { fetchImpl, urls };
+  return { fetchImpl, urls, registryHeaders };
 }
 
 afterEach(async () => {
@@ -143,6 +239,7 @@ describe("Agent Inbox landing sync", () => {
       sha256:
         "22caa6ca2280dc1e61a650dc2a8c487efb98b5d3be687d5ce7b7ae398740dba9",
       assets: [],
+      npm: [],
       files: [
         "public/agent-inbox/index.html",
         "vendor/agent-inbox-landing.json",
@@ -218,6 +315,7 @@ describe("Agent Inbox landing sync", () => {
       sha256:
         "335fca8574f060eea24ebcdae6b78f32414f5de03da1084fd0e73d710768e3a9",
       assets: [],
+      npm: [],
       files: ["vendor/agent-inbox-landing.json"],
     });
   });
@@ -225,28 +323,33 @@ describe("Agent Inbox landing sync", () => {
   it("copies the files the vendor manifest lists and records each SHA-256", async () => {
     const rootDir = await temporaryRoot();
     const landing = new TextEncoder().encode("<!doctype html>\n");
-    const { fetchImpl, urls } = mockGitHub(
+    const source = vendored(THREE_186);
+    const { fetchImpl, urls, registryHeaders } = mockGitHub(
       landing,
       COMMIT,
       "MIT",
-      vendored(THREE_186),
+      source,
     );
 
     const result = await syncAgentInboxLanding({
       rootDir,
       fetchImpl,
-      token: "",
+      token: "test-token",
     });
 
     const assets = Object.entries(THREE_186).map(([path, text]) => ({
       path,
       sha256: sha256(text),
     }));
+    const manifest = JSON.parse(source.vendor["vendor/manifest.json"]);
     expect(result).toEqual({
       changed: true,
       commit: COMMIT,
       sha256: sha256("<!doctype html>\n"),
       assets,
+      npm: [
+        { package: "three@0.186.0", integrity: manifest.sources[0].integrity },
+      ],
       files: [
         "public/agent-inbox/index.html",
         "public/agent-inbox/vendor",
@@ -261,6 +364,14 @@ describe("Agent Inbox landing sync", () => {
         `https://raw.githubusercontent.com/shariqh/agent-inbox/${COMMIT}/marketing/${path}`,
       );
     }
+    // The registry was asked for the release and its tarball, never with the token.
+    expect(urls).toContain("https://registry.npmjs.org/three/0.186.0");
+    expect(urls).toContain(
+      "https://registry.npmjs.org/three/-/three-0.186.0.tgz",
+    );
+    expect(
+      registryHeaders.map((headers) => headers.has("authorization")),
+    ).toEqual([false, false]);
     await expect(
       readFile(join(rootDir, "vendor/agent-inbox-landing.json"), "utf8"),
     ).resolves.toBe(
@@ -283,22 +394,120 @@ describe("Agent Inbox landing sync", () => {
     ).resolves.toMatchObject({ changed: false, files: [] });
   });
 
-  it("replaces the vendored folder as later revisions change it", async () => {
+  it("refuses a vendored file that differs from its npm release, even with a matching manifest hash", async () => {
+    const rootDir = await temporaryRoot();
+    // The commit edits three.core.js and updates its manifest hash to match.
+    const edited = {
+      ...THREE_186,
+      "vendor/three-0.186.0/three.core.js":
+        "fetch('https://example.invalid');\n",
+    };
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+      COMMIT,
+      "MIT",
+      vendored(edited, { npmFiles: THREE_186 }),
+    );
+
+    await expect(
+      syncAgentInboxLanding({ rootDir, fetchImpl, token: "" }),
+    ).rejects.toThrow(
+      "Agent Inbox vendored file vendor/three-0.186.0/three.core.js does not match package/build/three.core.js in npm three@0.186.0",
+    );
+    await expect(access(join(rootDir, "public"))).rejects.toThrow();
+  });
+
+  it.each([
+    [
+      "a tarball that does not match the registry's integrity",
+      (source: Required<Source>) => {
+        const url = "https://registry.npmjs.org/three/-/three-0.186.0.tgz";
+        source.registry[url] = () => new Response(npmTarball(THREE_186));
+      },
+      "The npm tarball for three@0.186.0 does not match the registry's integrity",
+    ],
+    [
+      "a registry integrity that differs from the manifest",
+      (source: Required<Source>) => {
+        const url = "https://registry.npmjs.org/three/0.186.0";
+        source.registry[url] = () =>
+          Response.json({
+            name: "three",
+            version: "0.186.0",
+            dist: {
+              tarball: "https://registry.npmjs.org/three/-/three-0.186.0.tgz",
+              integrity: `sha512-${"A".repeat(86)}==`,
+            },
+          });
+      },
+      "The npm registry does not list three@0.186.0 with the vendor manifest's tarball and integrity",
+    ],
+    [
+      "a registry tarball somewhere else",
+      (source: Required<Source>) => {
+        const { integrity } = manifestOf(THREE_186).sources[0];
+        source.registry["https://registry.npmjs.org/three/0.186.0"] = () =>
+          Response.json({
+            name: "three",
+            version: "0.186.0",
+            dist: {
+              tarball: "https://example.invalid/three-0.186.0.tgz",
+              integrity,
+            },
+          });
+      },
+      "The npm registry does not list three@0.186.0 with the vendor manifest's tarball and integrity",
+    ],
+  ])("refuses %s", async (_, change, message) => {
+    const source = vendored(THREE_186);
+    change(source);
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+      COMMIT,
+      "MIT",
+      source,
+    );
+
+    await expect(inspectSourceCommit(COMMIT, fetchImpl, "")).rejects.toThrow(
+      message,
+    );
+  });
+
+  it("replaces whatever is in the vendored folder, such as a file where a folder belongs", async () => {
     const rootDir = await temporaryRoot();
     const landing = new TextEncoder().encode("<!doctype html>\n");
     const three187 = {
       "vendor/three-0.187.0/LICENSE": "The MIT License\n",
       "vendor/three-0.187.0/three.core.js": "export const REVISION = '187';\n",
     };
-    // A file in one revision can become a folder in the next.
-    const asFile = { "vendor/three": "export {};\n" };
-    const asFolder = { "vendor/three/core.js": "export {};\n" };
+    const vendorDir = join(rootDir, "public/agent-inbox/vendor");
     const sync = async (fetchImpl: typeof fetch) =>
       syncAgentInboxLanding({ rootDir, fetchImpl, token: "" });
 
+    // A file where the release folder belongs, then a folder where a file belongs.
+    await mkdir(vendorDir, { recursive: true });
+    await writeFile(join(vendorDir, "three-0.186.0"), "stale\n");
     await sync(
       mockGitHub(landing, "a".repeat(40), "MIT", vendored(THREE_186)).fetchImpl,
     );
+    await expect(landingTree(rootDir)).resolves.toEqual([
+      "index.html",
+      ...Object.keys(THREE_186),
+    ]);
+    await rm(join(vendorDir, "three-0.186.0/LICENSE"));
+    await mkdir(join(vendorDir, "three-0.186.0/LICENSE/stale"), {
+      recursive: true,
+    });
+    await writeFile(join(vendorDir, "three-0.186.0/LICENSE/stale/x.js"), "x\n");
+    const repaired = await sync(
+      mockGitHub(landing, "a".repeat(40), "MIT", vendored(THREE_186)).fetchImpl,
+    );
+    expect(repaired.files).toEqual(["public/agent-inbox/vendor"]);
+    await expect(landingTree(rootDir)).resolves.toEqual([
+      "index.html",
+      ...Object.keys(THREE_186),
+    ]);
+
     const upgrade = await sync(
       mockGitHub(landing, "c".repeat(40), "MIT", vendored(three187)).fetchImpl,
     );
@@ -310,22 +519,6 @@ describe("Agent Inbox landing sync", () => {
       "index.html",
       ...Object.keys(three187),
     ]);
-    await expect(
-      readFile(
-        join(rootDir, "public/agent-inbox/vendor/three-0.187.0/three.core.js"),
-        "utf8",
-      ),
-    ).resolves.toBe(three187["vendor/three-0.187.0/three.core.js"]);
-
-    for (const files of [asFile, asFolder, asFile]) {
-      await sync(
-        mockGitHub(landing, "e".repeat(40), "MIT", vendored(files)).fetchImpl,
-      );
-      await expect(landingTree(rootDir)).resolves.toEqual([
-        "index.html",
-        ...Object.keys(files),
-      ]);
-    }
 
     // A revision without a manifest leaves index.html alone, as before vendoring.
     const legacy = await sync(mockGitHub(landing, "d".repeat(40)).fetchImpl);
@@ -394,15 +587,14 @@ describe("Agent Inbox landing sync", () => {
 
   it("writes nothing when a vendored file does not match its manifest", async () => {
     const rootDir = await temporaryRoot();
+    const source = vendored(THREE_186);
+    source.vendor["vendor/three-0.186.0/three.core.js"] =
+      "export const REVISION = '999';\n";
     const { fetchImpl } = mockGitHub(
       new TextEncoder().encode("<!doctype html>\n"),
       COMMIT,
       "MIT",
-      {
-        ...vendored(THREE_186),
-        "vendor/three-0.186.0/three.core.js":
-          "export const REVISION = '999';\n",
-      },
+      source,
     );
 
     await expect(
@@ -415,13 +607,26 @@ describe("Agent Inbox landing sync", () => {
   });
 
   it.each([
-    ["a parent segment", ["vendor/../index.html"]],
+    // Test runners would collect these from the synced tree and run them in CI.
+    [
+      "a TypeScript test file",
+      ["vendor/scripts/vendor-agent-inbox-landing.test.ts"],
+    ],
+    ["a JavaScript test file", ["vendor/three-0.186.0/three.test.js"]],
+    ["a spec module", ["vendor/three-0.186.0/three.spec.mjs"]],
+    ["an upper-case test name", ["vendor/three-0.186.0/three.TEST.js"]],
+    ["a test folder name", ["vendor/a.test.js/three.module.js"]],
+    ["a benchmark", ["vendor/three-0.186.0/three.bench.js"]],
+    ["a long benchmark name", ["vendor/three-0.186.0/three.benchmark.js"]],
+    ["a type test", ["vendor/three-0.186.0/three.test-d.js"]],
+    ["a file a page cannot load", ["vendor/three-0.186.0/three.core.cjs"]],
+    ["a parent segment", ["vendor/../index.js"]],
     ["a path outside vendor/", ["scripts/x.js"]],
-    ["a hidden segment", ["vendor/.git/config"]],
+    ["a hidden segment", ["vendor/.git/x.js"]],
     ["an empty segment", ["vendor//x.js"]],
     ["too many folders", ["vendor/a/b/c/d/e.js"]],
     ["paths that differ only in case", ["vendor/A.js", "vendor/a.js"]],
-    ["a file that is also a folder", ["vendor/a", "vendor/a/b.js"]],
+    ["a file that is also a folder", ["vendor/a.js", "vendor/a.js/b.js"]],
   ])("rejects a vendor manifest with %s", async (_, paths) => {
     const files = Object.fromEntries(paths.map((path) => [path, "x\n"]));
     const { fetchImpl } = mockGitHub(
@@ -437,10 +642,27 @@ describe("Agent Inbox landing sync", () => {
   });
 
   it.each([
-    ["no files", '{"files":[]}'],
+    ["a file the three release does not ship", "vendor/three-0.186.0/extra.js"],
+    ["a folder without an npm source", "vendor/other-1.0.0/other.js"],
+  ])("refuses %s", async (_, path) => {
+    const source = vendored({ ...THREE_186, [path]: "x\n" });
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+      COMMIT,
+      "MIT",
+      source,
+    );
+
+    await expect(inspectSourceCommit(COMMIT, fetchImpl, "")).rejects.toThrow(
+      `Agent Inbox vendored file ${path} is not a three release file the sync can check against npm`,
+    );
+  });
+
+  it.each([
+    ["no files", () => ({ files: [] })],
     [
       "too many files",
-      JSON.stringify({
+      () => ({
         files: Array.from({ length: 17 }, (_, index) => ({
           path: `vendor/${index}.js`,
           sha256: "0".repeat(64),
@@ -449,21 +671,50 @@ describe("Agent Inbox landing sync", () => {
     ],
     [
       "an invalid SHA-256",
-      JSON.stringify({
-        files: [{ path: "vendor/a.js", sha256: "A".repeat(64) }],
-      }),
+      () => ({ files: [{ path: "vendor/a.js", sha256: "A".repeat(64) }] }),
     ],
-    ["invalid JSON", "{"],
+    [
+      "no npm sources",
+      () => ({ ...manifestOf(THREE_186), sources: undefined }),
+    ],
+    ["another npm package", () => withSource({ package: "lodash@4.17.21" })],
+    [
+      "a source folder that does not match its release",
+      () => withSource({ directory: "vendor/three-0.185.0" }),
+    ],
+    [
+      "a tarball outside the npm registry",
+      () => withSource({ tarball: "https://example.invalid/three.tgz" }),
+    ],
+    ["an invalid integrity", () => withSource({ integrity: "sha1-x" })],
   ])("rejects a vendor manifest with %s", async (_, manifest) => {
     const { fetchImpl } = mockGitHub(
       new TextEncoder().encode("<!doctype html>\n"),
       COMMIT,
       "MIT",
-      { "vendor/manifest.json": manifest },
+      {
+        vendor: {
+          ...THREE_186,
+          "vendor/manifest.json": JSON.stringify(manifest()),
+        },
+      },
     );
 
     await expect(inspectSourceCommit(COMMIT, fetchImpl, "")).rejects.toThrow(
-      /^The Agent Inbox vendor manifest /,
+      /^(The Agent Inbox vendor manifest |Agent Inbox vendored file )/,
+    );
+  });
+
+  it("rejects a vendor manifest that is not JSON", async () => {
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+      COMMIT,
+      "MIT",
+      { vendor: { "vendor/manifest.json": "{" } },
+    );
+
+    await expect(inspectSourceCommit(COMMIT, fetchImpl, "")).rejects.toThrow(
+      "The Agent Inbox vendor manifest is not valid JSON",
     );
   });
 
@@ -577,7 +828,7 @@ describe("Agent Inbox landing sync", () => {
   });
 
   it("independently inspects an exact source commit", async () => {
-    const { fetchImpl } = mockGitHub(
+    const { fetchImpl, urls } = mockGitHub(
       new TextEncoder().encode("<!doctype html>\n"),
     );
 
@@ -587,7 +838,9 @@ describe("Agent Inbox landing sync", () => {
         "335fca8574f060eea24ebcdae6b78f32414f5de03da1084fd0e73d710768e3a9",
       license: "MIT",
       assets: [],
+      npm: [],
     });
+    expect(urls.some((url) => url.includes("registry.npmjs.org"))).toBe(false);
   });
 
   it("inspects a source commit's vendored files without writing them", async () => {
@@ -606,49 +859,65 @@ describe("Agent Inbox landing sync", () => {
         path,
         sha256: sha256(text),
       })),
+      npm: [expect.objectContaining({ package: "three@0.186.0" })],
     });
   });
 });
 
+interface WorkflowStep {
+  name?: string;
+  uses?: string;
+  run?: string;
+  env?: Record<string, string>;
+  with?: Record<string, string | boolean>;
+}
+
+interface WorkflowJob {
+  env?: Record<string, string>;
+  needs?: string;
+  permissions?: Record<string, string>;
+  steps: WorkflowStep[];
+}
+
+async function readWorkflow(): Promise<{
+  workflow: string;
+  jobs: Record<string, WorkflowJob>;
+}> {
+  const workflow = await readFile(
+    new URL(
+      "../.github/workflows/sync-agent-inbox-landing.yml",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const { jobs } = matter(`---\n${workflow}\n---`).data as {
+    jobs: Record<string, WorkflowJob>;
+  };
+  return { workflow, jobs };
+}
+
 describe("Agent Inbox landing sync workflow", () => {
   it("opens a reviewed PR without merging or pushing to main", async () => {
-    const workflow = await readFile(
-      new URL(
-        "../.github/workflows/sync-agent-inbox-landing.yml",
-        import.meta.url,
-      ),
-      "utf8",
-    );
-    const parsed = matter(`---\n${workflow}\n---`).data as {
-      jobs: {
-        sync: {
-          env?: Record<string, string>;
-          steps: Array<{
-            name?: string;
-            env?: Record<string, string>;
-            with?: Record<string, string | boolean>;
-          }>;
-        };
-      };
-    };
-    const sync = parsed.jobs.sync;
+    const { workflow, jobs } = await readWorkflow();
     const attributes = await readFile(
       new URL("../.gitattributes", import.meta.url),
       "utf8",
     );
-    const step = (name: string) => {
-      const found = sync.steps.find((candidate) => candidate.name === name);
-      if (!found) throw new Error(`Missing workflow step: ${name}`);
+    const step = (job: string, name: string) => {
+      const found = jobs[job].steps.find(
+        (candidate) => candidate.name === name,
+      );
+      if (!found) throw new Error(`Missing ${job} step: ${name}`);
       return found;
     };
 
+    expect(Object.keys(jobs)).toEqual(["sync", "publish"]);
     expect(workflow).toContain('cron: "17 * * * *"');
     expect(workflow).not.toContain("workflow_dispatch:");
     expect(workflow).toContain("branches: [main]");
     expect(workflow).toContain(
       '- ".github/workflows/sync-agent-inbox-landing.yml"',
     );
-    expect(workflow).toContain("secrets.AGENT_GH_TOKEN");
     expect(workflow).toContain(
       "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
     );
@@ -678,8 +947,10 @@ describe("Agent Inbox landing sync workflow", () => {
       "public/agent-inbox/vendor/** -text",
     );
     expect(workflow).toContain('echo "assets=$assets"');
+    expect(workflow).toContain('echo "npm=$npm"');
     expect(workflow).toContain("Invalid source assets");
     expect(workflow).toContain("Invalid deferred source assets");
+    expect(workflow).toContain("Invalid npm sources");
     expect(workflow).toContain(
       'verify_delivery_ref "$open_head_sha" "$open_commit" "$open_hash" "$open_assets"',
     );
@@ -689,6 +960,9 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain("Delivery ref has unexpected landing files");
     expect(workflow).toContain("Recovery branch has unexpected landing files");
     expect(workflow).toContain("Git staging produced unexpected landing files");
+    expect(workflow).toContain(
+      "The synced landing artifact holds unexpected files",
+    );
     expect(workflow).toContain("Delivery ref tree listing is truncated");
     expect(workflow).toContain(
       "Delivery ref does not match the resolved source for",
@@ -699,25 +973,14 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain(
       'git diff --no-renames --name-only "origin/main...origin/$BRANCH"',
     );
-    for (const name of [
-      "Inspect existing delivery state",
-      "Verify recoverable branch",
-      "Create or recover delivery pull request",
-    ]) {
-      expect(step(name).env?.SOURCE_ASSETS).toBe(
-        "${{ steps.sync.outputs.assets }}",
-      );
-    }
-    expect(workflow).toContain(
-      'gh pr edit "$PR_NUMBER" --add-reviewer copilot-pull-request-reviewer',
-    );
+    expect(workflow).toContain("## npm release");
+    expect(workflow).toContain('gh pr edit "$PR_NUMBER"');
+    expect(workflow).toContain("--add-reviewer copilot-pull-request-reviewer");
     expect(workflow).toContain("-f state=all");
     expect(workflow).toContain("Unexpected delivery PR state");
     expect(workflow).toMatch(/case "\$state" in\s+open\)/);
     expect(workflow).toContain('action="closed"');
-    expect(workflow).toContain("Verify recoverable branch");
     expect(workflow).toContain("git/matching-refs/heads/$branch");
-    expect(workflow).toContain('verify_delivery_ref "$head_sha"');
     expect(workflow).toContain('verify_pr_scope "$number"');
     expect(workflow).toContain("Unexpected delivery PR path");
     expect(workflow).toContain("invalid file mode");
@@ -738,30 +1001,158 @@ describe("Agent Inbox landing sync workflow", () => {
     );
     expect(workflow).toContain("gh auth setup-git");
     expect(workflow).toContain('[[ "$author" == "$GITHUB_REPOSITORY_OWNER" &&');
-    expect(sync.env).toBeUndefined();
-    expect(step("Check out blog site").with).toMatchObject({
+    expect(workflow).toContain("AGENT_GH_TOKEN must authenticate as");
+    expect(jobs.sync.env).toBeUndefined();
+    expect(jobs.publish.env).toBeUndefined();
+    expect(step("sync", "Check out blog site").with).toMatchObject({
       "persist-credentials": false,
       ref: "main",
     });
     expect(workflow).toContain("Sync checkout must match origin/main");
-    expect(step("Sync the latest landing revision").env).toEqual({
+    expect(step("sync", "Sync the latest landing revision").env).toEqual({
       GITHUB_TOKEN: "${{ github.token }}",
     });
-    expect(step("Install dependencies").env).toBeUndefined();
-    expect(step("Validate synchronized landing").env).toBeUndefined();
-    expect(step("Inspect existing delivery state").env?.GH_TOKEN).toBe(
-      "${{ secrets.AGENT_GH_TOKEN }}",
+    expect(step("sync", "Install dependencies").env).toBeUndefined();
+    expect(step("sync", "Validate synchronized landing").env).toBeUndefined();
+    expect(step("sync", "Inspect existing delivery state").env?.GH_TOKEN).toBe(
+      "${{ github.token }}",
     );
-    expect(step("Create or recover delivery pull request").env?.GH_TOKEN).toBe(
-      "${{ secrets.AGENT_GH_TOKEN }}",
-    );
-    expect(step("Ensure built-in Copilot review").env?.GH_TOKEN).toBe(
-      "${{ secrets.AGENT_GH_TOKEN }}",
-    );
+    for (const name of [
+      "Check the publishing token",
+      "Create or recover delivery pull request",
+      "Ensure built-in Copilot review",
+    ]) {
+      expect(step("publish", name).env?.GH_TOKEN).toBe(
+        "${{ secrets.AGENT_GH_TOKEN }}",
+      );
+    }
     expect(workflow).toContain("--paginate");
     expect(workflow).toContain("--slurp");
     expect(workflow).toContain("reviews?per_page=100");
     expect(workflow).not.toMatch(/\bgh pr merge\b/);
-    expect(workflow).not.toMatch(/git push [^\n]*\bmain\b/);
+    expect(workflow).not.toMatch(/git (?:-c \S+ )?push [^\n]*\bmain\b/);
+  });
+
+  it.each([
+    ["vendor/three-0.186.0/three.module.js", true],
+    ["vendor/three-0.186.0/LICENSE", true],
+    ["vendor/a/b/c/site.css", true],
+    ["vendor/x.mjs", true],
+    ["vendor/scripts/vendor-agent-inbox-landing.test.ts", false],
+    ["vendor/three-0.186.0/three.test.js", false],
+    ["vendor/three-0.186.0/three.spec.mjs", false],
+    ["vendor/three-0.186.0/three.TEST.js", false],
+    ["vendor/a.test.js/three.module.js", false],
+    ["vendor/three-0.186.0/three.bench.js", false],
+    ["vendor/three-0.186.0/three.benchmark.js", false],
+    ["vendor/three-0.186.0/three.test-d.js", false],
+    ["vendor/three-0.186.0/three.Spec-D.mjs", false],
+    ["vendor/three-0.186.0/three.core.cjs", false],
+    ["vendor/../index.js", false],
+    ["vendor/.git/x.js", false],
+    ["vendor/a/b/c/d/e.js", false],
+  ])(
+    "checks %s with the same rules in every workflow step",
+    async (path, allowed) => {
+      const { workflow } = await readWorkflow();
+      // Bash checks repository paths; jq checks paths relative to the page.
+      const bash = [
+        ...workflow.matchAll(
+          /asset_path_pattern='([^']+)'\n\s+test_name_pattern='([^']+)'/g,
+        ),
+      ].map(
+        ([, asset, test]) => [new RegExp(asset), new RegExp(test)] as const,
+      );
+      const jq = [
+        ...workflow.matchAll(
+          /test\("(\^vendor(?:[^"\\]|\\.)*)"\) and\s+\(test\("((?:[^"\\]|\\.)*)"; "i"\) \| not\)/g,
+        ),
+      ].map(
+        ([, asset, test]) =>
+          [
+            new RegExp(JSON.parse(`"${asset}"`)),
+            new RegExp(JSON.parse(`"${test}"`), "i"),
+          ] as const,
+      );
+
+      expect(bash).toHaveLength(4);
+      expect(jq).toHaveLength(3);
+      for (const [asset, test] of bash) {
+        const repositoryPath = `public/agent-inbox/${path}`;
+        expect(asset.test(repositoryPath) && !test.test(repositoryPath)).toBe(
+          allowed,
+        );
+      }
+      for (const [asset, test] of jq) {
+        expect(asset.test(path) && !test.test(path)).toBe(allowed);
+      }
+    },
+  );
+
+  it("keeps AGENT_GH_TOKEN out of every job that runs code over the synced files", async () => {
+    const { jobs } = await readWorkflow();
+
+    // Only the publish job names the owner token, and it needs the sync job.
+    for (const [name, job] of Object.entries(jobs)) {
+      expect(JSON.stringify(job).includes("AGENT_GH_TOKEN"), name).toBe(
+        name === "publish",
+      );
+    }
+    expect(jobs.publish.needs).toBe("sync");
+    expect(jobs.sync.permissions).toEqual({
+      contents: "read",
+      "pull-requests": "read",
+    });
+    expect(jobs.publish.permissions).toEqual({ contents: "read" });
+
+    // The publish job sets up no Node and runs no npm, Node, test or build tool.
+    const command =
+      /(?:^\s*|\$\(\s*|[|;&]\s*)(?:npm|npx|node|vitest|astro|tsx|yarn|pnpm|bun|deno)\b/m;
+    for (const { name, uses = "", run = "" } of jobs.publish.steps) {
+      expect(uses, name).not.toMatch(/setup-node/);
+      expect(run, name).not.toMatch(command);
+    }
+    // ...and no Git hook: every git command that could run one says so.
+    const publish = jobs.publish.steps.find(
+      (step) => step.name === "Create or recover delivery pull request",
+    )!;
+    expect(publish.env).toMatchObject({
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "core.hooksPath",
+      GIT_CONFIG_VALUE_0: "/dev/null",
+    });
+    const hooked = [
+      ...(publish.run ?? "").matchAll(
+        /\bgit\s+(?:-c\s+\S+\s+)*(?:switch|checkout|commit|push|merge|rebase|am|pull)\b/g,
+      ),
+    ].map(([match]) => match);
+    expect(hooked).toHaveLength(3);
+    for (const match of hooked) {
+      expect(match).toMatch(/^git -c core\.hooksPath=\/dev\/null /);
+    }
+
+    // Checkouts keep no credentials, and the synced files leave the sync job
+    // before any dependency code runs there.
+    for (const job of Object.values(jobs)) {
+      for (const step of job.steps) {
+        if (step.uses?.startsWith("actions/checkout@")) {
+          expect(step.with?.["persist-credentials"]).toBe(false);
+        }
+      }
+    }
+    const names = jobs.sync.steps.map(({ name }) => name);
+    expect(names.indexOf("Upload synced landing")).toBeGreaterThan(-1);
+    expect(names.indexOf("Upload synced landing")).toBeLessThan(
+      names.indexOf("Install dependencies"),
+    );
+  });
+
+  it("never lets vitest collect the synced landing", async () => {
+    const config = await readFile(
+      new URL("../vitest.config.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(config).toMatch(/exclude: \[[^\]]*'public\/\*\*'/);
   });
 });

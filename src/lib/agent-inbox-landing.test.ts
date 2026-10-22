@@ -43,7 +43,7 @@ describe("Agent Inbox landing page", () => {
       ...(metadata.assets && {
         assets: metadata.assets.map(() => ({
           path: expect.stringMatching(
-            /^vendor(?:\/[A-Za-z0-9][A-Za-z0-9._-]*){1,4}$/,
+            /^vendor(?:\/[A-Za-z0-9][A-Za-z0-9._-]*){0,3}\/(?:LICENSE|[A-Za-z0-9][A-Za-z0-9._-]*\.(?:js|mjs|css))$/,
           ),
           sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
         })),
