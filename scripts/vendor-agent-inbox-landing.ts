@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   lstat,
   mkdir,
-  readdir,
+  opendir,
   readFile,
   rename,
   rm,
@@ -497,7 +497,8 @@ async function vendorMatches(
   let entries = 0;
   let matched = 0;
   for (let directory = pending.pop(); directory; directory = pending.pop()) {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
+    // opendir() reads entries as it goes, so the limit bounds the work.
+    for await (const entry of await opendir(directory)) {
       entries += 1;
       if (entries > 4 * MAX_ASSETS) return false;
       const path = join(directory, entry.name);
@@ -750,18 +751,23 @@ export async function syncAgentInboxLanding({
     await vendor?.apply();
     await replaceWrites(writes);
   } catch (error) {
-    try {
-      await vendor?.undo();
-    } catch (undoError) {
+    const cleanupErrors: unknown[] = [];
+    for (const step of [() => vendor?.undo(), () => vendor?.removeStage()]) {
+      try {
+        await step();
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError);
+      }
+    }
+    if (cleanupErrors.length > 0) {
       throw new AggregateError(
-        [error, undoError],
+        [error, ...cleanupErrors],
         "Failed to update and roll back the Agent Inbox landing files",
       );
     }
     throw error;
-  } finally {
-    await vendor?.removeStage();
   }
+  await vendor?.removeStage();
   await vendor?.removeBackup();
 
   const files = [

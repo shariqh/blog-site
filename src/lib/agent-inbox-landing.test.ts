@@ -60,20 +60,19 @@ describe("Agent Inbox landing page", () => {
   });
 
   it("holds exactly the page and its pinned vendored files", () => {
-    const files = readdirSync(LANDING_DIRECTORY, {
+    const entries = readdirSync(LANDING_DIRECTORY, {
       recursive: true,
       withFileTypes: true,
-    })
-      .filter((entry) => !entry.isDirectory())
-      .map((entry) =>
-        relative(LANDING_DIRECTORY, join(entry.parentPath, entry.name))
-          .split("\\")
-          .join("/"),
-      )
-      .sort();
+    }).filter((entry) => !entry.isDirectory());
+    const name = (entry: (typeof entries)[number]) =>
+      relative(LANDING_DIRECTORY, join(entry.parentPath, entry.name))
+        .split("\\")
+        .join("/");
     const assets = metadata.assets ?? [];
 
-    expect(files).toEqual(
+    // Plain files only: a link could point the published page anywhere.
+    expect(entries.filter((entry) => !entry.isFile()).map(name)).toEqual([]);
+    expect(entries.map(name).sort()).toEqual(
       ["index.html", ...assets.map(({ path }) => path)].sort(),
     );
     for (const asset of assets) {
