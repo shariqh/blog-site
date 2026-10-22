@@ -11,7 +11,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, matchesGlob } from "node:path";
 import { gzipSync } from "node:zlib";
 import matter from "gray-matter";
 import { afterEach, describe, expect, it } from "vitest";
@@ -515,6 +515,8 @@ describe("Agent Inbox landing sync", () => {
     const three187 = {
       "vendor/three-0.187.0/LICENSE": "The MIT License\n",
       "vendor/three-0.187.0/three.core.js": "export const REVISION = '187';\n",
+      "vendor/three-0.187.0/three.module.js":
+        "export * from './three.core.js';\n",
     };
     const vendorDir = join(rootDir, "public/agent-inbox/vendor");
     const sync = async (fetchImpl: typeof fetch) =>
@@ -754,21 +756,52 @@ describe("Agent Inbox landing sync", () => {
     );
   });
 
-  it("refuses a page that loads vendored files when the manifest is missing", async () => {
-    const rootDir = await temporaryRoot();
-    const { fetchImpl } = mockGitHub(
-      new TextEncoder().encode(
-        "<script type=\"module\">import('./vendor/three-0.186.0/three.module.js')</script>\n",
-      ),
-    );
+  it.each([
+    ["a revision without a manifest", "three.module.js", {}],
+    [
+      "a manifest that does not list it",
+      "three.webgpu.js",
+      vendored(THREE_186),
+    ],
+  ])(
+    "refuses a page that loads a vendored file from %s",
+    async (_, name, source) => {
+      const rootDir = await temporaryRoot();
+      const { fetchImpl } = mockGitHub(
+        new TextEncoder().encode(
+          `<script type="module">import('./vendor/three-0.186.0/${name}')</script>\n`,
+        ),
+        COMMIT,
+        "MIT",
+        source,
+      );
 
-    await expect(
-      syncAgentInboxLanding({ rootDir, fetchImpl, token: "" }),
-    ).rejects.toThrow(
-      `Agent Inbox commit ${COMMIT} refers to vendor/ files but has no vendor manifest`,
-    );
-    await expect(access(join(rootDir, "public"))).rejects.toThrow();
-  });
+      await expect(
+        syncAgentInboxLanding({ rootDir, fetchImpl, token: "" }),
+      ).rejects.toThrow(
+        `Agent Inbox commit ${COMMIT} refers to vendor/three-0.186.0/${name}, which its vendor manifest does not list`,
+      );
+      await expect(access(join(rootDir, "public"))).rejects.toThrow();
+    },
+  );
+
+  it.each(Object.keys(THREE_186))(
+    "refuses a vendored release without %s",
+    async (path) => {
+      const files: Record<string, string> = { ...THREE_186 };
+      delete files[path];
+      const { fetchImpl } = mockGitHub(
+        new TextEncoder().encode("<!doctype html>\n"),
+        COMMIT,
+        "MIT",
+        vendored(files),
+      );
+
+      await expect(inspectSourceCommit(COMMIT, fetchImpl, "")).rejects.toThrow(
+        `The Agent Inbox vendor manifest lists vendor/three-0.186.0 without ${path.slice("vendor/three-0.186.0/".length)}`,
+      );
+    },
+  );
 
   it("fails instead of dropping vendored files when the manifest download fails", async () => {
     const { fetchImpl: github } = mockGitHub(
@@ -1129,6 +1162,17 @@ describe("Agent Inbox landing sync workflow", () => {
 
       expect(bash).toHaveLength(4);
       expect(jq).toHaveLength(3);
+      // ...and every one of them decides a check that fails its step.
+      expect(
+        workflow.match(
+          /\( "\$path" =~ \$asset_path_pattern &&\s+! "\$path" =~ \$test_name_pattern \) \]\] \|\| \{/g,
+        ),
+      ).toHaveLength(4);
+      expect(
+        workflow.match(
+          /jq -e '[^']*test\("\^vendor[^']*' <<<"\$\w+" >\/dev\/null \|\| \{/g,
+        ),
+      ).toHaveLength(3);
       for (const [asset, test] of bash) {
         const repositoryPath = `public/agent-inbox/${path}`;
         expect(asset.test(repositoryPath) && !test.test(repositoryPath)).toBe(
@@ -1206,11 +1250,18 @@ describe("Agent Inbox landing sync workflow", () => {
   });
 
   it("never lets vitest collect the synced landing", async () => {
-    const config = await readFile(
-      new URL("../vitest.config.ts", import.meta.url),
-      "utf8",
-    );
+    // The exported config, not its text, so a comment cannot satisfy this.
+    const { default: config } = await import("../vitest.config");
+    const exclude = config.test?.exclude ?? [];
 
-    expect(config).toMatch(/exclude: \[[^\]]*'public\/\*\*'/);
+    for (const path of [
+      "public/agent-inbox/vendor/scripts/vendor-agent-inbox-landing.test.ts",
+      "public/agent-inbox/vendor/three-0.186.0/three.test.js",
+    ]) {
+      expect(
+        exclude.some((pattern) => matchesGlob(path, pattern)),
+        path,
+      ).toBe(true);
+    }
   });
 });

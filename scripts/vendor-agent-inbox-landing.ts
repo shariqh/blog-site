@@ -455,6 +455,19 @@ function parseVendorManifest(bytes: Uint8Array): {
       );
     }
   }
+  // A vendored release is complete: three.module.js imports three.core.js, and
+  // the MIT license travels with the code.
+  const listedPaths = new Set(assets.map(({ path }) => path));
+  for (const path of listedPaths) {
+    const directory = path.slice(0, path.lastIndexOf("/"));
+    for (const name of Object.keys(NPM_FILES)) {
+      if (!listedPaths.has(`${directory}/${name}`)) {
+        throw new Error(
+          `The Agent Inbox vendor manifest lists ${directory} without ${name}`,
+        );
+      }
+    }
+  }
   return {
     assets: assets.sort((a, b) =>
       a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
@@ -902,14 +915,17 @@ async function loadSourceRevision(
   const license = await verifySourceLicense(commit, fetchImpl, token);
   const landing = await fetchSourceBytes(commit, fetchImpl, token);
   const { downloads, npm } = await fetchSourceAssets(commit, fetchImpl, token);
-  // Only a page that loads nothing from vendor/ may come without a manifest.
-  if (
-    downloads.length === 0 &&
-    new TextDecoder().decode(landing).includes("vendor/")
-  ) {
-    throw new Error(
-      `Agent Inbox commit ${commit} refers to vendor/ files but has no vendor manifest`,
-    );
+  // The page may refer only to vendored files the manifest lists, so a
+  // revision without a manifest may not refer to vendor/ at all.
+  const listed = new Set(downloads.map(({ path }) => path));
+  for (const [reference] of new TextDecoder()
+    .decode(landing)
+    .matchAll(/vendor\/[\w./-]*/g)) {
+    if (!listed.has(reference)) {
+      throw new Error(
+        `Agent Inbox commit ${commit} refers to ${reference}, which its vendor manifest does not list`,
+      );
+    }
   }
   return {
     commit,

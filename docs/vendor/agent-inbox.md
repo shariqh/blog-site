@@ -17,7 +17,10 @@ the page refers to nothing under `vendor/`. It refuses any revision where:
   `vendor/`, or has a name test runners collect, such as `x.test.js`;
 - a file is not one it can match to npm: only `three.module.js`,
   `three.core.js` and `LICENSE` in a `vendor/three-<version>/` folder whose
-  manifest entry names `three@<version>`;
+  manifest entry names `three@<version>`, and each such folder must hold all
+  three, because `three.module.js` imports `three.core.js` and the license
+  travels with the code;
+- the page refers to a `vendor/` path the manifest does not list;
 - the npm check fails. The sync fetches that release from
   registry.npmjs.org, requires the registry's `dist.tarball` and
   `dist.integrity` to equal the manifest's, checks the downloaded tarball's
