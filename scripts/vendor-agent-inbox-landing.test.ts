@@ -1,5 +1,15 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import matter from "gray-matter";
@@ -37,6 +47,22 @@ function vendored(
     ...files,
     "vendor/manifest.json": JSON.stringify({ files: [...listed].reverse() }),
   };
+}
+
+// Every entry under public/agent-inbox, with links and other non-files marked.
+async function landingTree(rootDir: string): Promise<string[]> {
+  const landing = join(rootDir, "public/agent-inbox");
+  const entries = await readdir(landing, {
+    recursive: true,
+    withFileTypes: true,
+  });
+  return entries
+    .filter((entry) => !entry.isDirectory())
+    .map(
+      (entry) =>
+        `${join(entry.parentPath, entry.name).slice(landing.length + 1)}${entry.isFile() ? "" : " (not a file)"}`,
+    )
+    .sort();
 }
 
 const THREE_186 = {
@@ -223,7 +249,7 @@ describe("Agent Inbox landing sync", () => {
       assets,
       files: [
         "public/agent-inbox/index.html",
-        ...Object.keys(THREE_186).map((path) => `public/agent-inbox/${path}`),
+        "public/agent-inbox/vendor",
         "vendor/agent-inbox-landing.json",
       ],
     });
@@ -257,40 +283,33 @@ describe("Agent Inbox landing sync", () => {
     ).resolves.toMatchObject({ changed: false, files: [] });
   });
 
-  it("replaces and removes vendored files as later revisions change them", async () => {
+  it("replaces the vendored folder as later revisions change it", async () => {
     const rootDir = await temporaryRoot();
     const landing = new TextEncoder().encode("<!doctype html>\n");
     const three187 = {
       "vendor/three-0.187.0/LICENSE": "The MIT License\n",
       "vendor/three-0.187.0/three.core.js": "export const REVISION = '187';\n",
-      "vendor/three-0.187.0/three.module.js":
-        "export * from './three.core.js';\n",
     };
-    const revisions = [
-      mockGitHub(landing, "a".repeat(40), "MIT", vendored(THREE_186)),
-      mockGitHub(landing, "c".repeat(40), "MIT", vendored(three187)),
-      mockGitHub(landing, "d".repeat(40)),
-    ];
+    // A file in one revision can become a folder in the next.
+    const asFile = { "vendor/three": "export {};\n" };
+    const asFolder = { "vendor/three/core.js": "export {};\n" };
+    const sync = async (fetchImpl: typeof fetch) =>
+      syncAgentInboxLanding({ rootDir, fetchImpl, token: "" });
 
-    await syncAgentInboxLanding({
-      rootDir,
-      fetchImpl: revisions[0].fetchImpl,
-      token: "",
-    });
-    const upgrade = await syncAgentInboxLanding({
-      rootDir,
-      fetchImpl: revisions[1].fetchImpl,
-      token: "",
-    });
-    expect([...upgrade.files].sort()).toEqual(
-      [...Object.keys(THREE_186), ...Object.keys(three187)]
-        .map((path) => `public/agent-inbox/${path}`)
-        .concat("vendor/agent-inbox-landing.json")
-        .sort(),
+    await sync(
+      mockGitHub(landing, "a".repeat(40), "MIT", vendored(THREE_186)).fetchImpl,
     );
-    await expect(
-      access(join(rootDir, "public/agent-inbox/vendor/three-0.186.0/LICENSE")),
-    ).rejects.toThrow();
+    const upgrade = await sync(
+      mockGitHub(landing, "c".repeat(40), "MIT", vendored(three187)).fetchImpl,
+    );
+    expect(upgrade.files).toEqual([
+      "public/agent-inbox/vendor",
+      "vendor/agent-inbox-landing.json",
+    ]);
+    await expect(landingTree(rootDir)).resolves.toEqual([
+      "index.html",
+      ...Object.keys(three187),
+    ]);
     await expect(
       readFile(
         join(rootDir, "public/agent-inbox/vendor/three-0.187.0/three.core.js"),
@@ -298,19 +317,24 @@ describe("Agent Inbox landing sync", () => {
       ),
     ).resolves.toBe(three187["vendor/three-0.187.0/three.core.js"]);
 
+    for (const files of [asFile, asFolder, asFile]) {
+      await sync(
+        mockGitHub(landing, "e".repeat(40), "MIT", vendored(files)).fetchImpl,
+      );
+      await expect(landingTree(rootDir)).resolves.toEqual([
+        "index.html",
+        ...Object.keys(files),
+      ]);
+    }
+
     // A revision without a manifest leaves index.html alone, as before vendoring.
-    const legacy = await syncAgentInboxLanding({
-      rootDir,
-      fetchImpl: revisions[2].fetchImpl,
-      token: "",
-    });
+    const legacy = await sync(mockGitHub(landing, "d".repeat(40)).fetchImpl);
     expect(legacy.assets).toEqual([]);
-    expect([...legacy.files].sort()).toEqual(
-      Object.keys(three187)
-        .map((path) => `public/agent-inbox/${path}`)
-        .concat("vendor/agent-inbox-landing.json")
-        .sort(),
-    );
+    expect(legacy.files).toEqual([
+      "public/agent-inbox/vendor",
+      "vendor/agent-inbox-landing.json",
+    ]);
+    await expect(landingTree(rootDir)).resolves.toEqual(["index.html"]);
     const metadata = JSON.parse(
       await readFile(join(rootDir, "vendor/agent-inbox-landing.json"), "utf8"),
     );
@@ -322,6 +346,50 @@ describe("Agent Inbox landing sync", () => {
       "sha256",
       "license",
     ]);
+  });
+
+  it("replaces links and other non-files in the vendored folder without following them", async () => {
+    const rootDir = await temporaryRoot();
+    const outside = await temporaryRoot();
+    await writeFile(join(outside, "keep.js"), "outside\n");
+    const vendorDir = join(rootDir, "public/agent-inbox/vendor");
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+      COMMIT,
+      "MIT",
+      vendored(THREE_186),
+    );
+    const sync = () => syncAgentInboxLanding({ rootDir, fetchImpl, token: "" });
+
+    // A linked subfolder, then a linked vendor folder, are swapped out rather
+    // than written through.
+    await mkdir(vendorDir, { recursive: true });
+    await symlink(outside, join(vendorDir, "three-0.186.0"));
+    await expect(sync()).resolves.toMatchObject({ changed: true });
+    await rm(vendorDir, { recursive: true });
+    await symlink(outside, vendorDir);
+    await expect(sync()).resolves.toMatchObject({ changed: true });
+    await expect(readdir(outside)).resolves.toEqual(["keep.js"]);
+    await expect(landingTree(rootDir)).resolves.toEqual([
+      "index.html",
+      ...Object.keys(THREE_186),
+    ]);
+
+    // A FIFO is never read, so it cannot stall the sync.
+    execFileSync("mkfifo", [join(vendorDir, "three-0.186.0/pipe")]);
+    await expect(sync()).resolves.toMatchObject({ changed: true });
+    await expect(landingTree(rootDir)).resolves.toEqual([
+      "index.html",
+      ...Object.keys(THREE_186),
+    ]);
+
+    // A link standing in for the landing folder itself is refused.
+    await rm(join(rootDir, "public/agent-inbox"), { recursive: true });
+    await symlink(outside, join(rootDir, "public/agent-inbox"));
+    await expect(sync()).rejects.toThrow(
+      "public/agent-inbox must be a directory",
+    );
+    await expect(readdir(outside)).resolves.toEqual(["keep.js"]);
   });
 
   it("writes nothing when a vendored file does not match its manifest", async () => {

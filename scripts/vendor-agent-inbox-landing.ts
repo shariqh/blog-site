@@ -8,7 +8,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const SOURCE_REPOSITORY = "shariqh/agent-inbox";
@@ -73,8 +73,7 @@ interface SyncOptions {
 interface PlannedWrite {
   relativePath: string;
   path: string;
-  // Absent when the file is removed.
-  bytes?: Uint8Array;
+  bytes: Uint8Array;
   current?: Uint8Array;
 }
 
@@ -460,31 +459,127 @@ function isMissing(error: unknown): boolean {
   );
 }
 
-// Every file under the vendored directory, relative to rootDir.
-async function listVendoredFiles(rootDir: string): Promise<string[]> {
-  const directory = resolve(rootDir, ASSET_DIRECTORY);
-  let stats;
+// A landing folder must be a real directory, never a link to somewhere else.
+async function requireDirectory(
+  rootDir: string,
+  relativePath: string,
+): Promise<void> {
   try {
-    stats = await lstat(directory);
+    if (!(await lstat(resolve(rootDir, relativePath))).isDirectory()) {
+      throw new Error(`${relativePath} must be a directory`);
+    }
   } catch (error) {
-    if (isMissing(error)) return [];
+    if (!isMissing(error)) throw error;
+  }
+}
+
+// Whether the vendored folder already holds exactly these files, as plain
+// files. It reads no entry but a plain file of the expected size, and stops
+// after more entries than a synced folder can have.
+async function vendorMatches(
+  rootDir: string,
+  downloads: Array<VendorAsset & { bytes: Uint8Array }>,
+): Promise<boolean> {
+  const target = resolve(rootDir, ASSET_DIRECTORY);
+  const expected = new Map(
+    downloads.map(({ path, bytes }) => [
+      resolve(rootDir, LANDING_DIRECTORY, path),
+      bytes,
+    ]),
+  );
+  try {
+    if (!(await lstat(target)).isDirectory()) return false;
+  } catch (error) {
+    if (isMissing(error)) return expected.size === 0;
     throw error;
   }
-  if (!stats.isDirectory()) {
-    throw new Error(`${ASSET_DIRECTORY} must be a directory`);
+  const pending = [target];
+  let entries = 0;
+  let matched = 0;
+  for (let directory = pending.pop(); directory; directory = pending.pop()) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      entries += 1;
+      if (entries > 4 * MAX_ASSETS) return false;
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(path);
+        continue;
+      }
+      const bytes = expected.get(path);
+      if (!entry.isFile() || !bytes) return false;
+      if ((await lstat(path)).size !== bytes.byteLength) return false;
+      if (!equalBytes(await readFile(path), bytes)) return false;
+      matched += 1;
+    }
   }
-  const entries = await readdir(directory, {
-    recursive: true,
-    withFileTypes: true,
-  });
-  return entries
-    .filter((entry) => !entry.isDirectory())
-    .map((entry) =>
-      relative(rootDir, join(entry.parentPath, entry.name))
-        .split(sep)
-        .join("/"),
-    )
-    .sort();
+  return matched === expected.size;
+}
+
+interface VendorSwap {
+  apply(): Promise<void>;
+  undo(): Promise<void>;
+  removeBackup(): Promise<void>;
+  removeStage(): Promise<void>;
+}
+
+// Writes the vendored files into a new folder that then replaces the vendored
+// folder by rename. Nothing is written through an existing path, and files a
+// revision no longer lists leave with the old folder.
+async function stageVendor(
+  rootDir: string,
+  downloads: Array<VendorAsset & { bytes: Uint8Array }>,
+): Promise<VendorSwap> {
+  const landing = resolve(rootDir, LANDING_DIRECTORY);
+  const target = resolve(rootDir, ASSET_DIRECTORY);
+  const id = `${process.pid}.${randomUUID()}`;
+  const staged = join(landing, `.vendor.${id}.tmp`);
+  const backup = join(landing, `.vendor.${id}.old`);
+  await mkdir(landing, { recursive: true });
+  if (downloads.length > 0) {
+    await mkdir(staged);
+    try {
+      for (const { path, bytes } of downloads) {
+        const file = join(staged, relative("vendor", path));
+        await mkdir(dirname(file), { recursive: true });
+        await writeFile(file, bytes, { flag: "wx" });
+      }
+    } catch (error) {
+      await rm(staged, { recursive: true, force: true });
+      throw error;
+    }
+  }
+  let movedAside = false;
+  let placed = false;
+  return {
+    async apply() {
+      try {
+        await rename(target, backup);
+        movedAside = true;
+      } catch (error) {
+        if (!isMissing(error)) throw error;
+      }
+      if (downloads.length > 0) {
+        await rename(staged, target);
+        placed = true;
+      }
+    },
+    async undo() {
+      if (placed) {
+        await rm(target, { recursive: true, force: true });
+        placed = false;
+      }
+      if (movedAside) {
+        await rename(backup, target);
+        movedAside = false;
+      }
+    },
+    async removeBackup() {
+      if (movedAside) await rm(backup, { recursive: true, force: true });
+    },
+    async removeStage() {
+      await rm(staged, { recursive: true, force: true });
+    },
+  };
 }
 
 async function writeAtomic(path: string, bytes: Uint8Array): Promise<void> {
@@ -510,11 +605,11 @@ function equalBytes(
   );
 }
 
-async function stageWrite(path: string, bytes: Uint8Array): Promise<string> {
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+async function stageWrite(write: PlannedWrite): Promise<string> {
+  await mkdir(dirname(write.path), { recursive: true });
+  const temporary = `${write.path}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporary, bytes);
+    await writeFile(temporary, write.bytes);
     return temporary;
   } catch (error) {
     await rm(temporary, { force: true });
@@ -523,21 +618,14 @@ async function stageWrite(path: string, bytes: Uint8Array): Promise<string> {
 }
 
 async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
-  const staged: Array<{ write: PlannedWrite; temporary?: string }> = [];
+  const staged: Array<{ write: PlannedWrite; temporary: string }> = [];
   try {
     for (const write of writes) {
-      staged.push({
-        write,
-        temporary: write.bytes
-          ? await stageWrite(write.path, write.bytes)
-          : undefined,
-      });
+      staged.push({ write, temporary: await stageWrite(write) });
     }
   } catch (error) {
     await Promise.all(
-      staged.map(({ temporary }) =>
-        temporary ? rm(temporary, { force: true }) : undefined,
-      ),
+      staged.map(({ temporary }) => rm(temporary, { force: true })),
     );
     throw error;
   }
@@ -545,11 +633,7 @@ async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
   const replaced: PlannedWrite[] = [];
   try {
     for (const { write, temporary } of staged) {
-      if (temporary) {
-        await rename(temporary, write.path);
-      } else {
-        await rm(write.path);
-      }
+      await rename(temporary, write.path);
       replaced.push(write);
     }
   } catch (error) {
@@ -574,9 +658,7 @@ async function replaceWrites(writes: PlannedWrite[]): Promise<void> {
     throw error;
   } finally {
     await Promise.all(
-      staged.map(({ temporary }) =>
-        temporary ? rm(temporary, { force: true }) : undefined,
-      ),
+      staged.map(({ temporary }) => rm(temporary, { force: true })),
     );
   }
 }
@@ -648,14 +730,12 @@ export async function syncAgentInboxLanding({
   );
   const candidates = [
     { relativePath: LANDING_PATH, bytes: landing },
-    ...downloads.map(({ path, bytes }) => ({
-      relativePath: `${LANDING_DIRECTORY}/${path}`,
-      bytes,
-    })),
     { relativePath: METADATA_PATH, bytes: metadataBytes },
   ];
   const writes: PlannedWrite[] = [];
 
+  await requireDirectory(rootDir, "public");
+  await requireDirectory(rootDir, LANDING_DIRECTORY);
   for (const candidate of candidates) {
     const path = resolve(rootDir, candidate.relativePath);
     const current = await readOptional(path);
@@ -663,21 +743,37 @@ export async function syncAgentInboxLanding({
       writes.push({ ...candidate, path, current });
     }
   }
-  // Remove vendored files an earlier revision listed and this one does not.
-  const listed = new Set(candidates.map(({ relativePath }) => relativePath));
-  for (const relativePath of await listVendoredFiles(rootDir)) {
-    if (listed.has(relativePath)) continue;
-    const path = resolve(rootDir, relativePath);
-    writes.push({ relativePath, path, current: await readOptional(path) });
+  const vendor = (await vendorMatches(rootDir, downloads))
+    ? undefined
+    : await stageVendor(rootDir, downloads);
+  try {
+    await vendor?.apply();
+    await replaceWrites(writes);
+  } catch (error) {
+    try {
+      await vendor?.undo();
+    } catch (undoError) {
+      throw new AggregateError(
+        [error, undoError],
+        "Failed to update and roll back the Agent Inbox landing files",
+      );
+    }
+    throw error;
+  } finally {
+    await vendor?.removeStage();
   }
-  await replaceWrites(writes);
+  await vendor?.removeBackup();
 
+  const files = [
+    ...writes.map(({ relativePath }) => relativePath),
+    ...(vendor ? [ASSET_DIRECTORY] : []),
+  ].sort();
   return {
-    changed: writes.length > 0,
+    changed: files.length > 0,
     commit,
     sha256: digest,
     assets,
-    files: writes.map(({ relativePath }) => relativePath),
+    files,
   };
 }
 
