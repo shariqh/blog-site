@@ -1072,6 +1072,7 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(workflow).toContain('cmp --silent "$actual_metadata"');
     expect(workflow).toContain('cmp --silent "$staged_metadata"');
     expect(workflow).toContain("Git staging produced an invalid file mode");
+    expect(workflow).toContain("Recovery branch moved after verification");
     expect(workflow).toContain("Delivery PR changed after verification");
     expect(workflow).toContain(
       "Delivery PR changed while review was requested",

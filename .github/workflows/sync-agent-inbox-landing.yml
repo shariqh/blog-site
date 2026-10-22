@@ -846,9 +846,17 @@ jobs:
             git -c core.hooksPath=/dev/null push --set-upstream origin "$BRANCH"
             verified_head="$(git rev-parse HEAD)"
           else
-            # The sync job fetched and verified this branch head.
+            # The sync job fetched and verified this branch head, and the branch
+            # must not have moved while that job validated it.
             [[ "$RECOVERED_HEAD" =~ ^[a-f0-9]{40}$ ]] || {
               echo "Missing verified recovery head" >&2
+              exit 1
+            }
+            [[ "$(
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$BRANCH" \
+                --jq '.object.sha'
+            )" == "$RECOVERED_HEAD" ]] || {
+              echo "Recovery branch moved after verification" >&2
               exit 1
             }
             verified_head="$RECOVERED_HEAD"
