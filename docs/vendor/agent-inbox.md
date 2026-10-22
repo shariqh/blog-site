@@ -9,8 +9,8 @@ modules behind its hero. Agent Inbox lists them, each with its SHA-256, in
 `marketing/vendor/manifest.json`, and names the npm release each folder comes
 from. The sync copies exactly the listed files from `marketing/<path>` to
 `public/agent-inbox/<path>` and removes vendored files a newer revision no
-longer lists. A revision without a manifest syncs `index.html` alone. It
-refuses any revision where:
+longer lists. A revision without a manifest syncs `index.html` alone, as long as
+the page refers to nothing under `vendor/`. It refuses any revision where:
 
 - a listed file's bytes differ from the manifest's SHA-256;
 - a path is not a script (`.js`, `.mjs`), stylesheet (`.css`) or `LICENSE` under

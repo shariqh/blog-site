@@ -35,8 +35,13 @@ function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
-// A gzipped tar archive of plain files, laid out like an npm tarball.
-function npmTarball(files: Record<string, string>): Uint8Array<ArrayBuffer> {
+// A gzipped ustar archive of plain files, laid out like an npm tarball. `size`
+// writes each entry's size field, so a test can damage one.
+function npmTarball(
+  files: Record<string, string>,
+  size: (name: string, length: number) => string = (_, length) =>
+    `${length.toString(8).padStart(11, "0")}\0`,
+): Uint8Array<ArrayBuffer> {
   const encoder = new TextEncoder();
   const blocks: Uint8Array[] = [];
   for (const [name, text] of Object.entries(files)) {
@@ -46,9 +51,13 @@ function npmTarball(files: Record<string, string>): Uint8Array<ArrayBuffer> {
       header.set(encoder.encode(value), offset);
     field(0, name);
     field(100, "0000644\0");
-    field(124, `${data.length.toString(8).padStart(11, "0")}\0`);
+    field(124, size(name, data.length));
     field(156, "0");
     field(257, "ustar\u000000");
+    // The checksum is the header's byte sum, counting its own field as spaces.
+    header.fill(0x20, 148, 156);
+    const checksum = header.reduce((sum, byte) => sum + byte, 0);
+    field(148, `${checksum.toString(8).padStart(6, "0")}\0 `);
     blocks.push(header, data, new Uint8Array(-data.length & 511));
   }
   blocks.push(new Uint8Array(1024));
@@ -79,9 +88,11 @@ function vendored(
       sha256: sha256(files[path]),
     })),
     npmFiles = files,
+    size,
   }: {
     listed?: Array<{ path: string; sha256: string }>;
     npmFiles?: Record<string, string>;
+    size?: (name: string, length: number) => string;
   } = {},
 ): Required<Source> {
   const registry: Record<string, () => Response> = {};
@@ -96,10 +107,13 @@ function vendored(
       const member = NPM_FILES[path.slice(directory.length + 1)];
       return path.startsWith(`${directory}/`) && member ? [[member, text]] : [];
     });
-    const archive = npmTarball({
-      "package/package.json": JSON.stringify({ name: "three", version }),
-      ...Object.fromEntries(members),
-    });
+    const archive = npmTarball(
+      {
+        "package/package.json": JSON.stringify({ name: "three", version }),
+        ...Object.fromEntries(members),
+      },
+      size,
+    );
     const tarball = `https://registry.npmjs.org/three/-/three-${version}.tgz`;
     const integrity = `sha512-${createHash("sha512").update(archive).digest("base64")}`;
     registry[`https://registry.npmjs.org/three/${version}`] = () =>
@@ -473,6 +487,28 @@ describe("Agent Inbox landing sync", () => {
     );
   });
 
+  it.each([
+    ["a negative size", "-0000000001\0"],
+    ["a size with trailing garbage", "0000000001x\0"],
+    ["a base-256 size", "\u0080\0\0\0\0\0\0\0\0\0\0\u0001"],
+  ])("refuses an npm tarball entry with %s", async (_, field) => {
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode("<!doctype html>\n"),
+      COMMIT,
+      "MIT",
+      vendored(THREE_186, {
+        size: (name, length) =>
+          name === "package/build/three.core.js"
+            ? field
+            : `${length.toString(8).padStart(11, "0")}\0`,
+      }),
+    );
+
+    await expect(inspectSourceCommit(COMMIT, fetchImpl, "")).rejects.toThrow(
+      "The npm tarball has a damaged entry",
+    );
+  });
+
   it("replaces whatever is in the vendored folder, such as a file where a folder belongs", async () => {
     const rootDir = await temporaryRoot();
     const landing = new TextEncoder().encode("<!doctype html>\n");
@@ -716,6 +752,22 @@ describe("Agent Inbox landing sync", () => {
     await expect(inspectSourceCommit(COMMIT, fetchImpl, "")).rejects.toThrow(
       "The Agent Inbox vendor manifest is not valid JSON",
     );
+  });
+
+  it("refuses a page that loads vendored files when the manifest is missing", async () => {
+    const rootDir = await temporaryRoot();
+    const { fetchImpl } = mockGitHub(
+      new TextEncoder().encode(
+        "<script type=\"module\">import('./vendor/three-0.186.0/three.module.js')</script>\n",
+      ),
+    );
+
+    await expect(
+      syncAgentInboxLanding({ rootDir, fetchImpl, token: "" }),
+    ).rejects.toThrow(
+      `Agent Inbox commit ${COMMIT} refers to vendor/ files but has no vendor manifest`,
+    );
+    await expect(access(join(rootDir, "public"))).rejects.toThrow();
   });
 
   it("fails instead of dropping vendored files when the manifest download fails", async () => {
@@ -1106,12 +1158,18 @@ describe("Agent Inbox landing sync workflow", () => {
     expect(jobs.publish.permissions).toEqual({ contents: "read" });
 
     // The publish job sets up no Node and runs no npm, Node, test or build tool.
+    // Wrappers and shells count too: they could run a synced file.
     const command =
-      /(?:^\s*|\$\(\s*|[|;&]\s*)(?:npm|npx|node|vitest|astro|tsx|yarn|pnpm|bun|deno)\b/m;
-    for (const { name, uses = "", run = "" } of jobs.publish.steps) {
-      expect(uses, name).not.toMatch(/setup-node/);
+      /(?:^\s*|\$\(\s*|[|;&]\s*)(?:npm|npx|node|vitest|astro|tsx|yarn|pnpm|bun|deno|env|command|exec|xargs|bash|sh|zsh|source|\.)(?=\s|$)/m;
+    for (const { name, run = "" } of jobs.publish.steps) {
       expect(run, name).not.toMatch(command);
     }
+    expect(
+      jobs.publish.steps.flatMap(({ uses }) => (uses ? [uses] : [])),
+    ).toEqual([
+      "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+    ]);
     // ...and no Git hook: every git command that could run one says so.
     const publish = jobs.publish.steps.find(
       (step) => step.name === "Create or recover delivery pull request",

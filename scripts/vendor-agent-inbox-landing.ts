@@ -482,7 +482,12 @@ function readTarFiles(
       const end = field.indexOf(0);
       return decoder.decode(end === -1 ? field : field.subarray(0, end));
     };
-    const size = Number.parseInt(text(124, 12).trim() || "0", 8);
+    // An octal size, padded with spaces or NULs. Anything else, such as a sign
+    // or the base-256 form, is refused so the next offset always moves forward.
+    const sizeField = text(124, 12).trim();
+    const size = /^[0-7]{1,11}$/.test(sizeField)
+      ? Number.parseInt(sizeField, 8)
+      : Number.NaN;
     const start = offset + 512;
     if (!Number.isSafeInteger(size) || start + size > archive.length) {
       throw new Error("The npm tarball has a damaged entry");
@@ -897,6 +902,15 @@ async function loadSourceRevision(
   const license = await verifySourceLicense(commit, fetchImpl, token);
   const landing = await fetchSourceBytes(commit, fetchImpl, token);
   const { downloads, npm } = await fetchSourceAssets(commit, fetchImpl, token);
+  // Only a page that loads nothing from vendor/ may come without a manifest.
+  if (
+    downloads.length === 0 &&
+    new TextDecoder().decode(landing).includes("vendor/")
+  ) {
+    throw new Error(
+      `Agent Inbox commit ${commit} refers to vendor/ files but has no vendor manifest`,
+    );
+  }
   return {
     commit,
     sha256: sha256(landing),
