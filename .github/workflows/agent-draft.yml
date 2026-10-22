@@ -8,9 +8,10 @@ on:
 jobs:
   draft:
     runs-on: ubuntu-latest
+    # Every write (checkout credentials, git push, gh pr) uses AGENT_GH_TOKEN,
+    # so the built-in token only needs to read.
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
