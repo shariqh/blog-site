@@ -2,7 +2,21 @@
   "repository": "https://github.com/shariqh/agent-inbox",
   "sourcePath": "marketing/index.html",
   "sourceRef": "main",
-  "commit": "6155dccfac2cbbf8cb85e99dac5feaad7e4e9dfc",
-  "sha256": "9c8b7283ad63679f182245f657f02bb1c16a5d8ba90d5dc840dc93ec4cd85c9f",
-  "license": "MIT"
+  "commit": "f2d55fd909efd4c2cbb43e47806879564c2898ec",
+  "sha256": "90fa2932138619e721e496fe5262d03c178fa77fbd708ad3fe7358d312c12bbb",
+  "license": "MIT",
+  "assets": [
+    {
+      "path": "vendor/three-0.186.0/LICENSE",
+      "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+    },
+    {
+      "path": "vendor/three-0.186.0/three.core.js",
+      "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6"
+    },
+    {
+      "path": "vendor/three-0.186.0/three.module.js",
+      "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea"
+    }
+  ]
 }
