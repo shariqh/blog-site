@@ -7,10 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
-
-concurrency:
-  group: ai-code-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  issues: read
 
 jobs:
   review:
@@ -20,12 +17,10 @@ jobs:
       github.triggering_actor == github.repository_owner &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: shariqh/ai-code-review@07592511accc379c8234733848755f016e1edf85
-        with:
-          copilot-token: ${{ secrets.COPILOT_REVIEW_PAT }}
-          github-token: ${{ github.token }}
-          model: gpt-5.6-sol
-          comment-marker: ai-code-review-sticky
+    # The shared reusable workflow, pinned to the v1.5.0 release commit; the
+    # reviewer job runs the action from the same commit, so the pin covers both.
+    # Defaults: Sol as the finder, each finding checked by a verifier call before
+    # it is posted, confirmed findings inline, incremental rounds after the first.
+    uses: shariqh/ai-code-review/.github/workflows/review.yml@f62d6186659b1bb1fbf6f0712e24b95147a35968 # v1.5.0
+    secrets:
+      COPILOT_REVIEW_PAT: ${{ secrets.COPILOT_REVIEW_PAT }}
