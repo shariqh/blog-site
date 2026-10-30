@@ -1,0 +1,137 @@
+---
+title: Making AI product UX feel fast is a systems problem
+date: '2026-08-20'
+tags:
+  - engineering
+  - performance
+  - ai-ux
+  - systems
+  - infrastructure
+summary: >-
+  Making AI product UX feel fast is a nine-stage systems problem. Optimizing only
+  the model leaves eight other latency sources exactly where you found them.
+draft: false
+hero:
+  image: /static/images/blog/making-ai-ux-feel-instant/cover.png
+  alt: >-
+    Cover illustration for "Making AI product UX feel fast is a systems
+    problem".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: Generate a high-contrast technical hero through the
+    image gateway in the shariq.dev palette: charcoal black, warm paper white,
+    clay/coral, and amber. The composition should be dominated by one large
+    horizontal latency waterfall with two lanes: Search and Ask. Show
+    interaction milestones as clean, unlabeled nodes only, not fake numeric
+    benchmarks and not named steps. Do not depict or quote any phrase from the
+    article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
+---
+
+Making AI product UX feel fast is mostly a systems engineering problem, not a model problem. The model's time-to-first-token is one segment in a longer chain (panel open, lexical results, reflected state, streaming, citations, follow-up, session restore). Optimizing the model sharpens one variable. The others stay exactly as slow as you left them.
+
+Infrastructure, UI transitions, preserved state: all of it compounds. A 40ms model improvement disappears into a 500ms cold container start. A fast first-token disappears into a blank loading screen.
+
+Building Askdocs, the AI search layer embedded in Oris and other tenant sites, forced this view on us. Here's how the full budget breaks down, and what actually moves at each stage.
+
+## The latency waterfall
+
+Every AI product interaction has roughly the same skeleton. Most teams instrument one segment. Here's the full chain.
+
+**Hotkey to panel open.** Pure UI cost. Mount the panel once and toggle visibility rather than unmounting and remounting on every open. Avoid full shadow-DOM rebuilds. This segment should be imperceptible.
+
+**Keystroke to lexical results.** This fires before any model call. Indexed search returns ranked results as the user types. The AI isn't involved yet. Users have something useful before they've committed to the AI path.
+
+**Ask submission to visible streaming state.** The user clicks Ask. What do they see immediately? A blank area with a spinner says the click may not have registered. A reflected version of their query appearing in the answer panel says the system heard them. Implement reflected state before optimizing first-token latency.
+
+**First token.** This is what LLM benchmarks measure. It's also one segment in a longer chain, and the segments before it have already shaped the user's emotional baseline.
+
+**Incremental answer.** Stream chunks as they arrive. Accumulating the full response server-side and delivering it as a block inflates perceived latency regardless of model speed.
+
+**Citations.** If citations block until the answer completes, you've added a hidden wait at the end. Render citation placeholders as streaming begins; fill them as they arrive.
+
+**Follow-up query.** Does the session survive a second submission? Does the answer component re-render from scratch, or update in place? Re-mounting on every follow-up adds DOM rebuild cost directly on top of model latency.
+
+**Close and reopen.** If the user closes the panel and reopens it, draft text, mode selection, and the previous answer should be there. A session store for this is cheap to build and noticeably good for perceived quality.
+
+**Navigation recovery.** Scope this deliberately. State that survives intra-page navigation is valuable. State that persists across navigation to a completely different document context creates its own problems: stale answers, wrong-document citations. Bounded persistence is the goal, clearing on meaningful context change rather than every click.
+
+
+
+## Lexical first, model second
+
+The most impactful latency technique in Askdocs has nothing to do with the model. The first thing a user sees after typing is lexical results (indexed, sub-100ms, no inference involved). The Ask row is pinned at the bottom; the AI is an explicit upgrade the user chooses, not the only response path.
+
+
+
+<Image src="/static/images/blog/making-ai-ux-feel-instant/img1.png" alt="Askdocs command bar embedded on Oris's docs site, displaying immediate roadmap search results before the user chooses the AI Ask action" />
+
+
+
+When the user submits Ask, lexical search runs in parallel with the model call, not sequentially after it. Lexical results can update before the first token arrives. The user has something to read while the model works.
+
+Treat lexical search as part of the answer experience, not as a degraded fallback.
+
+## Infrastructure: one warm replica
+
+Cold container start can exceed model latency for interactive first hits. On [Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/scale-app), keeping one replica always warm eliminates the floor for that case. The configuration isn't complicated, but it's easy to skip in early development and then puzzle over why tail latency looks like a different product.
+
+One warm replica doesn't remove every latency risk. Askdocs is capped at a single replica: there's no autoscaling to absorb a burst, so concurrent requests queue behind whatever is already in flight rather than spreading across new instances. But for the single-user first-interaction case (the one that shapes first impressions), the warm replica removes the dominant source of variance.
+
+Verify after every deploy that the minimum replica configuration actually survived. Redeploy, then immediately test the first request. Production sometimes doesn't match what you configured.
+
+## Pre-first-token: making dead time visible
+
+Between Ask submission and first token, the request is in flight and the model hasn't responded. This window is where perceived speed and actual speed diverge most sharply.
+
+The wrong pattern is a spinner or an empty container where the answer will appear.
+
+The right pattern is to reflect the user's query immediately in the answer area, with a low-key indication the model is working. The user's input is acknowledged. The panel looks active. Perceived wait starts after this acknowledgment, not at submission.
+
+This costs almost nothing to implement and requires no model changes.
+
+## Streaming, pinned controls, citation rendering
+
+Once tokens arrive, stream them. Token-by-token can feel jittery on fast connections; paragraph-by-paragraph often reads more naturally. Tune for legibility, not just speed.
+
+Pin the input controls. As the streaming answer grows the panel, the follow-up input and controls shouldn't shift. Users who want to submit mid-stream need stable targets to click.
+
+Don't block citation rendering on completion. Render citation structure as streaming begins and fill in metadata as it arrives. An answer that completes next to a spinning citation indicator is a UX failure regardless of how fast the model ran.
+
+## Follow-up and close: no full rebuilds
+
+Products silently add latency in two places.
+
+A **full re-render on follow-up**: the answer component unmounts and remounts on every subsequent query. DOM rebuild cost stacks on top of model latency and is invisible in any LLM benchmark.
+
+**State loss on close.** Draft text gone, mode reset, session context cleared. Users interpret this as the product being unreliable, even if the underlying model is fast.
+
+Keep the session component mounted across follow-ups and update state in place. Persist draft text, mode (lexical vs Ask), and the last answer in a session store. Scope the store deliberately. It should survive close/reopen and navigation within the same context, but clear on meaningful context change.
+
+
+
+## What actually moved the needle
+
+The instinct when an AI product feels slow is to look at the model. In Askdocs, the model was rarely the bottleneck that mattered. Cold container start on Azure Container Apps routinely outran the model's own first-token time, and it was configuration, not inference, that erased that floor. One warm replica did more for perceived speed on first interaction than any model swap did.
+
+The second-largest lever wasn't a latency fix at all. It was taking the model off the critical path for most queries. Lexical search returns ranked results before a user has decided to invoke the AI, so the product has already responded by the time anyone reaches for Ask. The model only has to be fast for the subset of queries that actually need it, which is a much smaller problem than making every query fast.
+
+The third was the dead zone between submission and streaming. A blank panel with a spinner reads as "this might not have worked." Reflecting the query immediately and rendering citation placeholders as tokens arrive closed that gap without touching the model at all.
+
+Stacked together, a warm replica, a non-AI first response, and an honestly acknowledged wait did more for how fast Askdocs feels than any amount of model tuning. That's the actual shape of the problem: eight of the nine stages sit outside the model, and most of the perceived speed lives in them, not in shaving milliseconds off inference.
