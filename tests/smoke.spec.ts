@@ -446,10 +446,10 @@ test('Agent Inbox landing is standalone and interactive', async ({ page }) => {
     page.getByRole('tabpanel', { name: 'Plans' }),
   ).toContainText('Ship the customer portal')
 
-  const liveTab = page.getByRole('tab', { name: 'Live' })
-  await liveTab.click()
-  await expect(liveTab).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('tabpanel', { name: 'Live' })).toContainText(
+  const agentsTab = page.getByRole('tab', { name: 'Agents' })
+  await agentsTab.click()
+  await expect(agentsTab).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tabpanel', { name: 'Agents' })).toContainText(
     "See who's working on what.",
   )
 
