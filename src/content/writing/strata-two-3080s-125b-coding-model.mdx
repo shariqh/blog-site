@@ -1,0 +1,63 @@
+---
+title: "Strata inference on two 3080s: 126 tok/s, 125B sparse model"
+date: '2026-11-05'
+tags:
+  - field-notes
+  - local-llm
+  - inference
+  - homelab
+  - moe
+summary: "Strata hit 126 tok/s decode on two RTX 3080s with a 125B sparse coding model, more than double llama.cpp, with the full 262k-token context window."
+draft: false
+---
+
+The first time I ran the [Strata](https://github.com/Niko1221/Strata) inference engine on my homelab, the decode speed on a code prompt came back at 126 tok/s. llama.cpp had been returning 57 on the same prompt, same model, same files.
+
+The hardware is two RTX 3080 20 GB cards (modded), Ryzen 5 5600X, 64 GB RAM, Ubuntu Server. The model, ISTA-DASLab's [Qwen3.8-Flash-Next GSQ-RCO Coder](https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF), is a 125B-parameter mixture-of-experts model pruned to 6B active parameters and quantized to 3.5 bits per weight. It sits in 29.6 GB (transformer shard) plus 28.8 GB (n-gram table) of GGUF files. ISTA-DASLab built this model; credit is theirs. It scores 79.2 on SWE-bench Verified (versus 82.8 for the unpruned BF16 version) and 87.43 on LiveCodeBench v6, matching the unpruned model on that benchmark.
+
+The gap between 57 and 126 tok/s comes down to a few mechanics worth naming.
+
+**Prefill** is what happens before the model writes its first output token. It reads the full prompt and builds internal state for every position in parallel. Fast, but it scales with prompt length. **Decode** is what comes after, generating output tokens one at a time, each conditioned on everything before it. This is the slow part and the one that determines how responsive the model feels.
+
+This model is a mixture-of-experts architecture. Instead of one large feed-forward network per token, it has 12,288 small sub-networks and a router that picks a few per token (6B active parameters out of 125B total). The rest are idle. In most inference setups those idle expert weights live in system RAM and must be fetched across the PCIe bus before each generated token. **Resident experts** means all 12,288 are loaded into VRAM and stay there. With two 3080 20 GB cards holding this model, Strata keeps the full set resident.
+
+
+
+## Strata vs llama.cpp
+
+Same model, same GGUF files, both cards active, thinking off unless noted.
+
+| Measure | llama.cpp | Strata |
+|---|---|---|
+| Decode, code prompt | 57 tok/s | 126–137 tok/s |
+| Decode, prose prompt | 60 tok/s | 90 tok/s |
+| Decode, thinking on | 58 tok/s | 120 tok/s |
+| Decode after 19k-token prompt | 52 tok/s | 85 tok/s |
+| Prefill, 19k-token prompt | 1,397 tok/s | 2,261 tok/s |
+| Prefill, long prompt | 1,291 tok/s (67k tokens) | 3,029 tok/s (50k tokens) |
+| Max context in VRAM | 131,072 tokens | 262,144 tokens |
+| Load time | ~150 s | 31 s (cached) / 86 s (cold) |
+
+The context ceiling was the most surprising number. 262,144 tokens is the model's full window, and it fits within 40 GB of VRAM. I ran needle tests at 99k and 218k tokens. At 218k, prefill ran at 3,169 tok/s with decode at 85 tok/s afterward, a context size that was simply unavailable with llama.cpp on this hardware.
+
+Three things account for most of the gap. The GPU expert cache keeps all 12,288 routed experts on the two cards, so the router never waits on a CPU-side fetch. Multi-token prediction drafts tokens speculatively and accepts or rejects them in parallel. Strata also splits layers automatically across the two cards with Ampere-specific optimizations on by default.
+
+The 0.2.x line added a conversation cache in RAM. A 14k-token repeated prompt that took 7.8 s to prefill now returns in 0.3 s. Unload time dropped from 4 s to 0.7 s.
+
+
+
+## Daily use
+
+The speed change shifted what I reach for the model to do. Agents and scripts on my Mac call it over my private network for bulk reads, summaries, and first-pass code review. A 160 kB file prefills at around 3,000 tok/s; an 80 kB summary decodes at 102 tok/s. Before, I'd save the model for tasks that felt worth a slow wait. Now it's the default.
+
+On Aider polyglot (225 exercises), the model scored 49.8% pass rate with thinking off and 68.4% with thinking on. Those are scores for this model, not evidence that Strata improves reasoning. The inference engine doesn't change what the model knows; it changes how long you wait to find out.
+
+The model is served through [llama-swap](https://github.com/mostlygeek/llama-swap) for backend hot-swap. llama.cpp stays loaded as the fallback.
+
+## Caveats
+
+Strata is young. Releases ship every few days, and not everything has been tested on a GeForce pair like mine. I measure each upgrade side by side before committing to it.
+
+Upgrading system RAM from 16 to 64 GB improved load time and gave the conversation cache room to work. It didn't move the token-per-second numbers. If inference speed is what you're after, RAM above what the model needs on disk isn't the lever.
+
+Strata builds on ggml, the same tensor library llama.cpp uses. The gap here reflects specific bets Strata has made (resident expert cache, MTP, Ampere tuning) that pay off well for this model on this GPU pair. On different hardware or a denser model, the comparison would look different. If you're running a large sparse model on consumer multi-GPU hardware and haven't tried it, the project is at [github.com/Niko1221/Strata](https://github.com/Niko1221/Strata).
