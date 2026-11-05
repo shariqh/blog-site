@@ -1,5 +1,5 @@
 ---
-title: "Agent Inbox 2.4: rebuilding session UI around one invariant"
+title: 'Agent Inbox 2.4: rebuilding session UI around one invariant'
 date: '2026-11-05'
 tags:
   - ai
@@ -7,8 +7,40 @@ tags:
   - developer-tools
   - open-source
   - software-architecture
-summary: "Agent Inbox 2.4 replaces two session surfaces with a single Agents view: every ask lives on exactly one card, with counts that agree everywhere."
+summary: >-
+  Agent Inbox 2.4 replaces two session surfaces with a single Agents view: every
+  ask lives on exactly one card, with counts that agree everywhere.
 draft: false
+hero:
+  image: /static/images/blog/agent-inbox-agents-view/cover.png
+  alt: >-
+    Cover illustration for "Agent Inbox 2.4: rebuilding session UI around one
+    invariant".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: A dark surface scattered with clusters of small
+    luminous cards connected by fine light-threads to a single glowing counter
+    at center; one card among the clusters is dimmer than the rest but its
+    thread still reaches the counter; the composition suggests belonging and
+    enumeration recovered from disorder.. Do not depict or quote any phrase from
+    the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
 ---
 
 Running multiple Claude Code sessions through [Agent Inbox](https://shariq.dev/agent-inbox/) at once exposed a gap I hadn't expected. The Inbox badge said 4; the session cards said 3. I went looking for the fourth ask. It had come from a session that had already exited. No card owned it, so it sat there counted but invisible. Three surfaces disagreed about what was waiting on me.
