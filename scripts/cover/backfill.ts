@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync, lstatSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
-import matter from 'gray-matter'
 import { generateCover, type CoverResult } from './generate-cover'
 import { setHeroInFile, toHeroPatch, coverInputFromFrontmatter, type HeroPatch } from './frontmatter'
+import { parseYamlFrontmatter } from './yaml-frontmatter'
 
 const WRITING_DIR = join('src', 'content', 'writing')
 
@@ -52,7 +52,7 @@ export async function runBackfill(
   let failed = 0
 
   for (const filePath of files) {
-    const fm = matter(deps.readFile(filePath))
+    const fm = parseYamlFrontmatter(deps.readFile(filePath))
     if (fm.data.draft) {
       skipped++
       continue
