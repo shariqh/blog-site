@@ -203,6 +203,16 @@ verified head SHA, and the workflow checks the resulting deployment's ID,
 commit, branch, preview environment, successful stage, and immutable URL
 against Cloudflare before advertising success.
 
+The workflow builds and deploys in separate jobs. The `build` job has a
+read-only GitHub token and no deploy credentials. It runs `npm ci` and
+`npm run build`, compiles `functions/` into `dist/_worker.js/` and
+`dist/_routes.json` with the pinned Wrangler (`WRANGLER_VERSION`), and
+uploads `dist/` as a short-lived artifact. The `deploy` job holds the
+Cloudflare secrets. It checks out nothing and runs no repository scripts: it
+downloads that artifact into `dist/` and uploads it with
+`wrangler pages deploy --no-bundle`, taking the branch and commit from the
+workflow event rather than from the artifact.
+
 Preview metadata is also available through GitHub's deployments API at the
 exact PR head SHA, under `cloudflare-preview/pr-<number>`. These deployments
 are explicitly transient and non-production. Reruns reuse one record per

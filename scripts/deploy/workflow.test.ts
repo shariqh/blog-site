@@ -60,7 +60,7 @@ const lifecycle = script(
   "prepare-preview",
   "Prepare or retire preview metadata",
 );
-const provenance = script("deploy", "Verify checked-out source");
+const provenance = script("build", "Verify checked-out source");
 const verifyProvider = script("deploy", "Verify Cloudflare preview");
 const comment = script("finish-preview", "Comment preview URL on PR");
 
@@ -255,6 +255,7 @@ function harness(records: Deployment[] = []) {
       GITHUB_RUN_ATTEMPT: "1",
       DEPLOYMENT_ID: "1",
       PREPARED_ATTEMPT: "1",
+      BUILD_RESULT: "success",
       DEPLOY_RESULT: "success",
       VERIFIED_SHA: HEAD,
       PREVIEW_URL,
@@ -302,14 +303,21 @@ describe("deployment workflow boundaries", () => {
       queue: "max",
     });
     expect(workflow.permissions).toEqual({ contents: "read" });
-    expect(workflow.jobs.deploy.permissions).toEqual({ contents: "read" });
+    expect(workflow.jobs.build.permissions).toEqual({ contents: "read" });
+    expect(workflow.jobs.deploy.permissions).toEqual({});
+    for (const name of ["build", "deploy"]) {
+      expect(workflow.jobs[name].if).toContain(
+        "github.event_name != 'pull_request'",
+      );
+      expect(workflow.jobs[name].if).toContain(
+        "needs.prepare-preview.outputs.should-deploy == 'true'",
+      );
+      expect(workflow.jobs[name].if).toContain("!cancelled()");
+    }
+    expect(workflow.jobs.deploy.needs).toEqual(["prepare-preview", "build"]);
     expect(workflow.jobs.deploy.if).toContain(
-      "github.event_name != 'pull_request'",
+      "needs.build.result == 'success'",
     );
-    expect(workflow.jobs.deploy.if).toContain(
-      "needs.prepare-preview.outputs.should-deploy == 'true'",
-    );
-    expect(workflow.jobs.deploy.if).toContain("!cancelled()");
     expect(workflow.jobs["finish-preview"].if).toContain("always()");
   });
 
@@ -342,17 +350,72 @@ describe("deployment workflow boundaries", () => {
     expect(workflow.jobs["prepare-preview"].if).toContain(
       "github.event.pull_request.user.login != 'dependabot[bot]'",
     );
+    expect(JSON.stringify(workflow.jobs.build)).not.toContain("secrets.");
     expect(source).not.toContain("pull_request_target");
     expect(source).not.toContain("workflow_run");
     expect(source).not.toContain("gitHubToken:");
   });
 
+  it("runs repository code only in the credential-free build job", () => {
+    const deploy = workflow.jobs.deploy;
+    expect(deploy.steps.map((candidate) => candidate.uses ?? "run")).toEqual([
+      "actions/github-script@v7",
+      "actions/download-artifact@v8",
+      "run",
+      "cloudflare/wrangler-action@v3",
+      "actions/github-script@v7",
+    ]);
+    for (const candidate of deploy.steps) {
+      expect(candidate.run ?? "").not.toMatch(
+        /\b(npm|npx|node|git|bash|source)\b/,
+      );
+      expect(candidate.with?.workingDirectory).toBeUndefined();
+    }
+    expect(step("deploy", "Download built site").with).toEqual({
+      name: "${{ needs.build.outputs.artifact }}",
+      path: "dist",
+    });
+    expect(workflow.jobs.build.outputs).toEqual({
+      artifact: "site-${{ github.run_attempt }}",
+    });
+    expect(step("build", "Upload built site").with).toEqual({
+      name: "site-${{ github.run_attempt }}",
+      path: "dist/",
+      "if-no-files-found": "error",
+      "include-hidden-files": true,
+      "retention-days": 1,
+    });
+    expect(step("build", "Build Pages Functions").run).toContain(
+      "--outdir dist/_worker.js --output-routes-path dist/_routes.json",
+    );
+    expect(step("build", "Build Pages Functions").run).toContain(
+      'wrangler@${WRANGLER_VERSION}"',
+    );
+    expect(
+      step("deploy", "Deploy to Cloudflare Pages").with?.wranglerVersion,
+    ).toBe("${{ env.WRANGLER_VERSION }}");
+    expect(
+      (workflow as unknown as { env: Record<string, string> }).env
+        .WRANGLER_VERSION,
+    ).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
   it("wires exact-head source, verified outputs, and shared checkout-free scripts", () => {
-    expect(step("deploy", "Checkout").with).toEqual({
+    expect(step("build", "Checkout").with).toEqual({
       ref: "${{ github.event.pull_request.head.sha || github.sha }}",
       "persist-credentials": false,
     });
-    expect(script("deploy", "Verify deployment source")).toBe(provenance);
+    expect(script("build", "Verify deployment source")).toBe(provenance);
+    expect(script("deploy", "Derive deployment command")).toBe(provenance);
+    expect(step("build", "Verify checked-out source").env).toEqual({
+      PHASE: "build",
+    });
+    expect(step("build", "Verify deployment source").env).toEqual({
+      PHASE: "build",
+    });
+    expect(step("deploy", "Derive deployment command").env).toEqual({
+      PHASE: "deploy",
+    });
     expect(script("finish-preview", "Finalize preview metadata")).toBe(
       lifecycle,
     );
@@ -371,6 +434,14 @@ describe("deployment workflow boundaries", () => {
     expect(
       step("finish-preview", "Finalize preview metadata").env?.DEPLOY_RESULT,
     ).toBe("${{ needs.deploy.result }}");
+    expect(
+      step("finish-preview", "Finalize preview metadata").env?.BUILD_RESULT,
+    ).toBe("${{ needs.build.result }}");
+    expect(workflow.jobs["finish-preview"].needs).toEqual([
+      "prepare-preview",
+      "build",
+      "deploy",
+    ]);
     for (const job of Object.values(workflow.jobs)) {
       for (const step of job.steps) {
         expect(step.with?.script ?? step.run ?? "").not.toContain("${{");
@@ -380,21 +451,52 @@ describe("deployment workflow boundaries", () => {
 });
 
 describe("immutable checkout provenance", () => {
-  it("uses the checked-out PR head rather than the event merge SHA", async () => {
+  const BUILD = { PHASE: "build" };
+  const DEPLOY = { PHASE: "deploy" };
+
+  it("verifies the checked-out PR head rather than the event merge SHA at build", async () => {
     const h = harness();
-    const output = await h.execute(provenance);
-    expect(output.command).toBe(
-      `pages deploy dist --project-name=shariq-dev --branch=${h.state.live.head.ref} --commit-hash=${HEAD}`,
-    );
+    expect(await h.execute(provenance, BUILD)).toEqual({});
     expect(h.exec.getExecOutput).toHaveBeenCalledWith(
       "git",
       ["rev-parse", "HEAD"],
       { silent: true },
     );
     h.exec.getExecOutput.mockResolvedValue({ stdout: `${MERGE}\n` });
-    await expect(h.execute(provenance)).rejects.toThrow(
+    await expect(h.execute(provenance, BUILD)).rejects.toThrow(
       "immutable deployment commit",
     );
+  });
+
+  it("derives the deploy command from event context without reading a checkout", async () => {
+    const h = harness();
+    h.exec.getExecOutput.mockResolvedValue({ stdout: `${MERGE}\n` });
+    expect(await h.execute(provenance, DEPLOY)).toEqual({
+      command: `pages deploy dist --project-name=shariq-dev --branch=${h.state.live.head.ref} --commit-hash=${HEAD} --no-bundle`,
+    });
+    expect(h.exec.getExecOutput).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "finish"])(
+    "rejects an unknown provenance phase %j",
+    async (phase) => {
+      const h = harness();
+      await expect(h.execute(provenance, { PHASE: phase })).rejects.toThrow(
+        "Invalid provenance phase",
+      );
+      expect(h.core.setOutput).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects an event without an immutable commit", async () => {
+    const h = harness();
+    h.context.payload.pull_request!.head.sha = "main";
+    for (const environment of [BUILD, DEPLOY]) {
+      await expect(h.execute(provenance, environment)).rejects.toThrow(
+        "immutable deployment commit",
+      );
+    }
+    expect(h.core.setOutput).not.toHaveBeenCalled();
   });
 
   it.each(["push", "workflow_dispatch"])(
@@ -405,13 +507,17 @@ describe("immutable checkout provenance", () => {
       h.context.payload.pull_request = undefined;
       h.context.ref = "refs/heads/main";
       h.exec.getExecOutput.mockResolvedValue({ stdout: `${MERGE}\n` });
+      const environment = {
+        GITHUB_REF_NAME: "main",
+        GITHUB_REF_TYPE: "branch",
+      };
+      expect(await h.execute(provenance, { ...BUILD, ...environment })).toEqual(
+        {},
+      );
       expect(
-        await h.execute(provenance, {
-          GITHUB_REF_NAME: "main",
-          GITHUB_REF_TYPE: "branch",
-        }),
+        await h.execute(provenance, { ...DEPLOY, ...environment }),
       ).toEqual({
-        command: `pages deploy dist --project-name=shariq-dev --branch=main --commit-hash=${MERGE}`,
+        command: `pages deploy dist --project-name=shariq-dev --branch=main --commit-hash=${MERGE} --no-bundle`,
       });
     },
   );
@@ -427,7 +533,7 @@ describe("immutable checkout provenance", () => {
   ])("preserves command-safe Git branch %j", async (branch) => {
     const h = harness();
     h.context.payload.pull_request!.head.ref = branch;
-    expect((await h.execute(provenance)).command).toContain(
+    expect((await h.execute(provenance, DEPLOY)).command).toContain(
       `--branch=${branch} `,
     );
     h.context.eventName = "workflow_dispatch";
@@ -437,6 +543,7 @@ describe("immutable checkout provenance", () => {
     expect(
       (
         await h.execute(provenance, {
+          ...DEPLOY,
           GITHUB_REF_NAME: branch,
           GITHUB_REF_TYPE: "branch",
         })
@@ -457,12 +564,15 @@ describe("immutable checkout provenance", () => {
       h.context.payload.pull_request = undefined;
       h.context.sha = HEAD;
       h.context.ref = ref;
-      await expect(
-        h.execute(provenance, {
-          GITHUB_REF_NAME: name,
-          GITHUB_REF_TYPE: type,
-        }),
-      ).rejects.toThrow("unambiguous branch ref");
+      for (const phase of [BUILD, DEPLOY]) {
+        await expect(
+          h.execute(provenance, {
+            ...phase,
+            GITHUB_REF_NAME: name,
+            GITHUB_REF_TYPE: type,
+          }),
+        ).rejects.toThrow("unambiguous branch ref");
+      }
       expect(h.core.setOutput).not.toHaveBeenCalled();
     },
   );
@@ -482,9 +592,12 @@ describe("immutable checkout provenance", () => {
     async (branch) => {
       const h = harness();
       h.context.payload.pull_request!.head.ref = branch;
-      await expect(h.execute(provenance)).rejects.toThrow(
-        "Unsafe deployment branch",
-      );
+      for (const phase of [BUILD, DEPLOY]) {
+        await expect(h.execute(provenance, phase)).rejects.toThrow(
+          "Unsafe deployment branch",
+        );
+      }
+      expect(h.core.setOutput).not.toHaveBeenCalled();
     },
   );
 });
@@ -652,6 +765,29 @@ describe("preview metadata lifecycle", () => {
       await h.run("finish", { DEPLOY_RESULT: result });
       expect(h.state.statuses.get(1)?.[0]).toMatchObject({
         state: result === "failure" ? "failure" : "error",
+        environment_url: "",
+      });
+      expect(
+        h.createDeploymentStatus.mock.calls.some(
+          ([status]) => status.state === "success",
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it.each([
+    { build: "failure", deploy: "skipped", state: "failure" },
+    { build: "cancelled", deploy: "skipped", state: "error" },
+    { build: "skipped", deploy: "skipped", state: "error" },
+    { build: "", deploy: "success", state: "error" },
+  ])(
+    "finalizes instead of staying in progress when the build is $build",
+    async ({ build, deploy, state }) => {
+      const h = harness();
+      await h.run("prepare");
+      await h.run("finish", { BUILD_RESULT: build, DEPLOY_RESULT: deploy });
+      expect(h.state.statuses.get(1)?.[0]).toMatchObject({
+        state,
         environment_url: "",
       });
       expect(
