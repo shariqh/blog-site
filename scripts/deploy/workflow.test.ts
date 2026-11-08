@@ -383,7 +383,7 @@ describe("deployment workflow boundaries", () => {
       path: "dist/",
       "if-no-files-found": "error",
       "include-hidden-files": true,
-      "retention-days": 1,
+      "retention-days": 7,
     });
     expect(step("build", "Build Pages Functions").run).toContain(
       "--outdir dist/_worker.js --output-routes-path dist/_routes.json",
