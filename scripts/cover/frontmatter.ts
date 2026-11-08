@@ -41,7 +41,9 @@ export function coverInputFromFrontmatter(
 export function setHero(mdx: string, hero: HeroPatch): string {
   const parsed = parseYamlFrontmatter(mdx)
   const data = { ...parsed.data, hero: { ...hero } }
-  return matter.stringify(parsed.content, data)
+  // Pass a file object: given a string, matter.stringify re-parses it with the
+  // default engines, which would treat a body that opens with `---js` as frontmatter.
+  return matter.stringify({ content: parsed.content }, data)
 }
 
 export function setHeroInFile(filePath: string, hero: HeroPatch): void {

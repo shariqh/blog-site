@@ -52,6 +52,25 @@ describe('parseYamlFrontmatter', () => {
     expect(parseYamlFrontmatter('Just a body.\n').data).toEqual({})
   })
 
+  it('keeps a body that opens with JavaScript frontmatter as text when setting the hero', () => {
+    const body = `---js\n(globalThis.${MARK} = true, {})\n---\nBody.\n`
+    const out = setHero(`---\ntitle: A Post\n---\n${body}`, {
+      image: '/x.png',
+      alt: 'x',
+      prompt: 'x',
+      style: 'line-art',
+    })
+    expect(marked()).toBeUndefined()
+    expect(out.endsWith(`---\n${body}`)).toBe(true)
+    const parsed = parseYamlFrontmatter(out)
+    expect(parsed.data).toEqual({
+      title: 'A Post',
+      hero: { image: '/x.png', alt: 'x', prompt: 'x', style: 'line-art' },
+    })
+    expect(parsed.content).toBe(body)
+    expect(marked()).toBeUndefined()
+  })
+
   it('refuses at every post frontmatter entry point', () => {
     const hero = { image: '/x.png', alt: 'x', prompt: 'x', style: 'line-art' as const }
     expect(() => setHero(payload('---js'), hero)).toThrow('must be YAML')
