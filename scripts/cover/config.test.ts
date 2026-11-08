@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { getGatewayConfig } from './config.js';
+import { describe, it, expect, vi } from 'vitest';
+import { getGatewayConfig, loadLocalEnv } from './config.js';
 
 describe('getGatewayConfig', () => {
   it('reads url + token from env', () => {
@@ -21,4 +21,20 @@ describe('getGatewayConfig', () => {
     process.env.IMAGE_GATEWAY_URL = 'not a url'; process.env.IMAGE_GATEWAY_TOKEN = 'tok';
     expect(() => getGatewayConfig()).toThrow(/Invalid IMAGE_GATEWAY_URL/);
   });
+});
+
+describe('loadLocalEnv', () => {
+  it('loads .env.local then .env for local runs', () => {
+    const load = vi.fn();
+    expect(loadLocalEnv({}, load)).toBe(true);
+    expect(load.mock.calls).toEqual([[{ path: '.env.local' }], []]);
+  });
+  it.each([{ GITHUB_ACTIONS: 'true' }, { CI: 'true' }])(
+    'does not read env files from the working directory in CI (%j)',
+    (env) => {
+      const load = vi.fn();
+      expect(loadLocalEnv(env, load)).toBe(false);
+      expect(load).not.toHaveBeenCalled();
+    },
+  );
 });
