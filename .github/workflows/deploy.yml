@@ -15,6 +15,10 @@ concurrency:
   cancel-in-progress: false
   queue: max
 
+env:
+  # One exact Wrangler for compiling Pages Functions (build) and uploading (deploy).
+  WRANGLER_VERSION: 3.90.0
+
 jobs:
   prepare-preview:
     if: >-
@@ -170,8 +174,10 @@ jobs:
               await status(id, 'inactive', 'Preview superseded or PR closed', logUrl);
               return;
             }
-            if (process.env.DEPLOY_RESULT !== 'success') {
-              const state = process.env.DEPLOY_RESULT === 'failure' ? 'failure' : 'error';
+            // A failed build skips deploy, so the build result decides the final state too.
+            const results = [process.env.BUILD_RESULT, process.env.DEPLOY_RESULT];
+            if (results.some(result => result !== 'success')) {
+              const state = results.includes('failure') ? 'failure' : 'error';
               await status(id, state, 'Preview build or deployment did not complete successfully', logUrl);
               return;
             }
@@ -193,7 +199,9 @@ jobs:
             await status(id, 'success', 'Exact-head Cloudflare preview deployed', logUrl, url);
             core.setOutput('preview-url', url);
 
-  deploy:
+  # Runs repository code (npm ci, the Astro build, the Functions compile) with no
+  # deploy credentials. Its only hand-off to deploy is the built-output artifact.
+  build:
     needs: prepare-preview
     if: >-
       !cancelled() &&
@@ -204,9 +212,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      preview-url: ${{ steps.verify.outputs.preview-url }}
-      verified-sha: ${{ steps.verify.outputs.verified-sha }}
-      cloudflare-deployment-id: ${{ steps.verify.outputs.cloudflare-deployment-id }}
+      artifact: site-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -216,13 +222,21 @@ jobs:
 
       - name: Verify checked-out source
         uses: actions/github-script@v7
+        env:
+          PHASE: build
         with:
+          # Build verifies the checkout; deploy derives its command from event context only.
           script: &deployment-provenance |
+            const phase = process.env.PHASE;
+            if (!['build', 'deploy'].includes(phase)) throw new Error('Invalid provenance phase');
             const sha = context.payload.pull_request?.head.sha ?? context.sha;
             const branch = context.payload.pull_request?.head.ref ?? process.env.GITHUB_REF_NAME;
-            const { stdout } = await exec.getExecOutput('git', ['rev-parse', 'HEAD'], { silent: true });
-            if (!/^[a-f0-9]{40}$/.test(sha) || stdout.trim() !== sha) {
-              throw new Error('Checkout does not match the immutable deployment commit');
+            if (!/^[a-f0-9]{40}$/.test(sha ?? '')) {
+              throw new Error('Event does not name an immutable deployment commit');
+            }
+            if (phase === 'build') {
+              const { stdout } = await exec.getExecOutput('git', ['rev-parse', 'HEAD'], { silent: true });
+              if (stdout.trim() !== sha) throw new Error('Checkout does not match the immutable deployment commit');
             }
             if (context.eventName !== 'pull_request' &&
                 (process.env.GITHUB_REF_TYPE !== 'branch' || context.ref !== `refs/heads/${branch}`)) {
@@ -232,7 +246,11 @@ jobs:
                 (context.eventName === 'pull_request' && branch.toLowerCase() === 'main')) {
               throw new Error('Unsafe deployment branch or production branch selected by a PR');
             }
-            core.setOutput('command', `pages deploy dist --project-name=shariq-dev --branch=${branch} --commit-hash=${sha}`);
+            if (phase === 'deploy') {
+              // --no-bundle: upload the prebuilt dist/_worker.js as-is instead of re-bundling it.
+              core.setOutput('command',
+                `pages deploy dist --project-name=shariq-dev --branch=${branch} --commit-hash=${sha} --no-bundle`);
+            }
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -246,11 +264,63 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Compile functions/ into dist/ so the deploy job uploads it without
+      # building anything from the repository.
+      - name: Build Pages Functions
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: >-
+          npx --yes "wrangler@${WRANGLER_VERSION}" pages functions build functions
+          --outdir dist/_worker.js --output-routes-path dist/_routes.json
+
       - name: Verify deployment source
-        id: provenance
         uses: actions/github-script@v7
+        env:
+          PHASE: build
         with:
           script: *deployment-provenance
+
+      - name: Upload built site
+        uses: actions/upload-artifact@v7
+        with:
+          name: site-${{ github.run_attempt }}
+          path: dist/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  # Holds the Cloudflare credentials. Checks out nothing and runs no repository
+  # code: it downloads the built output as data and uploads it.
+  deploy:
+    needs: [prepare-preview, build]
+    if: >-
+      !cancelled() &&
+      needs.build.result == 'success' &&
+      (github.event_name != 'pull_request' ||
+       (needs.prepare-preview.result == 'success' && needs.prepare-preview.outputs.should-deploy == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions: {}
+    outputs:
+      preview-url: ${{ steps.verify.outputs.preview-url }}
+      verified-sha: ${{ steps.verify.outputs.verified-sha }}
+      cloudflare-deployment-id: ${{ steps.verify.outputs.cloudflare-deployment-id }}
+    steps:
+      - name: Derive deployment command
+        id: provenance
+        uses: actions/github-script@v7
+        env:
+          PHASE: deploy
+        with:
+          script: *deployment-provenance
+
+      # Only the built output lands in the workspace (under dist/), so no
+      # repository package.json, .npmrc, wrangler config or functions/ is present.
+      - name: Download built site
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: dist
 
       - name: Enable incoming request cancellation
         env:
@@ -295,6 +365,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           # Branch mapping:
           #   main      → production (shariq.dev)
           #   any other → preview deployment with its own URL
@@ -345,7 +416,7 @@ jobs:
             core.setOutput('cloudflare-deployment-id', id);
 
   finish-preview:
-    needs: [prepare-preview, deploy]
+    needs: [prepare-preview, build, deploy]
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
@@ -365,6 +436,7 @@ jobs:
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
           DEPLOYMENT_ID: ${{ needs.prepare-preview.outputs.deployment-id }}
           PREPARED_ATTEMPT: ${{ needs.prepare-preview.outputs.attempt }}
+          BUILD_RESULT: ${{ needs.build.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
           VERIFIED_SHA: ${{ needs.deploy.outputs.verified-sha }}
           PREVIEW_URL: ${{ needs.deploy.outputs.preview-url }}
