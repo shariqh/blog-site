@@ -85,12 +85,15 @@ jobs:
           COVER_CONCEPT: ${{ github.event.client_payload.concept || inputs.concept }}
           IMAGE_GATEWAY_URL: https://img-gateway.shariq.dev
           IMAGE_GATEWAY_TOKEN: ${{ secrets.IMAGE_GATEWAY_TOKEN }}
+        # tsx reads tsconfig.json from the working directory by default; pin the
+        # tooling's own so the target branch's config cannot affect module resolution.
         run: |
           cd target
+          tsx=(../tooling/node_modules/.bin/tsx --tsconfig ../tooling/tsconfig.json)
           if [[ -n "$COVER_CONCEPT" ]]; then
-            ../tooling/node_modules/.bin/tsx ../tooling/scripts/cover/cli.ts "$SLUG" --concept "$COVER_CONCEPT"
+            "${tsx[@]}" ../tooling/scripts/cover/cli.ts "$SLUG" --concept "$COVER_CONCEPT"
           else
-            ../tooling/node_modules/.bin/tsx ../tooling/scripts/cover/cli.ts "$SLUG"
+            "${tsx[@]}" ../tooling/scripts/cover/cli.ts "$SLUG"
           fi
 
       - name: Commit cover to target branch

@@ -1,4 +1,4 @@
-import matter from 'gray-matter'
+import { parseYamlFrontmatter } from '../../cover/yaml-frontmatter'
 import { writingSchema } from '../../../src/lib/schemas'
 import { spawnSync } from 'node:child_process'
 
@@ -9,7 +9,7 @@ export type ValidationResult =
 export function validateMdxFrontmatter(mdx: string): ValidationResult {
   let parsed
   try {
-    parsed = matter(mdx)
+    parsed = parseYamlFrontmatter(mdx)
   } catch (e) {
     return { ok: false, error: `gray-matter parse failed: ${(e as Error).message}` }
   }

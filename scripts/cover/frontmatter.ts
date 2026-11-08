@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import matter from 'gray-matter'
 import type { CoverResult } from './generate-cover'
+import { parseYamlFrontmatter } from './yaml-frontmatter'
 
 export type HeroPatch = {
   image: string
@@ -38,9 +39,11 @@ export function coverInputFromFrontmatter(
 // frontmatter formatting may normalize (quotes/key order) — acceptable churn,
 // reviewed in the backfill PR.
 export function setHero(mdx: string, hero: HeroPatch): string {
-  const parsed = matter(mdx)
+  const parsed = parseYamlFrontmatter(mdx)
   const data = { ...parsed.data, hero: { ...hero } }
-  return matter.stringify(parsed.content, data)
+  // Pass a file object: given a string, matter.stringify re-parses it with the
+  // default engines, which would treat a body that opens with `---js` as frontmatter.
+  return matter.stringify({ content: parsed.content }, data)
 }
 
 export function setHeroInFile(filePath: string, hero: HeroPatch): void {
