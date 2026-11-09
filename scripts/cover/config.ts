@@ -1,9 +1,20 @@
 import { config as loadEnv } from 'dotenv'
 
-// Load .env.local first (wins over .env) then fall back to .env.
+// Local runs: load .env.local first (wins over .env) then fall back to .env.
 // Neither call overrides already-set process.env vars (dotenv's default).
-loadEnv({ path: '.env.local' })
-loadEnv()
+// CI skips both: the working directory may be a checkout of another branch, and
+// CI passes its settings through the environment.
+export function loadLocalEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  load: (options?: { path: string }) => unknown = loadEnv,
+): boolean {
+  if (env.GITHUB_ACTIONS === 'true' || env.CI === 'true') return false
+  load({ path: '.env.local' })
+  load()
+  return true
+}
+
+loadLocalEnv()
 
 export interface GatewayConfig { url: string; token: string }
 

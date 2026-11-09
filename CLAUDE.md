@@ -148,6 +148,9 @@ Style contracts:
 Cloudflare Pages via `.github/workflows/deploy.yml`. `main` → production
 (`shariq.dev`); every PR gets its own preview URL auto-commented on the PR.
 Required GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+The `build` job (no secrets) builds the site and compiles `functions/` into
+`dist/`; the `deploy` job (secrets, no checkout) only downloads and uploads
+that artifact. Never add repository scripts, `npm`, or a checkout to `deploy`.
 First push to a branch auto-creates the Pages project — no dashboard work
 needed beyond adding the custom domain. The wrangler CLI (`wrangler pages
 deployment tail --project-name=shariq-dev` etc.) is useful for ops; see

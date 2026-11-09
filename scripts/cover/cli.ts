@@ -1,6 +1,5 @@
 import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import matter from 'gray-matter'
 import { generateCover } from './generate-cover'
 import {
   setHeroInFile,
@@ -8,6 +7,7 @@ import {
   coverInputFromFrontmatter,
 } from './frontmatter'
 import { assertSafeSlug } from './slug'
+import { parseYamlFrontmatter } from './yaml-frontmatter'
 import type { CoverStyle } from './prompt'
 
 export function parseCliArgs(argv: string[]): {
@@ -80,7 +80,7 @@ async function main(): Promise<void> {
     )
   }
 
-  const fm = matter(readFileSync(filePath, 'utf8'))
+  const fm = parseYamlFrontmatter(readFileSync(filePath, 'utf8'))
 
   if (fm.data.hero?.image && !force) {
     console.log(
