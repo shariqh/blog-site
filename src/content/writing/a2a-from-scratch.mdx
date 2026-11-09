@@ -1,5 +1,5 @@
 ---
-title: 'A2A 1.0 from scratch: a Node.js agent server on node:http'
+title: "A2A 1.0 from scratch: a Node.js agent server on node:http"
 date: '2026-11-09'
 tags:
   - ai
@@ -7,37 +7,17 @@ tags:
   - agent-protocol
   - nodejs
   - security
-summary: >-
-  A 300-line Node.js A2A 1.0 agent server on node:http: agent card, front-door
-  security, task states, SSE streaming, and four bugs a code review surfaced.
+summary: "A 300-line Node.js A2A 1.0 agent server on node:http: agent card, front-door security, task states, SSE streaming, and four bugs a code review surfaced."
 draft: false
 hero:
   image: /static/images/blog/a2a-from-scratch/cover.png
-  alt: >-
-    Cover illustration for "A2A 1.0 from scratch: a Node.js agent server on
-    node:http".
-  prompt: >-
-    Style: flat abstract shapes combined with loose hand-drawn single-weight
-    line-art (thin, confident strokes), minimal and geometric — a vintage
-    mid-century editorial spot illustration. Flat color fills, subtle paper
-    grain, no gradients, no 3D, no glossy realism.
+  alt: 'Cover illustration for "A2A 1.0 from scratch: a Node.js agent server on node:http".'
+  prompt: |-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight line-art (thin, confident strokes), minimal and geometric — a vintage mid-century editorial spot illustration. Flat color fills, subtle paper grain, no gradients, no 3D, no glossy realism.
 
+    Visual concept only: A brown paper bag resting on a bare counter viewed through a glass door, a handwritten menu card taped to the inside of the glass; warm overhead light, elevated angle, no readable text anywhere in the scene. Do not depict or quote any phrase from the article title or summary.
 
-    Visual concept only: A brown paper bag resting on a bare counter viewed
-    through a glass door, a handwritten menu card taped to the inside of the
-    glass; warm overhead light, elevated angle, no readable text anywhere in the
-    scene. Do not depict or quote any phrase from the article title or summary.
-
-
-    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
-    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
-    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
-    NOT render any readable words, letters, numbers, captions, labels, interface
-    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
-    symbolic objects, and nonverbal diagrams because a title will be overlaid
-    afterward. No photorealistic human faces. Wide 3:2 landscape composition
-    with deliberate empty negative space in the LEFT third so a title can be
-    overlaid later.
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do NOT render any readable words, letters, numbers, captions, labels, interface text, signs, headlines, sentences, or paragraphs. Use only abstract shapes, symbolic objects, and nonverbal diagrams because a title will be overlaid afterward. No photorealistic human faces. Wide 3:2 landscape composition with deliberate empty negative space in the LEFT third so a title can be overlaid later.
   style: line-art
 ---
 
@@ -139,4 +119,4 @@ One gap remains. There's no way to prove the agent's identity against a local po
 
 The full server is at [`packages/mesh/src/a2a.ts`](https://github.com/shariqh/agent-inbox/blob/main/packages/mesh/src/a2a.ts) and the client at [`src/unslop-client.ts`](https://github.com/shariqh/agent-inbox/blob/main/src/unslop-client.ts). User-facing docs for the unslop agent are in [`docs/unslop.md`](https://github.com/shariqh/agent-inbox/blob/main/docs/unslop.md).
 
-Stream status updates only, deliver the artifact once complete, refuse `url` parts at the protocol layer. Those are the two decisions I'd make the same way again, and both cut failure modes before they reach application code rather than patching them afterward.
+Stream status updates only, deliver the artifact once complete, refuse `url` parts at the protocol layer. Those are the three decisions I'd make the same way again, and all three cut failure modes before they reach application code rather than patching them afterward.
