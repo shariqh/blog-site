@@ -1,5 +1,5 @@
 ---
-title: "A2A 1.0 from scratch: a Node.js agent server on node:http"
+title: 'A2A 1.0 from scratch: a Node.js agent server on node:http'
 date: '2026-11-09'
 tags:
   - ai
@@ -7,8 +7,38 @@ tags:
   - agent-protocol
   - nodejs
   - security
-summary: "A 300-line Node.js A2A 1.0 agent server on node:http: agent card, front-door security, task states, SSE streaming, and four bugs a code review surfaced."
+summary: >-
+  A 300-line Node.js A2A 1.0 agent server on node:http: agent card, front-door
+  security, task states, SSE streaming, and four bugs a code review surfaced.
 draft: false
+hero:
+  image: /static/images/blog/a2a-from-scratch/cover.png
+  alt: >-
+    Cover illustration for "A2A 1.0 from scratch: a Node.js agent server on
+    node:http".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: A brown paper bag resting on a bare counter viewed
+    through a glass door, a handwritten menu card taped to the inside of the
+    glass; warm overhead light, elevated angle, no readable text anywhere in the
+    scene. Do not depict or quote any phrase from the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
 ---
 
 The parts of A2A 1.0 the demos skip are the edges: what happens when the stream drops, what stops a web page from reaching a localhost agent, how you get the edited text out without the client seeing a half-finished result. I wanted to understand those edges, so I wrote a small Node.js agent server from scratch rather than reaching for the SDK.
