@@ -1,0 +1,78 @@
+---
+title: "From writing skill to shared A2A agent on a local model"
+date: '2026-11-09'
+tags:
+  - ai
+  - a2a
+  - local-llm
+  - agent-inbox
+  - developer-tools
+summary: "I turned a prose-editing skill into one shared A2A agent on a local model, adding a privacy screen and fidelity checks before it runs on anyone's text."
+draft: false
+---
+
+## The stale-copy problem
+
+I maintain a prose-editing skill called "unslop", a customized fork of an MIT-licensed upstream, that I run in Copilot CLI and Claude Code—today as a shared A2A agent on a local model, but for a while that meant a separate copy in each assistant's skill directory. It mostly worked, until I found Copilot was silently loading a stale backup copy that shadowed the real file. Two assistants supposedly running the same skill, actually running different versions, with no visible diff.
+
+I also run a homelab GPU box with an OpenAI-compatible model server. Cold start is about 65 seconds; after that, the model runs at 44–63 tokens per second. [Agent Inbox](https://github.com/shariqh/agent-inbox) (my open-source local inbox for coding agents) has an opt-in mesh layer where agents can delegate to other agents over the A2A protocol. The mesh gave me a natural home for a shared service. The stale-copy bug gave me the reason to build it.
+
+
+
+## Designing the A2A agent
+
+The goal was to make unslop one shared service, the first A2A agent in the mesh, so every assistant reads from one source and calls one endpoint.
+
+Three constraints were non-negotiable from the start. Customer and private text must never reach the model box. Facts, numbers, links, dates, negations, and conditions must never change. Off had to mean off, controlled by an explicit opt-in switch rather than a feature that runs unless you disable it.
+
+## Six PRs
+
+Before any code, I wrote a design doc and had it reviewed. That caught two blockers early. One was a header-less customer reply slipping past the privacy screen, because the screen was keyed on structural signals like email headers and known names. Without a header, it looks like ordinary prose. The other was an assistant calling the agent on its own, which counts as agent-initiated egress, where the assistant decides to send text out, not the user. I accepted that risk explicitly and noted it in the doc.
+
+The build ran in six reviewed slices.
+
+**PR #486** added the deterministic privacy screen and fidelity check. The screen runs on the calling machine before any network call. It refuses text matching signals for a customer reply (email headers, letter-shaped text, secrets, phone numbers, deny-listed names). If the screen rejects the input, nothing leaves the machine. The fidelity check runs after the model returns, verifying that every protected value survived in order and counting negations per clause to catch sign flips. One retry if the check fails; if the second pass also fails, the original comes back unchanged.
+
+**PR #487** added the model client, a thin wrapper around the homelab endpoint.
+
+**PR #488** added the A2A server with a security review. The review flagged that the prompt needed to treat the draft as data rather than as instructions. The fix was prompt fencing, where each call generates a random delimiter line before and after the draft, so any instructions embedded in the draft are treated as text, not as directives.
+
+
+
+**PR #490** added `meshctl enable/disable --unslop`. An explicit toggle.
+
+**PR #491** added the CLI client that assistants actually call. It handles the A2A handshake, passes the screened text, and returns either the edited draft or the original.
+
+**PR #496** added test bench S11, covering 24 generated public texts with planted slop phrases and injected instructions, plus 6 private texts, with trap assertions to verify that nothing the model was told to add appeared in a passing output.
+
+Tuning took three separate passes after the bench exposed real failures. The fidelity check was treating negation-form changes as violations — "does not add any" becoming "adds no" is semantically identical, but the original check flagged it. The model kept producing the elevation-reframe pattern my editorial rules ban, and it left negated clichés like "not all sunshine and rainbows" intact. I adjusted the prompt. Then the model started filling cut filler with invented text. I found "...without manual intervention" in a draft where I had written nothing of the sort. That required explicit instructions in the prompt forbidding invented claims (covered in #493, #494, #497).
+
+The skill files themselves got split into a routing `SKILL.md` and a shared `rules.md`. Copilot, Claude Code, and the agent all read `rules.md` now.
+
+## Bench results
+
+Bench S11 ran on 24 generated public texts. Zero broken trap assertions, zero inputs where the original came back unchanged, 90–94% of planted slop phrases removed. The injection test caught one model that obeyed a planted instruction, adding a date that was not in the original. The fidelity check caught it and returned the original.
+
+All 6 private texts were refused locally, with one exception. A private text with no name and no letter-shaped structure passed through; the screen had nothing to key on. That is a known gap, not a closed issue.
+
+Warm calls run about 2 seconds median. A cold start is about 13.6 seconds. For short drafts that overhead rarely pays; for longer ones it does.
+
+My own test drafts went from 0 of 2 and 0 of 4 passing the slop threshold to 4 of 4 and 3 of 3 after tuning.
+
+Routing turned on 2026-11-07 for a two-week trial, with two thresholds to decide whether to continue. The kept-original rate has to stay at or below 15%, and a blind review has to judge the agent not worse at least 70% of the time. The trial is still running.
+
+
+
+## What I'd do differently / what's next
+
+The design doc review before any code was worth the time. Both blockers it caught would have shipped as silent failure modes otherwise. I'd do that again on anything with a privacy or security surface.
+
+The fidelity check's negation handling is still patched rather than principled. I added "adds no" as an equivalent to "does not add any" as a one-off exception. A cleaner approach would normalize negation forms before comparison, so exceptions don't accumulate.
+
+The known miss on header-less private text needs addressing before I expand routing. A default-refuse posture for inputs that don't pass a positive confirmation test would be safer than a growing blocklist.
+
+A call spends roughly twice the draft in tokens on the calling assistant's context, because the prompt carries the full draft twice. The tradeoff pays for longer pieces; for a paragraph or two, probably not.
+
+If the trial passes its thresholds, the next candidate is any other skill where a dedicated model would do better than the ambient coding assistant. The constraint-enforcement approach (screen, fence, check) is reusable. Unslop was the proof of concept.
+
+The agent code is in [Agent Inbox](https://github.com/shariqh/agent-inbox). The design doc is [here](https://github.com/shariqh/agent-inbox/blob/main/docs/superpowers/specs/2026-11-06-unslop-a2a-agent-design.md). User-facing docs are [here](https://github.com/shariqh/agent-inbox/blob/main/docs/unslop.md).
