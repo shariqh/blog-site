@@ -45,7 +45,7 @@ hero:
 
 I maintain a prose-editing skill called "unslop", a customized fork of an MIT-licensed upstream, that I run in Copilot CLI and Claude Code—today as a shared A2A agent on a local model, but for a while that meant a separate copy in each assistant's skill directory. It mostly worked, until I found Copilot was silently loading a stale backup copy that shadowed the real file. Two assistants supposedly running the same skill, actually running different versions, with no visible diff.
 
-I also run a homelab GPU box with an OpenAI-compatible model server. Cold start is about 65 seconds; after that, the model runs at 44–63 tokens per second. [Agent Inbox](https://github.com/shariqh/agent-inbox) (my open-source local inbox for coding agents) has an opt-in mesh layer where agents can delegate to other agents over the A2A protocol. The mesh gave me a natural home for a shared service. The stale-copy bug gave me the reason to build it.
+I also run a homelab GPU box with an OpenAI-compatible model server. Loading its chat model from scratch, when it has to swap out another model, takes about 65 seconds; after that, the model runs at 44–63 tokens per second. [Agent Inbox](https://github.com/shariqh/agent-inbox) (my open-source local inbox for coding agents) has an opt-in mesh layer where agents can delegate to other agents over the A2A protocol. The mesh gave me a natural home for a shared service. The stale-copy bug gave me the reason to build it.
 
 
 
@@ -85,7 +85,7 @@ Bench S11 ran on 24 generated public texts. Zero broken trap assertions, zero in
 
 All 6 private texts were refused locally, with one exception. A private text with no name and no letter-shaped structure passed through; the screen had nothing to key on. That is a known gap, not a closed issue.
 
-Warm calls run about 2 seconds median. A cold start is about 13.6 seconds. For short drafts that overhead rarely pays; for longer ones it does.
+Warm calls run about 2 seconds median. The one cold call in my bench took about 13.6 seconds, most of it waiting for the model to load; if the box first has to swap models, that first call waits about a minute longer. For short drafts that overhead rarely pays; for longer ones it does.
 
 My own test drafts went from 0 of 2 and 0 of 4 passing the slop threshold to 4 of 4 and 3 of 3 after tuning.
 
