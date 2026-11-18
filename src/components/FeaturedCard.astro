@@ -1,5 +1,6 @@
 ---
 import { resolveCover } from "../lib/cover";
+import { coverSources } from "../lib/cover-variants";
 import { formatDate } from "../lib/formatDate";
 interface Props {
   href: string;
@@ -12,6 +13,7 @@ interface Props {
 }
 const { href, category, title, hook, cta = "Read it", date, coverData } = Astro.props;
 const cover = coverData ? resolveCover(coverData) : null;
+const sources = cover?.kind === "image" ? coverSources(cover.src) : null;
 ---
 <a class="featured" href={href}>
   <div class="panel">
@@ -22,7 +24,7 @@ const cover = coverData ? resolveCover(coverData) : null;
   </div>
   <div class="art">
     {cover && cover.kind === "image" ? (
-      <img class="art-img" src={cover.src} alt={cover.alt} loading="lazy" decoding="async" />
+      <img class="art-img" src={sources!.src} srcset={sources!.srcset} sizes={sources!.srcset ? "(min-width: 1100px) 550px, 100vw" : undefined} alt={cover.alt} width="1536" height="1024" loading="lazy" decoding="async" />
     ) : (
       <svg width="230" height="180" viewBox="0 0 230 180" fill="none" stroke="var(--color-terracotta)" stroke-width="2.5" aria-hidden="true">
         <circle cx="62" cy="62" r="30"></circle>
