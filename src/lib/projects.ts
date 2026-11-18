@@ -65,6 +65,7 @@ export const testflight: Project[] = [
     description:
       "An iOS home inventory app for keeping track of what's stored where.",
     kind: "product",
+    site: "https://matryoshka.bundleapps.io/",
     status: "TestFlight",
   },
   {

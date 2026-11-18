@@ -598,6 +598,9 @@ test('now owns the changing snapshot', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'Bundle', exact: true }),
   ).toHaveAttribute('href', 'https://bundleapps.io')
+  await expect(
+    page.getByRole('link', { name: 'Matryoshka', exact: true }),
+  ).toHaveAttribute('href', 'https://matryoshka.bundleapps.io/')
 
   const expectedTools = [
     { name: 'GitHub', icon: 'github' },
