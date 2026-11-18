@@ -111,7 +111,7 @@ Here is the total cost of the four re-run reviews for each setup, counting each 
 
 Against my old default, Fusion was about 70% cheaper and twice as fast (about 10 minutes against 20). Against GitHub's own baseline, Opus at medium, there was no saving, which is what you'd expect when the work runs on Opus at medium. For contrast, the local model cost 0 AIU for the same four reviews.
 
-At a cent per AIU, the four reviews cost about $19 on Opus at max, $5 on Opus at medium and $6 on Fusion. Almost all of that is the agents reading their own context back: Fusion's 593 AIU paid for about 9.5 million input tokens, 96% of them read from the prompt cache, and about 100,000 output tokens.
+At a cent per AIU, the four reviews cost about \$19 on Opus at max, \$5 on Opus at medium and \$6 on Fusion. Almost all of that is the agents reading their own context back: Fusion's 593 AIU paid for about 9.5 million input tokens, 96% of them read from the prompt cache, and about 100,000 output tokens.
 
 Builds saved less. Fusion's build of one pull request cost 19% less than an Opus-at-max build of a similar pull request from the same design. Most of a long build's bill is context: the model reads the same large conversation back on every call, and reasoning effort doesn't change that much.
 
@@ -193,6 +193,6 @@ My subagents are now tiered. Agents that build features, and first reviews of ri
 - The local model reviewed each change in a single pass with no tools, so unlike the agents it couldn't check its own claims by reading other files or running tests. Its quality numbers come from one run per thinking mode.
 - The machine was overloaded during the first batch of re-run reviews, so I didn't compare that batch's timings.
 - The list of known issues comes from one Opus review per pull request. The Opus-at-max re-runs show how much that matters, and it matters a lot.
-- This covers Fusion as a subagent model in Copilot CLI 1.0.100-1, on 20 October 2026, while it was still the Fusion research preview. It may behave differently in the main chat, in VS Code, or since general availability.
+- This covers Fusion as a subagent model in Copilot CLI 1.0.100-1, on 20 October 2026, while it was still the HydraFusion research preview. It may behave differently in the main chat, in VS Code, or since general availability.
 
 If you're trying Fusion, check your own usage records. They tell you which model actually did the work. And if you have a local model, give it a review you've already done and score it against what you know. Mine surprised me.
