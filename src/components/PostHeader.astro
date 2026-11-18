@@ -18,8 +18,8 @@ const { title, date, bucket, bucketLabel, summary, readingMinutes, articlePath }
 <header class="py-12">
   <p class="font-mono text-xs uppercase tracking-[0.16em] text-[var(--fg-soft)] sm:tracking-[0.22em]">
     <span class="whitespace-nowrap">{EYEBROW_PREFIX[bucket]}{bucketLabel.toUpperCase()}</span>
-    <span class="whitespace-nowrap"><span class="mx-2" aria-hidden="true">·</span>{formatDate(date)}</span>
-    {readingMinutes ? <span class="whitespace-nowrap"><span class="mx-2" aria-hidden="true">·</span>{readingMinutes} min read</span> : null}
+    <span class="whitespace-nowrap"><span class="mr-2" aria-hidden="true">·</span>{formatDate(date)}</span>
+    {readingMinutes ? <span class="whitespace-nowrap"><span class="mr-2" aria-hidden="true">·</span>{readingMinutes} min read</span> : null}
     <ReadCount path={articlePath} />
   </p>
 
