@@ -59,6 +59,11 @@ const focusProjects = [
             {project.status && <span class="project-status">{project.status}</span>}
           </div>
           {project.blurb && <p class="project-blurb">{project.blurb}</p>}
+          {safeHref(project.beta) && (
+            <p class="project-beta">
+              <a href={safeHref(project.beta)} target="_blank" rel="noopener">Join the TestFlight</a>
+            </p>
+          )}
         </article>
       ))}
     </div>
@@ -157,6 +162,20 @@ const focusProjects = [
     line-height: 1.55;
     color: var(--fg-soft);
     max-width: 58ch;
+  }
+
+  .project-beta {
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: .04em;
+  }
+
+  .project-beta a {
+    color: var(--color-terracotta);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 3px;
   }
 
   .writing-list {

@@ -601,6 +601,9 @@ test('now owns the changing snapshot', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'Matryoshka', exact: true }),
   ).toHaveAttribute('href', 'https://matryoshka.bundleapps.io/')
+  await expect(
+    page.getByRole('link', { name: 'Join the TestFlight', exact: true }),
+  ).toHaveAttribute('href', 'https://testflight.apple.com/join/zbxDR9K9')
 
   const expectedTools = [
     { name: 'GitHub', icon: 'github' },

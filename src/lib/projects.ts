@@ -12,6 +12,8 @@ export interface Project {
   repo?: string;
   /** Optional badge text like "active" / "archived" / a year. */
   status?: string;
+  /** Public beta link (e.g. a TestFlight invite), shown on the Now page. */
+  beta?: string;
   /** Technology or product traits shown when this project is spotlighted. */
   stack?: readonly string[];
 }
@@ -66,6 +68,7 @@ export const testflight: Project[] = [
       "An iOS home inventory app for keeping track of what's stored where.",
     kind: "product",
     site: "https://matryoshka.bundleapps.io/",
+    beta: "https://testflight.apple.com/join/zbxDR9K9",
     status: "TestFlight",
   },
   {
