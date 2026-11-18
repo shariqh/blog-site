@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import matter from 'gray-matter'
-import { active, built } from '../src/lib/projects'
+import { active, built, testflight } from '../src/lib/projects'
 import { buildArticlePath } from '../src/lib/popular-articles'
 import {
   handleReadCountRequest,
@@ -10,6 +10,7 @@ import {
   type ReadCountCache,
 } from '../src/lib/read-count-proxy'
 import { buildReadCountUrl } from '../src/lib/read-count'
+import { formatDate } from '../src/lib/formatDate'
 import { SITE } from '../src/lib/site'
 
 function walkMdx(dir: string, prefix = ''): string[] {
@@ -135,8 +136,17 @@ if (!HOME_FEATURED || !POPULAR_FIRST || !POPULAR_SECOND || !POPULAR_THIRD) {
 
 const POPULAR_FIXTURES = [
   { article: POPULAR_FIRST, count: '2,345', label: '2,345 views' },
-  { article: POPULAR_SECOND, count: '42', label: '42 views' },
-  { article: POPULAR_THIRD, count: '1', label: '1 view' },
+  // Under MIN_PUBLIC_READ_COUNT the list shows the post date instead of views.
+  {
+    article: POPULAR_SECOND,
+    count: '42',
+    label: formatDate(new Date(POPULAR_SECOND.publishedAt)),
+  },
+  {
+    article: POPULAR_THIRD,
+    count: '1',
+    label: formatDate(new Date(POPULAR_THIRD.publishedAt)),
+  },
 ] as const
 
 test.beforeEach(async ({ page }) => {
@@ -545,9 +555,12 @@ test('home keeps current work compact', async ({ page }) => {
 
 test('now owns the changing snapshot', async ({ page }) => {
   await page.goto('/now')
-  const focusProjects = active.filter((project) =>
-    ['Oris', 'Agent Inbox', 'AskDocs'].includes(project.name),
-  )
+  const focusProjects = [
+    ...testflight,
+    ...active.filter((project) =>
+      ['Oris', 'Agent Inbox'].includes(project.name),
+    ),
+  ]
 
   for (const project of focusProjects) {
     const projectEntry = page.locator('.building').filter({
@@ -575,8 +588,22 @@ test('now owns the changing snapshot', async ({ page }) => {
     }
   }
 
-  await expect(page.getByText('Day job', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('Senior Solutions Engineer')).toHaveCount(0)
+  await expect(page.locator('.building')).toHaveCount(focusProjects.length)
+  await expect(
+    page.locator('.building').getByText('AskDocs', { exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByText('Senior Solutions Engineer at GitHub.', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'Bundle', exact: true }),
+  ).toHaveAttribute('href', 'https://bundleapps.io')
+  await expect(
+    page.getByRole('link', { name: 'Matryoshka', exact: true }),
+  ).toHaveAttribute('href', 'https://matryoshka.bundleapps.io/')
+  await expect(
+    page.getByRole('link', { name: 'Join the TestFlight', exact: true }),
+  ).toHaveAttribute('href', 'https://testflight.apple.com/join/zbxDR9K9')
 
   const expectedTools = [
     { name: 'GitHub', icon: 'github' },

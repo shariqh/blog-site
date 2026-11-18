@@ -17,11 +17,11 @@ const rest = featured ? all.filter((p) => p.id !== featured.id) : all;
 const bucketList = Object.entries(BUCKETS).map(([key, def]) => ({ key, label: def.label }));
 const slug = (id: string) => `/blog/${id.replace(/\.mdx$/, "")}`;
 ---
-<BaseLayout title="The Blog" width="wide">
+<BaseLayout title="The Blog" description="Notes from building software, leading teams, and working with AI." width="wide">
   <section class="blogtitle">
     <p class="eyebrow">Writing</p>
     <h1>The Blog</h1>
-    <p class="lead">Notes from inside the work — engineering, leading teams, and the AI shift happening in real time.</p>
+    <p class="lead">Notes from building software, leading teams, and working with AI.</p>
   </section>
 
   <div data-filter-scope>

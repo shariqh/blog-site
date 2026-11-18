@@ -10,9 +10,9 @@
   --color-paper: #f3e8d2;
   --color-paper-soft: #faf3e3;
 
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --font-sans: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 /* Light theme only — dark mode was intentionally removed. */

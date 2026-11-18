@@ -109,15 +109,16 @@ const homeLd = [
 
 <style>
   /* HERO */
-  .hero { display: grid; grid-template-columns: 1fr auto; gap: 76px; align-items: stretch; padding-top: 72px; }
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: clamp(32px, 5vw, 76px); align-items: center; padding-top: 72px; }
   .herotext { display: flex; flex-direction: column; min-width: 0; }
   .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .5; }
   .hero h1 { font-family: var(--font-display); font-weight: 500; font-size: 74px; line-height: .98; letter-spacing: -.035em; text-wrap: balance; margin-top: 20px; }
   h1 .i { font-style: italic; color: var(--color-terracotta); }
   .kicker { font-size: 22px; line-height: 1.45; margin-top: 26px; max-width: 34ch; text-wrap: balance; }
 
-  /* tag row — pinned to the bottom of the hero text column */
-  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 40px; }
+  /* tag row sits right under the kicker (it used to be pinned to the bottom
+     of the column, which left a tall empty gap beside the photo deck) */
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
   .tags span { font-family: var(--font-mono); font-size: 12px; padding: 7px 14px; border-radius: 999px; background: color-mix(in oklab, var(--fg) 6%, transparent); }
 
   /* MANIFESTO */
@@ -131,7 +132,7 @@ const homeLd = [
   .right-now ul { list-style: none; display: flex; flex-direction: column; gap: 4px; padding: 0; }
   .right-now li { font-family: var(--font-display); font-size: 38px; line-height: 1.2; letter-spacing: -.015em; }
   .right-now .rn-link { color: var(--color-terracotta); text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
-  .right-now .rn-link-static { text-decoration: none; }
+  .right-now .rn-link-static { text-decoration: none; color: inherit; }
   .right-now .more-now { display: inline-block; margin-top: 24px; font-family: var(--font-mono); font-size: 12px; color: inherit; text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
   .right-now .more-now:hover { color: var(--color-terracotta); }
 
@@ -141,8 +142,7 @@ const homeLd = [
   @media (max-width: 880px) {
     .hero { grid-template-columns: 1fr; }
     :global([data-deck]) { order: -1; margin-bottom: 40px; }
-    :global([data-deck] .deck) { width: 100%; }
-    .tags { margin-top: 28px; padding-top: 0; }
+    .tags { margin-top: 28px; }
     .hero h1 { font-size: 60px; }
     .manifesto { font-size: 34px; }
     .right-now li { font-size: 28px; }

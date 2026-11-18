@@ -14,13 +14,13 @@ const { path } = Astro.props;
   hidden
 >
   <span class="whitespace-nowrap">
-    <span class="mx-2" aria-hidden="true">·</span>
+    <span class="mr-2" aria-hidden="true">·</span>
     <span data-read-count-value></span>
   </span>
 </span>
 
 <script>
-  import { fetchReadCount, formatReadCount } from "../lib/read-count";
+  import { fetchReadCount, formatReadCount, shouldShowReadCount } from "../lib/read-count";
 
   async function loadReadCount(element: HTMLElement) {
     if (element.dataset.readCountState !== "idle") return;
@@ -42,6 +42,10 @@ const { path } = Astro.props;
     }
     if (!result.ok) {
       element.dataset.readCountState = "unavailable";
+      return;
+    }
+    if (!shouldShowReadCount(result.count)) {
+      element.dataset.readCountState = "below-threshold";
       return;
     }
 
