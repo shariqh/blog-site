@@ -34,6 +34,7 @@ const slug = (id: string) => `/blog/${id.replace(/\.mdx$/, "")}`;
           category={`${fb.label} · Featured`}
           title={featured.data.title}
           hook={featured.data.summary}
+          date={featured.data.date}
           cta="Read full article"
           coverData={featured.data}
         />
