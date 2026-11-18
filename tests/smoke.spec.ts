@@ -10,6 +10,7 @@ import {
   type ReadCountCache,
 } from '../src/lib/read-count-proxy'
 import { buildReadCountUrl } from '../src/lib/read-count'
+import { formatDate } from '../src/lib/formatDate'
 import { SITE } from '../src/lib/site'
 
 function walkMdx(dir: string, prefix = ''): string[] {
@@ -135,8 +136,17 @@ if (!HOME_FEATURED || !POPULAR_FIRST || !POPULAR_SECOND || !POPULAR_THIRD) {
 
 const POPULAR_FIXTURES = [
   { article: POPULAR_FIRST, count: '2,345', label: '2,345 views' },
-  { article: POPULAR_SECOND, count: '42', label: '42 views' },
-  { article: POPULAR_THIRD, count: '1', label: '1 view' },
+  // Under MIN_PUBLIC_READ_COUNT the list shows the post date instead of views.
+  {
+    article: POPULAR_SECOND,
+    count: '42',
+    label: formatDate(new Date(POPULAR_SECOND.publishedAt)),
+  },
+  {
+    article: POPULAR_THIRD,
+    count: '1',
+    label: formatDate(new Date(POPULAR_THIRD.publishedAt)),
+  },
 ] as const
 
 test.beforeEach(async ({ page }) => {
