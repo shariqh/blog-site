@@ -1,19 +1,21 @@
 ---
 import { resolveCover } from "../lib/cover";
+import { formatDate } from "../lib/formatDate";
 interface Props {
   href: string;
   category: string;
   title: string;
   hook: string;
   cta?: string;
+  date?: Date;
   coverData?: { hero?: { image?: string; alt?: string }; tags?: string[] };
 }
-const { href, category, title, hook, cta = "Read it", coverData } = Astro.props;
+const { href, category, title, hook, cta = "Read it", date, coverData } = Astro.props;
 const cover = coverData ? resolveCover(coverData) : null;
 ---
 <a class="featured" href={href}>
   <div class="panel">
-    <p class="cat">{category}</p>
+    <p class="cat">{category}{date && <> · <time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time></>}</p>
     <h2>{title}</h2>
     <p class="hook">{hook}</p>
     <span class="more"><span class="dot">→</span> {cta}</span>
