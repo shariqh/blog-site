@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
-import { active, safeHref } from "../lib/projects";
+import { active, testflight, safeHref } from "../lib/projects";
 import { SITE } from "../lib/site";
 
 const nowLd = {
@@ -26,14 +26,25 @@ const tools = [
   { name: "Astro", icon: "astro" },
   { name: "Cloudflare", icon: "cloudflare" },
 ];
-const focusNames = new Set(["Oris", "Agent Inbox", "AskDocs"]);
-const focusProjects = active.filter((project) => focusNames.has(project.name));
+const focusNames = ["Oris", "Agent Inbox"];
+const focusProjects = [
+  ...testflight,
+  ...focusNames.flatMap((name) => active.filter((project) => project.name === name)),
+];
 ---
 <BaseLayout title="Now" description="What Shariq Hirani is working on right now." jsonLd={nowLd}>
   <PageHeader eyebrow="Updated regularly" title="Now" />
 
   <section class="now-section">
+    <span class="mono-label">Working</span>
+    <p class="now-line">Senior Solutions Engineer at GitHub.</p>
+  </section>
+
+  <section class="now-section">
     <span class="mono-label">Building</span>
+    <p class="now-line">
+      With <a href="https://bundleapps.io" target="_blank" rel="noopener">Bundle</a>, a team of three: me, Devyn Coyer and Braydon Coyer.
+    </p>
     <div class="building-list">
       {focusProjects.map((project) => (
         <article class="building">
@@ -56,9 +67,9 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
   <section class="now-section">
     <span class="mono-label">Writing about</span>
     <ul class="writing-list">
-      <li>AI as an operating model, not a side tool</li>
-      <li>Local AI products that outlast the demo</li>
-      <li>Agent guardrails, review, coordination, and human attention</li>
+      <li>Agents talking to agents: A2A from scratch, and on a local model</li>
+      <li>Local models as the default, not the fallback</li>
+      <li>Agent guardrails, review, and where human attention still matters</li>
     </ul>
   </section>
 
@@ -92,6 +103,21 @@ const focusProjects = active.filter((project) => focusNames.has(project.name));
     padding: 48px 0;
     border-bottom: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
   }
+
+  .now-line {
+    font-size: 18px;
+    line-height: 1.55;
+    max-width: 58ch;
+  }
+
+  .now-line a {
+    color: var(--color-terracotta);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ochre);
+    text-underline-offset: 3px;
+  }
+
+  .now-line + .building-list { margin-top: 8px; }
 
   .building-list { display: grid; }
   .building { padding: 20px 0; }

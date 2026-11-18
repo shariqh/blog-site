@@ -57,6 +57,25 @@ export const active: Project[] = [
   },
 ];
 
+/** iOS apps in TestFlight with Bundle. Shown on the Now page only for now. */
+export const testflight: Project[] = [
+  {
+    name: "Matryoshka",
+    blurb: "An iOS app for keeping track of what's stored where at home.",
+    description:
+      "An iOS home inventory app for keeping track of what's stored where.",
+    kind: "product",
+    status: "TestFlight",
+  },
+  {
+    name: "Reps & Co.",
+    blurb: "An iOS workout app where you bring your own AI keys.",
+    description: "A workout app for iPhone where you bring your own AI API keys.",
+    kind: "product",
+    status: "early TestFlight",
+  },
+];
+
 export const built: Project[] = [
   {
     name: "shariq.dev",

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import matter from 'gray-matter'
-import { active, built } from '../src/lib/projects'
+import { active, built, testflight } from '../src/lib/projects'
 import { buildArticlePath } from '../src/lib/popular-articles'
 import {
   handleReadCountRequest,
@@ -555,9 +555,12 @@ test('home keeps current work compact', async ({ page }) => {
 
 test('now owns the changing snapshot', async ({ page }) => {
   await page.goto('/now')
-  const focusProjects = active.filter((project) =>
-    ['Oris', 'Agent Inbox', 'AskDocs'].includes(project.name),
-  )
+  const focusProjects = [
+    ...testflight,
+    ...active.filter((project) =>
+      ['Oris', 'Agent Inbox'].includes(project.name),
+    ),
+  ]
 
   for (const project of focusProjects) {
     const projectEntry = page.locator('.building').filter({
@@ -585,8 +588,16 @@ test('now owns the changing snapshot', async ({ page }) => {
     }
   }
 
-  await expect(page.getByText('Day job', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('Senior Solutions Engineer')).toHaveCount(0)
+  await expect(page.locator('.building')).toHaveCount(focusProjects.length)
+  await expect(
+    page.locator('.building').getByText('AskDocs', { exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByText('Senior Solutions Engineer at GitHub.', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'Bundle', exact: true }),
+  ).toHaveAttribute('href', 'https://bundleapps.io')
 
   const expectedTools = [
     { name: 'GitHub', icon: 'github' },
