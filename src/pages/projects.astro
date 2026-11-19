@@ -341,13 +341,15 @@ const talksCount = String(talks.length).padStart(2, "0");
   }
   .card .links {
     display: flex;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 8px 16px;
     margin-top: 18px;
     font-family: var(--font-mono);
     font-size: 11px;
     letter-spacing: .08em;
   }
   .card .links a {
+    white-space: nowrap;
     text-decoration: underline;
     text-decoration-color: var(--color-ochre);
     text-underline-offset: 4px;
