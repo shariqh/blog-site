@@ -1,5 +1,6 @@
 ---
 import type { PopularArticleCandidate } from "../lib/popular-articles";
+import { formatDate } from "../lib/formatDate";
 
 interface Props {
   candidates: PopularArticleCandidate[];
@@ -40,7 +41,7 @@ const { candidates, featuredId } = Astro.props;
               <span class="separator" aria-hidden="true">
                 ·
               </span>
-              <span class="count" data-popular-count />
+              <span class="count" data-popular-count>{formatDate(new Date(candidate.publishedAt))}</span>
             </span>
           </a>
         </li>
@@ -50,7 +51,7 @@ const { candidates, featuredId } = Astro.props;
 </section>
 
 <script>
-  import { formatReadCount } from "../lib/read-count";
+  import { formatReadCount, shouldShowReadCount } from "../lib/read-count";
   import {
     hasUniquePopularArticleIds,
     resolvePopularArticles,
@@ -153,7 +154,8 @@ const { candidates, featuredId } = Astro.props;
       .forEach((element) => element.remove());
 
     for (const { article, count, element } of availableRankedElements) {
-      count.textContent = formatReadCount(article.count);
+      // Small counts read as a knock on the post; keep the date until it has real reach.
+      if (shouldShowReadCount(article.count)) count.textContent = formatReadCount(article.count);
       element.hidden = false;
       list.append(element);
     }

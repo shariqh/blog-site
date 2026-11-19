@@ -102,6 +102,16 @@ export function parseReadCount(payload: unknown): number | null {
 
 const countFormatter = new Intl.NumberFormat('en-US')
 
+/**
+ * Below this, a view count undersells a post more than it informs, so pages
+ * show the date (Most popular) or nothing (post header) instead.
+ */
+export const MIN_PUBLIC_READ_COUNT = 100
+
+export function shouldShowReadCount(count: number): boolean {
+  return Number.isSafeInteger(count) && count >= MIN_PUBLIC_READ_COUNT
+}
+
 export function formatReadCount(count: number): string {
   if (!Number.isSafeInteger(count) || count < 0) {
     throw new RangeError('Read counts must be non-negative safe integers')
