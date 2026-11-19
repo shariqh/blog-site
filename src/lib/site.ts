@@ -1,6 +1,6 @@
 export const SITE = {
   title: 'Shariq Hirani',
-  description: 'Musings on leadership and technology.',
+  description: 'Shariq Hirani writes about building software, leading engineering teams, and working with AI.',
   author: 'Shariq Hirani',
   url: 'https://shariq.dev',
   email: 'hello@shariq.dev',

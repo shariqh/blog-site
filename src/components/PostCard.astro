@@ -28,7 +28,7 @@ const { href, title, date, bucketKey, bucketLabel, summary, coverData } = Astro.
 
 <style>
   .card { display: block; text-decoration: none; color: inherit; }
-  .imgwrap { position: relative; overflow: hidden; aspect-ratio: 3 / 2; border-radius: 16px; background: linear-gradient(135deg, var(--color-ink), var(--color-ink-soft)); }
+  .imgwrap { position: relative; overflow: hidden; aspect-ratio: 3 / 2; border-radius: 16px; background: var(--color-paper-soft); }
   .imgwrap :global(.cover) { transition: transform .3s; }
   @media (prefers-reduced-motion: reduce) {
     .imgwrap :global(.cover) { transition: none; }

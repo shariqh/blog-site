@@ -77,7 +77,7 @@ const jsonLd = [
   <article class="relative pb-2">
     {post.data.hero?.image && (
       <div class="post-cover">
-        <CoverImage data={post.data} priority />
+        <CoverImage data={post.data} priority sizes="(min-width: 800px) 768px, 100vw" />
       </div>
     )}
     <PostHeader

@@ -39,7 +39,8 @@ export const BUCKETS = {
   },
   notes: {
     label: 'Notes',
-    tags: [],
+    // Anything unmapped also lands here; 'field-notes' makes it explicit.
+    tags: ['field-notes'],
   },
 } as const
 
