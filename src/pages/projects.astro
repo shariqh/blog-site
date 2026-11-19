@@ -9,7 +9,7 @@ const shippingCount = String(shipping.length).padStart(2, "0");
 const builtCount = String(built.length).padStart(2, "0");
 const talksCount = String(talks.length).padStart(2, "0");
 ---
-<BaseLayout title="Projects" width="wide">
+<BaseLayout title="Projects" description="Things Shariq Hirani is building, has built, and has talked about." width="wide">
   <PageHeader
     eyebrow="Building, built, talked about"
     title="Projects"
@@ -76,7 +76,7 @@ const talksCount = String(talks.length).padStart(2, "0");
             {p.repo && <a href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>}
           </div>
         )}
-        <span class="card-arrow" aria-hidden="true">↗</span>
+        {(p.site || p.repo) && <span class="card-arrow" aria-hidden="true">↗</span>}
       </div>
     ))}
   </div>

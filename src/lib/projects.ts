@@ -12,6 +12,8 @@ export interface Project {
   repo?: string;
   /** Optional badge text like "active" / "archived" / a year. */
   status?: string;
+  /** Public beta link (e.g. a TestFlight invite), shown on the Now page. */
+  beta?: string;
   /** Technology or product traits shown when this project is spotlighted. */
   stack?: readonly string[];
 }
@@ -54,6 +56,27 @@ export const active: Project[] = [
     site: "https://shariqh.github.io/github-enterprise-settings-configurator/",
     repo: "https://github.com/shariqh/github-enterprise-settings-configurator",
     status: "active",
+  },
+];
+
+/** iOS apps in TestFlight with Bundle. Shown on the Now page only for now. */
+export const testflight: Project[] = [
+  {
+    name: "Matryoshka",
+    blurb: "An iOS app for keeping track of what's stored where at home.",
+    description:
+      "An iOS home inventory app for keeping track of what's stored where.",
+    kind: "product",
+    site: "https://matryoshka.bundleapps.io/",
+    beta: "https://testflight.apple.com/join/zbxDR9K9",
+    status: "TestFlight",
+  },
+  {
+    name: "Reps & Co.",
+    blurb: "An iOS workout app where you bring your own AI keys.",
+    description: "A workout app for iPhone where you bring your own AI API keys.",
+    kind: "product",
+    status: "early TestFlight",
   },
 ];
 

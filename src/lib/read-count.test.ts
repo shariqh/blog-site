@@ -4,6 +4,8 @@ import {
   buildReadCountUrl,
   fetchReadCount,
   formatReadCount,
+  MIN_PUBLIC_READ_COUNT,
+  shouldShowReadCount,
   isCanonicalArticlePath,
   MAX_READ_COUNT_RESPONSE_BYTES,
   parseReadCount,
@@ -91,6 +93,15 @@ describe('parseReadCount', () => {
     { count: '9,007,199,254,740,992' },
   ])('rejects malformed payload %#', (payload) => {
     expect(parseReadCount(payload)).toBeNull()
+  })
+})
+
+describe('shouldShowReadCount', () => {
+  it('hides counts below the public threshold', () => {
+    expect(shouldShowReadCount(0)).toBe(false)
+    expect(shouldShowReadCount(MIN_PUBLIC_READ_COUNT - 1)).toBe(false)
+    expect(shouldShowReadCount(MIN_PUBLIC_READ_COUNT)).toBe(true)
+    expect(shouldShowReadCount(Number.NaN)).toBe(false)
   })
 })
 
