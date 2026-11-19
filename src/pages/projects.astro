@@ -1,10 +1,10 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
-import { active, built, talks, host, safeHref } from "../lib/projects";
+import { active, testflight, built, talks, host, safeHref } from "../lib/projects";
 
 const spotlight = active.find((p) => p.name === "Oris") ?? active[0];
-const shipping = active.filter((p) => p !== spotlight);
+const shipping = [...active.filter((p) => p !== spotlight), ...testflight];
 const shippingCount = String(shipping.length).padStart(2, "0");
 const builtCount = String(built.length).padStart(2, "0");
 const talksCount = String(talks.length).padStart(2, "0");
@@ -70,10 +70,11 @@ const talksCount = String(talks.length).padStart(2, "0");
           )}
         </h3>
         <p class="desc">{p.blurb ?? p.description}</p>
-        {(p.site || p.repo) && (
+        {(p.site || p.repo || p.beta) && (
           <div class="links">
             {p.site && <a href={safeHref(p.site)} target="_blank" rel="noopener">{host(p.site)} ↗</a>}
             {p.repo && <a href={safeHref(p.repo)} target="_blank" rel="noopener">github ↗</a>}
+            {p.beta && <a href={safeHref(p.beta)} target="_blank" rel="noopener">TestFlight ↗</a>}
           </div>
         )}
         {(p.site || p.repo) && <span class="card-arrow" aria-hidden="true">↗</span>}
@@ -340,13 +341,15 @@ const talksCount = String(talks.length).padStart(2, "0");
   }
   .card .links {
     display: flex;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 8px 16px;
     margin-top: 18px;
     font-family: var(--font-mono);
     font-size: 11px;
     letter-spacing: .08em;
   }
   .card .links a {
+    white-space: nowrap;
     text-decoration: underline;
     text-decoration-color: var(--color-ochre);
     text-underline-offset: 4px;
@@ -453,6 +456,8 @@ const talksCount = String(talks.length).padStart(2, "0");
   .d3        { animation-delay: .22s; }
   .d4        { animation-delay: .29s; }
   .d5        { animation-delay: .36s; }
+  .d6        { animation-delay: .40s; }
+  .d7        { animation-delay: .44s; }
   .d-quests  { animation-delay: .44s; }
   .d-talks   { animation-delay: .52s; }
 

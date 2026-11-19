@@ -12,7 +12,7 @@ export interface Project {
   repo?: string;
   /** Optional badge text like "active" / "archived" / a year. */
   status?: string;
-  /** Public beta link (e.g. a TestFlight invite), shown on the Now page. */
+  /** Public beta link (e.g. a TestFlight invite), shown on the Now and Projects pages. */
   beta?: string;
   /** Technology or product traits shown when this project is spotlighted. */
   stack?: readonly string[];
@@ -59,7 +59,7 @@ export const active: Project[] = [
   },
 ];
 
-/** iOS apps in TestFlight with Bundle. Shown on the Now page only for now. */
+/** iOS apps in TestFlight with Bundle. Shown on the Now page and in Projects' "Also building" grid. */
 export const testflight: Project[] = [
   {
     name: "Matryoshka",
