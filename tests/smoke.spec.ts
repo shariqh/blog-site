@@ -668,6 +668,20 @@ test('projects remains the detailed project inventory', async ({ page }) => {
   await expect(
     agentInbox.getByRole('link', { name: 'github ↗', exact: true }),
   ).toHaveAttribute('href', 'https://github.com/shariqh/agent-inbox')
+  const matryoshka = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Matryoshka', exact: true }),
+  })
+  await expect(
+    matryoshka.getByRole('link', { name: 'Matryoshka', exact: true }),
+  ).toHaveAttribute('href', testflight[0].site!)
+  await expect(
+    matryoshka.getByRole('link', { name: 'TestFlight ↗', exact: true }),
+  ).toHaveAttribute('href', testflight[0].beta!)
+  const reps = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Reps & Co.', exact: true }),
+  })
+  await expect(reps).toContainText('early TestFlight')
+  await expect(reps.getByRole('link')).toHaveCount(0)
   for (const retired of ['coffee-ui', 'unrivaledpro', 'myspace']) {
     await expect(page.getByText(retired, { exact: true })).toHaveCount(0)
   }
