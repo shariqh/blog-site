@@ -1,0 +1,96 @@
+---
+title: 'Agent Inbox 2.4: rebuilding session UI around one invariant'
+date: '2026-11-05'
+tags:
+  - ai
+  - agent-inbox
+  - developer-tools
+  - open-source
+  - software-architecture
+summary: >-
+  Agent Inbox 2.4 replaces two session surfaces with a single Agents view: every
+  ask lives on exactly one card, with counts that agree everywhere.
+draft: false
+hero:
+  image: /static/images/blog/agent-inbox-agents-view/cover.png
+  alt: >-
+    Cover illustration for "Agent Inbox 2.4: rebuilding session UI around one
+    invariant".
+  prompt: >-
+    Style: flat abstract shapes combined with loose hand-drawn single-weight
+    line-art (thin, confident strokes), minimal and geometric — a vintage
+    mid-century editorial spot illustration. Flat color fills, subtle paper
+    grain, no gradients, no 3D, no glossy realism.
+
+
+    Visual concept only: A dark surface scattered with clusters of small
+    luminous cards connected by fine light-threads to a single glowing counter
+    at center; one card among the clusters is dimmer than the rest but its
+    thread still reaches the counter; the composition suggests belonging and
+    enumeration recovered from disorder.. Do not depict or quote any phrase from
+    the article title or summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: line-art
+---
+
+Running multiple Claude Code sessions through [Agent Inbox](https://shariq.dev/agent-inbox/) at once exposed a gap I hadn't expected. The Inbox badge said 4; the session cards said 3. I went looking for the fourth ask. It had come from a session that had already exited. No card owned it, so it sat there counted but invisible. Three surfaces disagreed about what was waiting on me.
+
+That's the problem 2.4 is built around. I settled on one invariant. Every ask lives on exactly one card, owned by exactly one session. No ask floats free. If the session is running, the ask sits on its card. If the session has ended, the ask gets a small Session ended card of its own. The Needs you count in the Agents view and the Inbox badge both derive from the same set of asks, so they agree. Getting there meant rethinking what the session surface was.
+
+## The Agents view
+
+The old UI had a Live strip for active sessions and Dashboard lanes for everything else. That design assumed roughly one session at a time. Once sessions started running in parallel in their own worktrees, neither surface knew where to put asks cleanly. A Live strip is built around one foreground session; Dashboard lanes are built around post-session review, not live attention routing.
+
+
+
+<Image src="/static/images/blog/agent-inbox-agents-view/img3.png" alt="Agent Inbox Agents view in dark theme with session cards" />
+
+
+
+2.4 replaces both with the Agents view. One card per session, grouped by project. Each card shows what the session is doing, its plan progress, recent activity, and anything waiting on you. Filters at the top (Needs you, Working, Idle, Parked) let you cut to what matters. A Sessions line in the sidebar counts working and connected sessions. The Inbox badge and the Needs you count both derive from the same set of asks, so they agree. Session ended cards close the loop for sessions that stopped before you got to them.
+
+
+
+Opening a card opens its session panel. Answer the ask, read the transcript, check the worktree state (branch, folder, commits ahead, files changed), and message, park, resume, stop, or hand the session off to Terminal. The panel reuses the Inbox's answer controls directly. Having one implementation means every fix to shell approval UI applies in both places at once. Keyboard shortcuts work throughout — J/K between cards, Enter to open, 1–4 to pick an answer, S to snooze, P to pin, R to reply, Esc to close.
+
+
+
+<Image src="/static/images/blog/agent-inbox-agents-view/img2.png" alt="Agent Inbox session panel in dark theme with an approval and worktree" />
+
+
+
+The Inbox itself gets one addition. Each ask now says whether its session is live or ended, with a Show on Agents link back to its card.
+
+
+
+<Image src="/static/images/blog/agent-inbox-agents-view/img1.png" alt="Agent Inbox Inbox in dark theme with session labels" />
+
+
+
+## Parallel sessions in their own worktrees
+
+Each session started from Agent Inbox (macOS) can run in its own git worktree and branch, so several run simultaneously without touching your working checkout. Up to eight at once; the default is four. Remove worktree asks before acting, keeps the branch, and refuses when it would throw away uncommitted work. Take over in Terminal passes a running or parked Copilot session, history included, to a new Terminal window. Stopped sessions can be resumed. File links in agent messages now open in the right app, or Show in Finder.
+
+
+
+## How it got here
+
+The approvals surface was where I was most careful. Agent Inbox drives Copilot CLI sessions over Copilot's Agent Client Protocol; approvals are signed by the app. Because the session panel now contains answer controls for shell approvals, every piece of that UI went through independent review before it shipped.
+
+Reviews caught real problems. Keyboard focus landed on Allow once after the panel opened, meaning a stray Space would approve a shell command without intent. A double-click on a list item could approve the next approval as the list shifted under the cursor. On narrow windows, the session panel's Remove worktree control was reachable until reload rather than until the session actually ended. Any one of those would have been a bad day in a release.
+
+This was six PRs, each with an independent review and a hands-on checkout build running alongside my installed app. The same pattern held every time. I thought I had it; review found something real. I also held v2.3.1 and the first v2.4.0 candidate because parallel sessions worked but felt like a proof of concept. My release bar is personal. Does this change how I actually use the app? The session panel answering, the invariant counts, and the worktree lifecycle all passed before I tagged anything.
+
+v2.4.0 ships today for macOS (Apple silicon) and Linux (AppImage and DEB). Intel Mac stays on v1.8.0 for now. Starting sessions from Agent Inbox is macOS only; Linux session runtime is the next gap. The other open thread is resuming a session that ran out of budget. The infrastructure for resuming is there, but budget exhaustion involves enough context state that I'm not satisfied with what I have yet.
+
+Source and downloads at [shariq.dev/agent-inbox](https://shariq.dev/agent-inbox/). Release notes at the [v2.4.0 tag](https://github.com/shariqh/agent-inbox/releases/tag/v2.4.0).
