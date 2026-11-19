@@ -23,7 +23,7 @@ hero:
 
 The parts of A2A 1.0 the demos skip are the edges: what happens when the stream drops, what stops a web page from reaching a localhost agent, how you get the edited text out without the client seeing a half-finished result. I wanted to understand those edges, so I wrote a small Node.js agent server from scratch rather than reaching for the SDK.
 
-The server is `packages/mesh/src/a2a.ts` in [agent-inbox](https://github.com/shariqh/agent-inbox), about 300 lines of Node's built-in `node:http` with no framework. It powers a local editing agent called unslop that runs on a homelab GPU box. The agent is opt-in: nothing starts unless `A2A_ENABLED=true`. This post walks through the protocol layer piece by piece. For why the unslop agent exists and how it was built, the [companion post](/writing/unslop-a2a-agent) covers that.
+The server is `packages/mesh/src/a2a.ts` in [agent-inbox](https://github.com/shariqh/agent-inbox), about 300 lines of Node's built-in `node:http` with no framework. It powers a local editing agent called unslop that runs on a homelab GPU box. The agent is opt-in: nothing starts unless `A2A_ENABLED=true`. This post walks through the protocol layer piece by piece. For why the unslop agent exists and how it was built, the [companion post](/blog/unslop-a2a-agent) covers that.
 
 **A2A 1.0 basics.** The normative spec is `a2a.proto`. It defines three official transport bindings: JSON-RPC over HTTP, gRPC, and plain HTTP+JSON. An agent card can declare any number of these (or custom bindings named by URI), and all declared bindings must be functionally equivalent. This server implements JSON-RPC only. That's a valid subset.
 
