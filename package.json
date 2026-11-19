@@ -32,7 +32,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@tailwindcss/vite": "^4.3.5",
     "astro": "^7.4.13",
-    "katex": "^0.17.0",
+    "katex": "^0.19.1",
     "mdast-util-to-string": "^4.0.0",
     "reading-time": "^1.5.0",
     "rehype-autolink-headings": "^7.1.0",
@@ -46,14 +46,14 @@
     "@astrojs/check": "^0.9.12",
     "@playwright/test": "^1.65.1",
     "@resvg/resvg-js": "^2.6.2",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.10",
     "gray-matter": "^4.0.3",
     "prettier": "^3.10.1",
-    "prettier-plugin-astro": "^0.14.1",
+    "prettier-plugin-astro": "^1.1.2",
     "satori": "^0.26.0",
     "tsx": "^4.23.15",
     "twitter-api-v2": "^1.31.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.12"
+    "vitest": "^5.1.1"
   }
 }
