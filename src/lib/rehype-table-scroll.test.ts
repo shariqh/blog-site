@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Element, ElementContent, Root } from 'hast'
 import rehypeKatex from 'rehype-katex'
+import { isUnifiedProcessor } from '@astrojs/markdown-remark'
 import config from '../../astro.config.mjs'
 import { rehypeTableScroll } from './rehype-table-scroll'
 
@@ -83,7 +84,9 @@ describe('rehypeTableScroll', () => {
   })
 
   it('runs before rehypeKatex in the Astro config, while math is still TeX', () => {
-    const plugins: unknown[] = config.markdown?.rehypePlugins ?? []
+    const processor = config.markdown?.processor
+    const plugins: unknown[] =
+      processor && isUnifiedProcessor(processor) ? processor.options.rehypePlugins : []
     const position = plugins.indexOf(rehypeTableScroll)
 
     expect(position).toBeGreaterThanOrEqual(0)
