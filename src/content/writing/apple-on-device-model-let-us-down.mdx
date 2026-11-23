@@ -1,5 +1,5 @@
 ---
-title: Apple's Foundation Models on 128 Real Workouts
+title: Apple's on-device model fit the time once in 128 tries
 date: '2026-11-23'
 tags:
   - field-notes
@@ -8,12 +8,13 @@ tags:
   - testing
   - apple-foundation-models
 summary: >-
-  Apple's Foundation Models hit the target time once in 128 real workout tests.
-  Here's what the numbers revealed, and what the test environment nearly hid.
+  I measured Apple's on-device model on Shorter, a quick action in Reps & Co.
+  It fit the time once in 128 tries, and a simulator problem made it look broken
+  along the way.
 draft: false
 hero:
   image: /static/images/blog/apple-on-device-model-let-us-down/cover.png
-  alt: Cover illustration for "Apple's Foundation Models on 128 Real Workouts".
+  alt: Cover illustration for "Apple's on-device model fit the time once in 128 tries".
   prompt: >-
     Style: rich conceptual editorial illustration, like a Wired or New Yorker
     feature spread, with one clear central metaphor. Painterly flat shading,
@@ -23,7 +24,7 @@ hero:
     Visual concept only: A set of iron weight plates on bare concrete, a yellow
     measuring tape coiled loosely beside them, overhead shot, single-source
     natural light casting long shadows across the plate faces, no other objects
-    or text.. Do not depict or quote any phrase from the article title or
+    or text. Do not depict or quote any phrase from the article title or
     summary.
 
 
@@ -39,53 +40,43 @@ hero:
   style: conceptual
 ---
 
-After 128 tries against my real training plan, Apple's on-device Foundation Models hit the target time once.
+After 128 tries on my real training plan, Apple's on-device Foundation Models fit the target time once.
 
-That's the measurement for Shorter, the quick action in Reps & Co. that trims a workout to fit the time you have. Pick 15, 20, 25, or 30 minutes; the app cuts exercises until the total lands within about five minutes of that number, with two hard constraints: no added exercises, no invented lifts. We tried the on-device model for it because the case seemed straightforward — private, no server, works offline. The demo looked right, so we ran the numbers.
+That's the result for Shorter, the quick action in [Reps & Co.](/now) that trims a workout to fit the time you have. You pick 15, 20, 25 or 30 minutes, and it cuts sets, reps, weight or rest, or drops a lift. It can't add a lift that wasn't in the plan. Apple's model runs on the phone with no server, so it looked like a natural fit for a small job like this. I measured it before trusting it.
 
-My real 32-day training plan, each workout against all four target times, all in the iOS Simulator: 128 tries. The prompt was deliberately loose, giving the model only the goal, the target time, and the two constraints. No cut order, no step-by-step recipe.
+The test ran all 32 days of my plan at each of the four target times, in the iOS Simulator: 128 tries. The model got a deliberately loose prompt.
 
-| Outcome | Tries |
-|---|---|
-| Hit the target (within ~5 min) | 1 |
-| Returned the workout unchanged | 66 |
-| Crushed it to 7–9 min | 61 |
-| **Total** | **128** |
+- **Fit the target:** once, a 20-minute target trimmed to 18 minutes.
+- **No shorter:** about half the time, it handed the day back no shorter.
+- **Too short:** the other half, it cut the day to 7 to 9 minutes, whatever the target was.
+- **Wait:** about 13 seconds per try, and up to 51.
 
-Sixty-six times the model handed the day back no shorter. Sixty-one times it cut so aggressively the result ran seven to nine minutes, whatever the target was. Median latency was around 13 seconds, with individual runs reaching 51. That is time the lifter stands there waiting, in the middle of a session.
+Thirteen seconds is a long time to stand between sets waiting for an answer. The quick rule, a plain fallback with no model in it, caught every miss and never added work.
 
-A plain rule-based fallback (the quick rule) hit the target every time, answered in under a second, and never added work.
+The iOS Simulator can't run Apple's safety filter, so a real iPhone may behave a little differently. These numbers cover one task, one prompt and one model version. They're not a verdict on the model in general.
 
-The iOS Simulator cannot run Apple's safety filter, so results on a real device could differ. These numbers are for one task, one prompt, and one model version. Not a verdict on the model in general.
+## The simulator problem that made the model look broken
 
-## Getting Apple's Foundation Models to actually run in CI
+While I was measuring, Apple's model kept showing as "downloading" in tests and never as ready.
 
-Before we had any of those numbers, every test run reported the model as "downloading" and never ready, even though Apple Intelligence was fully enabled and downloaded on my Mac.
+A new simulator has to fetch the model on its own, and one took about 51 minutes before the model was ready. My test setup never found its own simulator, "Reps iPhone 17", so it made a new one on every run. Every new copy started that wait over. The model always looked like it was downloading because it always was.
 
-Each new iOS Simulator downloads its own copy of the model's assets, without sharing with the host. After booting a fresh simulator, we measured roughly 51 minutes before the model reported ready. A CI run lasts about 10 minutes. The model was never going to finish in time.
+By the time I caught it, there were 50 copies. The cleanup kept the one simulator that already had the model, deleted the other 49 and 253 old simulators that couldn't boot anymore, and freed about 116 GB.
 
-That was compounded by the test setup. The simulator picker looked for a device whose name starts with "iPhone", and ours is called "Reps iPhone 17". No match, so it created a new one on every run. Each new simulator started the 51-minute download cycle again. The model always appeared to be downloading because it always was.
+My first fix picked one of the 50 copies more or less at random. The real fix has the tests remember that one simulator by its ID. If there are several copies and none is remembered, the run stops and lists them instead of guessing.
 
-By the time we caught it, there were 50 duplicate simulators. Clearing those plus roughly 250 stale simulators for OS versions no longer installed freed 116 GB.
+## Shorter now uses the quick rule
 
+I dropped Apple's model for Shorter, and it now uses the quick rule. In build 261120.1843, I checked it on all 32 days at all four times: 128 answers, the slowest in 0.008 seconds, and none added work.
 
+Apple's model still handles Lighter, Harder and missing equipment. If you bring your own AI key, that model still gets the looser Shorter prompt.
 
-A first fix tried to reuse whichever simulator had booted most recently. But Xcode 27.2's `simctl list --json` doesn't include `lastBootedAt`, so "most recent" was effectively arbitrary. The real fix was to pin one simulator by its UDID, persist that identifier on the runner, and fail loudly when the expected device is missing rather than silently creating another.
+A few things I'm taking from this.
 
-The broader lesson from that detour is that a test environment problem can look exactly like a model quality problem. We spent real time on what seemed like model behavior before we confirmed the model had never actually run.
+Measure on your real data and your real task. Running every day of the plan at every target time showed failures that a few hand-picked tries would have missed.
 
-## Shorter now runs the quick rule
+Keep a simple fallback you can reason about. The quick rule is predictable, and for a job with hard limits like this one, predictable wins.
 
-We dropped Apple's on-device model for Shorter. It now runs the quick rule: deterministic, instant, and right every time for this specific task. The model still handles the other quick actions — Lighter, Harder, equipment swaps, custom requests. A user on their own API key still gets the loose Shorter prompt, since they've opted into more capable infrastructure.
+Count latency as part of quality. A 13-second wait in the middle of a session is part of what the lifter feels.
 
-
-
-The numbers settled it, and working through the process clarified a few things.
-
-Measure on your real data and your real task. A demo picks favorable inputs. Automated tests over your actual data find the edge cases the demo never shows.
-
-Keep a deterministic fallback that's easy to reason about. The quick rule is not clever. It is correct. For constrained optimization with hard limits, correct often beats creative.
-
-Count latency as part of quality. Thirteen seconds waiting to start a set is not a background cost; it's the experience. When the alternative is instant and accurate, latency becomes the whole argument.
-
-Before reading any results, make sure the thing you're measuring is actually running. Simulator churn, model download state, and test environment drift can silently invalidate a benchmark without throwing a single error. Confirm the runtime before you trust the numbers.
+Make sure the thing you're measuring is actually running. A test setup problem can look exactly like a model problem, and simulator copies or download state can quietly break a test without a single error.
