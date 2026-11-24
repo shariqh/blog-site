@@ -5,12 +5,11 @@ tags:
   - field-notes
   - ios
   - on-device-ai
-  - testing
   - apple-foundation-models
 summary: >-
   I measured Apple's on-device model on Shorter, a quick action in Reps & Co.
-  It fit the time once in 128 tries, and a simulator problem made it look broken
-  along the way.
+  that trims a workout to fit your time. It fit once in 128 tries, so a plain
+  rule does the job now.
 draft: false
 hero:
   image: /static/images/blog/apple-on-device-model-let-us-down/cover.png
@@ -44,39 +43,27 @@ After 128 tries on my real training plan, Apple's on-device Foundation Models fi
 
 That's the result for Shorter, the quick action in [Reps & Co.](/now) that trims a workout to fit the time you have. You pick 15, 20, 25 or 30 minutes, and it cuts sets, reps, weight or rest, or drops a lift. It can't add a lift that wasn't in the plan. Apple's model runs on the phone with no server, so it looked like a natural fit for a small job like this. I measured it before trusting it.
 
-The test ran all 32 days of my plan at each of the four target times, in the iOS Simulator: 128 tries. The model got a deliberately loose prompt.
+I ran all 32 days of my plan at each of the four target times: 128 tries.
 
 - **Fit the target:** once, a 20-minute target trimmed to 18 minutes.
 - **No shorter:** about half the time, it handed the day back no shorter.
 - **Too short:** the other half, it cut the day to 7 to 9 minutes, whatever the target was.
 - **Wait:** about 13 seconds per try, and up to 51.
 
-Thirteen seconds is a long time to stand between sets waiting for an answer. The quick rule, a plain fallback with no model in it, caught every miss and never added work.
+Thirteen seconds is a long time to stand between sets waiting for an answer.
 
-The iOS Simulator can't run Apple's safety filter, so a real iPhone may behave a little differently. These numbers cover one task, one prompt and one model version. They're not a verdict on the model in general.
+I ran these in the iOS Simulator, which can't run Apple's safety filter, so a real iPhone may behave a little differently. These numbers cover one task, one prompt and one model version. They're not a verdict on the model in general.
 
-## The simulator problem that made the model look broken
+## Shorter now uses a plain rule
 
-While I was measuring, Apple's model kept showing as "downloading" in tests and never as ready.
+I dropped Apple's model for Shorter. A plain rule with no model in it does the job now: it never adds work, and it answers in under a hundredth of a second.
 
-A new simulator has to fetch the model on its own, and one took about 51 minutes before the model was ready. My test setup never found its own simulator, "Reps iPhone 17", so it made a new one on every run. Every new copy started that wait over. The model always looked like it was downloading because it always was.
-
-By the time I caught it, there were 50 copies. The cleanup kept the one simulator that already had the model, deleted the other 49 and 253 old simulators that couldn't boot anymore, and freed about 116 GB.
-
-My first fix picked one of the 50 copies more or less at random. The real fix has the tests remember that one simulator by its ID. If there are several copies and none is remembered, the run stops and lists them instead of guessing.
-
-## Shorter now uses the quick rule
-
-I dropped Apple's model for Shorter, and it now uses the quick rule. In build 261120.1843, I checked it on all 32 days at all four times: 128 answers, the slowest in 0.008 seconds, and none added work.
-
-Apple's model still handles Lighter, Harder and missing equipment. If you bring your own AI key, that model still gets the looser Shorter prompt.
+Apple's model still handles Lighter, Harder and missing equipment in the app.
 
 A few things I'm taking from this.
 
-Measure on your real data and your real task. Running every day of the plan at every target time showed failures that a few hand-picked tries would have missed.
+Try the model on the real task before trusting it. Running every day of the plan at every target time showed misses that a few hand-picked tries would have hidden.
 
-Keep a simple fallback you can reason about. The quick rule is predictable, and for a job with hard limits like this one, predictable wins.
+Keep a simple fallback you can reason about. The plain rule is predictable, and for a job with hard limits like this one, predictable wins.
 
 Count latency as part of quality. A 13-second wait in the middle of a session is part of what the lifter feels.
-
-Make sure the thing you're measuring is actually running. A test setup problem can look exactly like a model problem, and simulator copies or download state can quietly break a test without a single error.
