@@ -682,6 +682,17 @@ test('projects remains the detailed project inventory', async ({ page }) => {
   })
   await expect(reps).toContainText('early TestFlight')
   await expect(reps.getByRole('link')).toHaveCount(0)
+  const testRecorder = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Test Recorder', exact: true }),
+  })
+  await expect(testRecorder).toContainText('TestFlight')
+  await expect(testRecorder.getByRole('link')).toHaveCount(0)
+  const alfred = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Browser Search for Alfred', exact: true }),
+  })
+  await expect(
+    alfred.getByRole('link', { name: 'github ↗', exact: true }),
+  ).toHaveAttribute('href', 'https://github.com/shariqh/browser-search-for-alfred')
   for (const retired of ['coffee-ui', 'unrivaledpro', 'myspace']) {
     await expect(page.getByText(retired, { exact: true })).toHaveCount(0)
   }

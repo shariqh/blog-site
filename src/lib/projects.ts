@@ -57,6 +57,15 @@ export const active: Project[] = [
     repo: "https://github.com/shariqh/github-enterprise-settings-configurator",
     status: "active",
   },
+  {
+    name: "Browser Search for Alfred",
+    blurb: "Search browser tabs, bookmarks and history from Alfred.",
+    description:
+      "An Alfred workflow that searches open tabs, bookmarks and history across Firefox, Safari and Chromium browsers.",
+    kind: "tool",
+    repo: "https://github.com/shariqh/browser-search-for-alfred",
+    status: "new",
+  },
 ];
 
 /** iOS apps in TestFlight with Bundle. Shown on the Now page and in Projects' "Also building" grid. */
@@ -77,6 +86,14 @@ export const testflight: Project[] = [
     description: "A workout app for iPhone where you bring your own AI API keys.",
     kind: "product",
     status: "early TestFlight",
+  },
+  {
+    name: "Test Recorder",
+    blurb: "An iPhone app that records app-testing sessions with your narration.",
+    description:
+      "An iPhone app that records your screen and voice while you test an app, with marks, sections and an on-device transcript.",
+    kind: "product",
+    status: "TestFlight",
   },
 ];
 
