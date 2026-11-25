@@ -1,5 +1,5 @@
 ---
-title: Apple's on-device model fit the time once in 128 tries
+title: Apple's on-device model got the time right once in 128 tries
 date: '2026-11-23'
 tags:
   - field-notes
@@ -7,13 +7,13 @@ tags:
   - on-device-ai
   - apple-foundation-models
 summary: >-
-  I measured Apple's on-device model on Shorter, a quick action in Reps & Co.
-  that trims a workout to fit your time. It fit once in 128 tries, so a plain
-  rule does the job now.
+  Reps & Co. has a quick action called Shorter that trims a workout to fit the
+  time you have. I tested Apple's on-device model on it, and it got the time
+  right once in 128 tries, so a plain rule does the job now.
 draft: false
 hero:
   image: /static/images/blog/apple-on-device-model-let-us-down/cover.png
-  alt: Cover illustration for "Apple's on-device model fit the time once in 128 tries".
+  alt: Cover illustration for "Apple's on-device model got the time right once in 128 tries".
   prompt: >-
     Style: rich conceptual editorial illustration, like a Wired or New Yorker
     feature spread, with one clear central metaphor. Painterly flat shading,
@@ -41,35 +41,35 @@ hero:
 
 ## What I wanted
 
-[Reps & Co.](/now) has a quick action called Shorter for the days you have less time than your plan expects. I wanted Apple's on-device Foundation Models to power it. The model runs on the phone with no server, so a small job like this looked like a natural fit.
+[Reps & Co.](/now) is a workout app we're building for iPhone. It has a quick action called Shorter for the days when you have less time than your plan expects. I wanted Shorter to run on Apple's on-device model, the one Apple ships in its Foundation Models framework. That model runs right on the phone with no server, so a small job like this seemed like a natural fit.
 
 ## The job
 
-You pick 15, 20, 25 or 30 minutes, and Shorter has to fit that day's workout into the time you picked. It can cut sets, reps, weight or rest, or drop a lift. It can't add a lift that wasn't in the plan.
+You pick 15, 20, 25 or 30 minutes, and Shorter has to fit that day's workout into the time you picked. It's allowed to cut sets, reps, weight or rest, or drop a lift. It isn't allowed to add a lift that wasn't in the plan.
 
 ## What I tried
 
-I gave Apple's model that job and measured it before trusting it. I ran every day of my real training plan, all 32 of them, at each of the four times: 128 tries. For each one I checked whether the trimmed day fit the time and how long the answer took.
+Before I trusted the model with that, I wanted numbers. So I ran all 32 days of my own training plan through it at each of the four times, 128 tries in all. For each try I checked two things: whether the trimmed workout actually fit the time, and how long the model took to answer.
 
 ## What happened
 
-Apple's model fit the target time once in 128 tries.
+The model got the time right once in 128 tries.
 
-- **Fit the target:** once, a 20-minute target trimmed to 18 minutes.
-- **No shorter:** about half the time, it handed the day back no shorter.
-- **Too short:** the other half, it cut the day to 7 to 9 minutes, whatever the target was.
-- **Wait:** about 13 seconds per try, and up to 51.
+- **Fit the time:** once. It trimmed a day to 18 minutes for a 20-minute target.
+- **No shorter:** about half the time, it gave the workout back no shorter than before.
+- **Too short:** the other half, it cut the workout to 7 to 9 minutes, no matter which time I picked.
+- **Wait:** about 13 seconds per answer, and as long as 51.
 
-Thirteen seconds is a long time to stand between sets waiting for an answer.
+Thirteen seconds is a long time to stand between sets waiting on your phone.
 
-These numbers come from the iOS Simulator, where the model runs without Apple's safety filter, so on a real iPhone it may answer a little differently. They cover one task, one prompt and one model version. They're not a verdict on the model in general.
+I ran all of this in the iOS Simulator, where the model runs without Apple's safety filter, so a real iPhone may answer a little differently. It's also one task, one prompt and one version of the model, so it isn't a verdict on the model in general.
 
-So I dropped Apple's model for Shorter. A plain rule with no model in it does the job now: it never adds work, and it answers in under a hundredth of a second. Apple's model still handles Lighter, Harder and missing equipment in the app.
+So Shorter doesn't use Apple's model anymore. It uses a plain rule now, with no model involved. The rule never adds work, and it answers in under a hundredth of a second. Apple's model still handles Lighter, Harder and missing equipment elsewhere in the app.
 
-A few things I'm taking from this.
+Here's what I'm taking from it.
 
-Try the model on the real task before trusting it. Running every day of the plan at every target time showed misses that a few hand-picked tries would have hidden.
+Test the model on the real task before you trust it. Running every day of the plan at every time showed misses that a few hand-picked tries would have hidden.
 
 Keep a simple fallback you can reason about. The plain rule is predictable, and for a job with hard limits like this one, predictable wins.
 
-Count latency as part of quality. A 13-second wait in the middle of a session is part of what the lifter feels.
+Count the wait as part of quality. A 13-second pause in the middle of a workout is something the person lifting actually feels.
