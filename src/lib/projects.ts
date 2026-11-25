@@ -23,7 +23,7 @@ export const active: Project[] = [
     name: "Oris",
     blurb: "Local-first meeting notes for Mac.",
     description:
-      "A local-first Mac app that records meetings without a call bot, transcribes on-device with WhisperKit, and lands structured notes in Obsidian, Apple Notes, or a Markdown folder.",
+      "A local-first Mac app that records meetings without a call bot, transcribes on-device with WhisperKit, and lands structured notes in Obsidian, Apple Notes, Notion, or a Markdown folder.",
     kind: "product",
     site: "https://orisnotes.com",
     status: "active",
