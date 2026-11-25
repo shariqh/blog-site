@@ -1,11 +1,7 @@
 // Agent Inbox's page moved from shariq.dev/agent-inbox/ to Bundle's site.
 // functions/_middleware.ts sends /agent-inbox and everything under it to the
 // new page with a 301, and the Projects page links there directly.
-//
-// REPLACE_BEFORE_MERGE: the bundleapps.io address isn't final yet. The
-// placeholder guard workflow fails while this marker is anywhere in the repo.
-export const AGENT_INBOX_HOME =
-  "https://bundleapps.io/REPLACE_BEFORE_MERGE/agent-inbox/";
+export const AGENT_INBOX_HOME = "https://bundleapps.io/agent-inbox/";
 
 // The old page lived at /agent-inbox/ with its assets under /agent-inbox/vendor/.
 const OLD_PATH = /^\/agent-inbox(?:\/.*)?$/i;
