@@ -16,7 +16,7 @@ export default defineConfig({
   site: SITE.url,
   integrations: [
     mdx(),
-    sitemap({ customPages: [`${SITE.url}/agent-inbox/`] }),
+    sitemap(),
   ],
   markdown: {
     remarkPlugins: [remarkMath, remarkReadingTime],
