@@ -47,7 +47,7 @@ I maintain a prose-editing skill called "unslop", a customized fork of an MIT-li
 
 I also run a homelab GPU box with an OpenAI-compatible model server. Loading its chat model from scratch, when it has to swap out another model, takes about 65 seconds; after that, the model runs at 44–63 tokens per second. [Agent Inbox](https://github.com/shariqh/agent-inbox) (my open-source local inbox for coding agents) has an opt-in mesh layer where agents can delegate to other agents over the A2A protocol. The mesh gave me a natural home for a shared service. The stale-copy bug gave me the reason to build it.
 
-## The task: one shared agent with three hard rules
+## The task: one shared A2A agent with three hard rules
 
 The goal was to make unslop one shared service, the first A2A agent in the mesh, so every assistant reads from one source and calls one endpoint.
 
