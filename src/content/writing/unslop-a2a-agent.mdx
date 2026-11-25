@@ -68,7 +68,7 @@ The build ran in six reviewed slices.
 - **PR #488** added the A2A server with a security review. The review flagged that the prompt needed to treat the draft as data rather than as instructions. The fix was prompt fencing: each call generates a random delimiter line before and after the draft, so any instructions embedded in the draft are treated as text, not as directives.
 - **PR #490** added `meshctl enable/disable --unslop`, the explicit toggle.
 - **PR #491** added the CLI client that assistants actually call. It handles the A2A handshake, passes the screened text, and returns either the edited draft or the original.
-- **PR #496** added test bench S11: 24 generated public texts with planted slop phrases and injected instructions, plus 6 private texts, with trap assertions to verify that nothing the model was told to add appeared in a passing output.
+- **PR #496** added test bench S11: 24 generated public texts with planted slop phrases and injected instructions, plus 7 private texts, with trap assertions to verify that nothing the model was told to add appeared in a passing output.
 
 Tuning took three separate passes after the bench exposed real failures. The fidelity check was treating negation-form changes as violations: "does not add any" becoming "adds no" is semantically identical, but the original check flagged it. The model kept producing the elevation-reframe pattern my editorial rules ban, and it left negated clichés like "not all sunshine and rainbows" intact. I adjusted the prompt. Then the model started filling cut filler with invented text. I found "...without manual intervention" in a draft where I had written nothing of the sort. That took explicit instructions in the prompt forbidding invented claims (covered in #493, #494 and #497).
 
@@ -78,7 +78,7 @@ The skill files themselves got split into a routing `SKILL.md` and a shared `rul
 
 Bench S11 ran on 24 generated public texts. Zero broken trap assertions, zero inputs where the original came back unchanged, and 90–94% of planted slop phrases removed. The injection test caught one model that obeyed a planted instruction, adding a date that was not in the original. The fidelity check caught it and returned the original.
 
-All 6 private texts were refused locally, with one exception. A private text with no name and no letter-shaped structure passed through; the screen had nothing to key on. That is a known gap, not a closed issue.
+Of the 7 private texts, the screen refused 6 on my machine, so they never reached the model. The 7th had no name in it and wasn't laid out like a letter, so the screen had nothing to catch and let it through to the model. The design already lists that as a known miss, and it's still open.
 
 Warm calls run about 2 seconds median. The one cold call in my bench took about 13.6 seconds, most of it waiting for the model to load; if the box first has to swap models, that first call waits about a minute longer. For short drafts that overhead rarely pays; for longer ones it does.
 
