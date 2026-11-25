@@ -84,7 +84,12 @@ Warm calls run about 2 seconds median. The one cold call in my bench took about 
 
 My own test drafts went from 0 of 2 and 0 of 4 passing the slop threshold to 4 of 4 and 3 of 3 after tuning.
 
-Routing turned on 2026-11-07 for a two-week trial, with two thresholds to decide whether to continue. The kept-original rate has to stay at or below 15%, and a blind review has to judge the agent not worse at least 70% of the time.
+On November 7 I started sending my real drafts to the agent for a two-week trial, and the trial passed. From November 9 to 21, my assistants called the agent 260 times, and 97% of those calls worked. The trial had two limits the agent had to stay under:
+
+- **Failed calls:** 3% of calls failed and fell back to editing without the agent. The limit was 25%.
+- **Original text returned:** 2% of calls gave back my original text unchanged. The limit was 15%.
+
+I also planned a blind review of 20 rewrites to check that they kept their meaning. That review was never recorded, so I can't say how the agent did on it.
 
 ## What I'd change next
 
@@ -92,10 +97,10 @@ The design doc review before any code was worth the time. Both blockers it caugh
 
 The fidelity check's negation handling is still patched rather than principled. I added "adds no" as an equivalent to "does not add any" as a one-off exception. A cleaner approach would normalize negation forms before comparison, so exceptions don't accumulate.
 
-The known miss on header-less private text needs addressing before I expand routing. A default-refuse posture for inputs that don't pass a positive confirmation test would be safer than a growing blocklist.
+The private text that got through, with no name and no letter layout, needs fixing before I send more kinds of drafts to the agent. A default-refuse posture for inputs that don't pass a positive confirmation test would be safer than a growing blocklist.
 
 A call spends roughly twice the draft in tokens on the calling assistant's context, because the prompt carries the full draft twice. The tradeoff pays for longer pieces; for a paragraph or two, probably not.
 
-If the trial passes its thresholds, the next candidate is any other skill where a dedicated model would do better than the ambient coding assistant. The constraint-enforcement approach (screen, fence, check) is reusable. Unslop was the proof of concept.
+Now that the trial has passed, the next candidate is any other skill where a dedicated model would do better than the coding assistant itself. The constraint-enforcement approach (screen, fence, check) is reusable. Unslop was the proof of concept.
 
 The agent code is in [Agent Inbox](https://github.com/shariqh/agent-inbox). The design doc is [here](https://github.com/shariqh/agent-inbox/blob/main/docs/superpowers/specs/2026-11-06-unslop-a2a-agent-design.md). User-facing docs are [here](https://github.com/shariqh/agent-inbox/blob/main/docs/unslop.md).
