@@ -1,3 +1,5 @@
+import { AGENT_INBOX_HOME } from "./agent-inbox-redirect";
+
 export type ProjectKind = "product" | "tool" | "site" | "learn" | "talk";
 
 export interface Project {
@@ -12,7 +14,7 @@ export interface Project {
   repo?: string;
   /** Optional badge text like "active" / "archived" / a year. */
   status?: string;
-  /** Public beta link (e.g. a TestFlight invite), shown on the Now page. */
+  /** Public beta link (e.g. a TestFlight invite), shown on the Now and Projects pages. */
   beta?: string;
   /** Technology or product traits shown when this project is spotlighted. */
   stack?: readonly string[];
@@ -23,7 +25,7 @@ export const active: Project[] = [
     name: "Oris",
     blurb: "Local-first meeting notes for Mac.",
     description:
-      "A local-first Mac app that records meetings without a call bot, transcribes on-device with WhisperKit, and lands structured notes in Obsidian, Apple Notes, or a Markdown folder.",
+      "A local-first Mac app that records meetings without a call bot, transcribes on-device with WhisperKit, and lands structured notes in Obsidian, Apple Notes, Notion, or a Markdown folder.",
     kind: "product",
     site: "https://orisnotes.com",
     status: "active",
@@ -35,8 +37,16 @@ export const active: Project[] = [
     description:
       "A local, cross-project attention inbox where Copilot CLI and Claude Code surface decisions, plans, and handoffs through MCP.",
     kind: "tool",
-    site: "https://shariq.dev/agent-inbox/",
+    site: AGENT_INBOX_HOME,
     repo: "https://github.com/shariqh/agent-inbox",
+    status: "building",
+  },
+  {
+    name: "A2A Marketplace",
+    blurb: "Hosted A2A agents that plug into Agent Inbox.",
+    description:
+      "Hosted A2A agent services for Agent Inbox: accounts, a catalog of hosted agents, billing and a relay. Agent Inbox itself stays open source and local-first.",
+    kind: "product",
     status: "building",
   },
   {
@@ -57,9 +67,18 @@ export const active: Project[] = [
     repo: "https://github.com/shariqh/github-enterprise-settings-configurator",
     status: "active",
   },
+  {
+    name: "Browser Search for Alfred",
+    blurb: "Search browser tabs, bookmarks and history from Alfred.",
+    description:
+      "An Alfred workflow that searches open tabs, bookmarks and history across Firefox, Safari and Chromium browsers.",
+    kind: "tool",
+    repo: "https://github.com/shariqh/browser-search-for-alfred",
+    status: "awaiting approval",
+  },
 ];
 
-/** iOS apps in TestFlight with Bundle. Shown on the Now page only for now. */
+/** iOS apps in TestFlight with Bundle. Shown on the Now page and in Projects' "Also building" grid. */
 export const testflight: Project[] = [
   {
     name: "Matryoshka",
@@ -76,7 +95,17 @@ export const testflight: Project[] = [
     blurb: "An iOS workout app where you bring your own AI keys.",
     description: "A workout app for iPhone where you bring your own AI API keys.",
     kind: "product",
-    status: "early TestFlight",
+    beta: "https://testflight.apple.com/join/Hny7ksYg",
+    status: "TestFlight",
+  },
+  {
+    name: "Test Recorder",
+    blurb: "An iPhone app that records app-testing sessions with your narration.",
+    description:
+      "An iPhone app that records your screen and voice while you test an app, with marks, sections and an on-device transcript.",
+    kind: "product",
+    beta: "https://testflight.apple.com/join/KMhUu3P9",
+    status: "TestFlight",
   },
 ];
 

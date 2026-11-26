@@ -26,7 +26,6 @@
 *.css             text
 *.htm             text diff=html
 *.html            text diff=html
-public/agent-inbox/index.html -text diff=html
 *.inc             text
 *.ini             text
 *.js              text
@@ -202,7 +201,3 @@ Procfile          text
 
 # Ignore files (like .npmignore or .gitignore)
 *.*ignore         text
-
-# Vendored Agent Inbox landing files are published byte for byte. This must
-# stay after the *.js and LICENSE rules above, which it overrides.
-public/agent-inbox/vendor/** -text
