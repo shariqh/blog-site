@@ -30,6 +30,45 @@ Every post follows one of two shapes (Shariq, Nov 24 2026):
 
 Pick the shape before drafting. If neither fits, the post probably isn't ready yet.
 
+### Don't label sections after the shape
+
+PAS and STAR shape the post; they never show in it. No heading named after a step: not "Situation", "Task", "Action", "Result", "Problem", "Agitate" or "Solution", and not "The situation: two copies of one skill" either. Name what the section is about.
+
+| Bad                                      | Good                           |
+| ---------------------------------------- | ------------------------------ |
+| "The situation: two copies of one skill" | "Two copies of the same skill" |
+| "The result: what the bench showed"      | "How the two-week trial went"  |
+
+`npm run lint:plain` fails a heading that starts with one of these labels.
+
+### A title a stranger understands
+
+The title is read alone, in a feed, by someone who has never heard of the project. It says what the post is about in words that person already knows. It isn't a summary of the result with every number in it, and it isn't built for search keywords.
+
+| Bad                                                                                   | Good                                                        |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| "Apple's on-device model trimmed my workout to the time I had just once in 128 tries" | "Apple's on-device model couldn't shorten my workouts"      |
+| "From writing skill to shared A2A agent on a local model"                             | "One copy of my writing rules for every AI assistant I use" |
+
+### Every detail serves the point
+
+Write the post's point in one sentence before drafting, and keep it in view. A true, interesting detail that doesn't move that point along gets cut, however much work went into it. Ask of each paragraph: if it were gone, would the reader miss it?
+
+Cut from the unslop post, whose point is "two assistants drifted apart on one writing skill, so I made it one shared agent": the GPU's load time and tokens per second, the design-doc review and its two blockers, and the list of six PR numbers. All true; none of it helps a reader follow why or how the copies became one.
+
+### No internal names
+
+Names that only exist inside the project mean nothing to a reader: test-suite IDs, ticket numbers, internal codenames. "Bench S11 ran on 24 generated public texts" tells a reader nothing. Say what it was: "In testing, ...". Link a PR or issue only when the reader would want to open it.
+
+### Say it the way a person would
+
+Read each sentence aloud. If you wouldn't say it to a colleague, rewrite it. Nouns stacked into jargon are the usual sign.
+
+| Bad                                                                           | Good                                                           |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| "adding a privacy screen and fidelity checks before it runs on anyone's text" | "without letting private text leave my laptop or facts change" |
+| "which counts as agent-initiated egress"                                      | "the assistant, not me, decides to send the text out"          |
+
 ### Stay on the subject
 
 A post is about its subject, not about how it was made. A post reflecting on Apple's on-device model is about the model, not about the agents or process that produced the test. Cut asides that belong in a different post.
@@ -73,7 +112,7 @@ How to fix a flagged sentence:
 
 Before a draft goes to Shariq, a fresh reader with no context reads it once, top to bottom, and flags every sentence it can't follow. Run it as a new agent session that has seen nothing but the post. Give it only the file path and this prompt:
 
-> You are a cold reader. Read the blog post at `<path>` (skip the YAML frontmatter and code blocks). You know nothing about the author or project beyond what the post says. Don't open any other file or page. Read it once, top to bottom, as a working software engineer new to the topic. Flag every sentence that (1) points back to something the post hasn't introduced yet, (2) uses insider shorthand or a vague verb where a plain statement would do, or (3) a reader who has read only what came before couldn't explain. For each: quote the sentence, name the test it fails, and give a one-line plain rewrite. Worst first, 15 at most. If nothing fails, say "No sentences flagged." Don't edit the file.
+> You are a cold reader. Read the blog post at `<path>` (skip the YAML frontmatter and code blocks). You know nothing about the author or project beyond what the post says. Don't open any other file or page. Read it once, top to bottom, as a working software engineer new to the topic. First, say in one sentence what you think the post's point is, and whether the title alone would make sense to you in a feed. Then flag every sentence that (1) points back to something the post hasn't introduced yet, (2) uses insider shorthand, an internal name or a vague verb where a plain statement would do, (3) a reader who has read only what came before couldn't explain, (4) no person would say out loud, or (5) adds a detail that doesn't serve the post's point. For each: quote the sentence, name the test it fails, and give a one-line plain rewrite or say to cut it. Worst first, 15 at most. If nothing fails, say "No sentences flagged." Don't edit the file.
 
 Fold in every flag that holds up, keeping the facts as they are. Don't add facts the post can't back up just because the cold reader suggested them. Then run `npm run lint:plain` again.
 
@@ -169,6 +208,7 @@ Before a post lands on master (`draft: false`), run through:
 
 - [ ] **Voice check:** sounds like you, not like a press release.
 - [ ] **Shape:** PAS or STAR, and the post stays on its subject.
+- [ ] **Point and title:** the point fits in one sentence, every detail serves it, no heading is named after a PAS or STAR step, no internal names, and the title makes sense to a stranger.
 - [ ] **Plain English:** `npm run lint:plain -- <post>` has no errors, and a cold read (§Plain English) flags nothing that still holds up.
 - [ ] **Accuracy:** every claim reflects something you actually did/saw/built.
 - [ ] **AI-tell sweep:** Vale clean on warnings + suggestions for the post file. (Errors block merge.)

@@ -69,6 +69,31 @@ describe("checkPlainEnglish", () => {
     ]);
   });
 
+  it("fails headings named after a PAS or STAR step (#128)", () => {
+    for (const h of [
+      "## The situation: two copies of one skill",
+      "## The task: one shared A2A agent with three hard rules",
+      "### Action",
+      "## The result: what the bench showed",
+      "## Problem",
+      "## Solution",
+    ]) {
+      expect(errors(h).map((f) => f.rule)).toEqual(["structure-label-heading"]);
+    }
+  });
+
+  it("passes headings that name their subject, and the words in prose", () => {
+    expect(
+      checkPlainEnglish(
+        [
+          "## Two copies of the same skill",
+          "## How the two-week trial went",
+          "The situation was simple. The result: 260 calls.",
+        ].join("\n"),
+      ),
+    ).toEqual([]);
+  });
+
   it("reports line and column", () => {
     const [f] = checkPlainEnglish(
       "First line.\nA plain rule does the job now.",

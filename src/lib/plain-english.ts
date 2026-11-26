@@ -95,6 +95,15 @@ export const RULES: Rule[] = [
     instead: 'Say who chooses: "a web address that the caller chooses".',
   },
   {
+    id: "structure-label-heading",
+    level: "error",
+    pattern:
+      /^#{2,6}[ \t]+(?:the[ \t]+)?(?:situation|task|action|result|problem|agitat(?:e|ion)|solution)s?\b/gim,
+    why: "PAS and STAR shape the post but never show in it. A heading named after a step reads like a template.",
+    instead:
+      'Name what the section is about: "Two copies of the same skill", not "The situation: two copies of one skill".',
+  },
+  {
     id: "moves-the-needle",
     level: "error",
     pattern: /\b(?:move|moves|moved|moving) the needle\b/gi,
