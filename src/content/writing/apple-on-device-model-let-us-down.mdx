@@ -1,0 +1,76 @@
+---
+title: "Why I gave up on Apple's on-device model for my workout app"
+date: '2026-11-23'
+tags:
+  - field-notes
+  - ios
+  - on-device-ai
+  - apple-foundation-models
+summary: >-
+  Reps & Co. has a quick action called Shorter that trims a workout to fit the
+  time you have. I wanted Apple's on-device model to do the trimming, but only 1
+  of its 128 trimmed workouts actually fit the time I gave it. So Shorter now
+  uses a simple rule instead of the model.
+draft: false
+hero:
+  image: /static/images/blog/apple-on-device-model-let-us-down/cover.png
+  alt: Cover illustration for "Why I gave up on Apple's on-device model for my workout app".
+  prompt: >-
+    Style: rich conceptual editorial illustration, like a Wired or New Yorker
+    feature spread, with one clear central metaphor. Painterly flat shading,
+    depth, texture, sophisticated. Constrained to the palette.
+
+
+    Visual concept only: A set of iron weight plates on bare concrete, a yellow
+    measuring tape coiled loosely beside them, overhead shot, single-source
+    natural light casting long shadows across the plate faces, no other objects
+    or text. Do not depict or quote any phrase from the article title or
+    summary.
+
+
+    Strict, limited color palette ONLY: deep navy ink (#15233a) as the dominant
+    base, warm ochre/mustard (#d49a3a), muted terracotta red (#b04a3a), and soft
+    cream/paper (#f3e8d2). Warm, calm, intelligent, premium editorial feel. Do
+    NOT render any readable words, letters, numbers, captions, labels, interface
+    text, signs, headlines, sentences, or paragraphs. Use only abstract shapes,
+    symbolic objects, and nonverbal diagrams because a title will be overlaid
+    afterward. No photorealistic human faces. Wide 3:2 landscape composition
+    with deliberate empty negative space in the LEFT third so a title can be
+    overlaid later.
+  style: conceptual
+---
+
+## What I wanted
+
+[Reps & Co.](https://bundleapps.io/work/reps-and-co/) is a workout app we're building for iPhone. It has a quick action called Shorter for days when you have less time than your workout plan calls for. I wanted Shorter to run on Apple's on-device model, the one Apple ships in its Foundation Models framework. That model runs right on the phone with no server, so trimming a workout seemed like an easy thing to hand it.
+
+## What Shorter has to do
+
+You pick how much time you have: 15, 20, 25 or 30 minutes. Shorter then trims that day's workout so it takes close to that long without going over. To get there, it can cut sets, reps, weight or rest time, or drop an exercise. It can't add an exercise that wasn't in the workout.
+
+## What I tried
+
+Before I handed Shorter over to the model, I wanted to see how well it did. My own training plan has 32 workouts, so I asked the model to trim each one to each of the four times. That came to 128 tries. For each try I checked two things: whether the trimmed workout came out close to the time I asked for, and how long the model took to answer.
+
+## What happened
+
+Only 1 of the 128 trimmed workouts came out close to the time I asked for.
+
+- **Close to the time:** once. I asked for 20 minutes and got an 18-minute workout.
+- **Not shortened:** about half the time, the workout came back as long as it was before.
+- **Too short:** the rest of the time, it cut the workout down to 7 to 9 minutes, whether I asked for 15 minutes or 30.
+- **Waiting time:** each answer took about 13 seconds, and the slowest took 51.
+
+Thirteen seconds is a long time to stand between sets waiting on your phone.
+
+I ran all of this in the iOS Simulator, where the model runs without Apple's safety filter, so a real iPhone may answer a little differently. I also tested only this one feature, with one prompt and one version of the model, so this isn't a verdict on the model in general.
+
+So Shorter doesn't use Apple's model anymore. It now trims workouts with a simple rule written in code, with no model involved. The rule never adds anything to a workout, and it answers in under a hundredth of a second. Apple's model still runs the app's Lighter and Harder options, and it still adjusts workouts when you're missing equipment.
+
+Here's what I'm taking from it.
+
+Test the model on the real task before you trust it. Running every workout in the plan at every time length showed misses that a few hand-picked tries would have hidden.
+
+Have a simple version you can predict. The rule does the same thing every time, and when a feature has a hard limit, like Shorter's time limit, that matters more than anything clever.
+
+Count the waiting time as part of how good a feature is. A 13-second pause in the middle of a workout is something the person lifting actually feels.
