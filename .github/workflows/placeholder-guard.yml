@@ -1,0 +1,29 @@
+name: Placeholder guard
+
+# Fails while any tracked file still holds the REPLACE_BEFORE_MERGE marker,
+# so a change waiting on a real value (like the address Agent Inbox's page
+# moves to) can't land with its placeholder.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  placeholders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: No REPLACE_BEFORE_MERGE markers left
+        run: |
+          if git grep -n "REPLACE_BEFORE""_MERGE" -- . ':!.github/workflows/placeholder-guard.yml'; then
+            echo "::error::Replace the placeholder values above before merging."
+            exit 1
+          fi
+          echo "No placeholders left."
