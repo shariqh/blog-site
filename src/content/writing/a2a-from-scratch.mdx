@@ -7,7 +7,7 @@ tags:
   - agent-protocol
   - nodejs
   - security
-summary: "A 300-line Node.js A2A 1.0 agent server on node:http: agent card, front-door security, task states, SSE streaming, and four bugs a code review surfaced."
+summary: "A 300-line A2A 1.0 agent server in Node.js, built on node:http alone: the agent card, the checks every request passes, task states, streaming, and four bugs a security review found."
 draft: false
 hero:
   image: /static/images/blog/a2a-from-scratch/cover.png
@@ -21,25 +21,25 @@ hero:
   style: line-art
 ---
 
-The parts of A2A 1.0 the demos skip are the edges: what happens when the stream drops, what stops a web page from reaching a localhost agent, how you get the edited text out without the client seeing a half-finished result. A demo that works on the happy path tells you nothing about those. I wanted to understand them, so I wrote a small Node.js agent server from scratch rather than reaching for the SDK.
+A2A (Agent2Agent) 1.0 is a protocol that lets one AI agent call another over HTTP. Most A2A demos show a request going in and an answer coming back. They skip what happens when something goes wrong: the connection drops halfway through a reply, a web page in your browser tries to call an agent running on your own machine, or the client (the program calling the agent) shows part of an answer before the agent has finished checking it. I wanted to understand those cases, so I wrote a small A2A agent server in Node.js from scratch instead of using the official A2A SDK (software development kit).
 
-## Why the edges are where it breaks
+## Where a local agent can go wrong
 
-A local agent is an HTTP server on your machine, and every web page you have open can send requests to localhost. Without a guard, a page can reach the agent through CORS or a redirect. Even with one, an attacker who points their own domain at 127.0.0.1 can get the browser to call the agent under a name it trusts. That's DNS rebinding.
+An agent on your own machine is an HTTP server listening on localhost, and every web page you have open can send requests to localhost. Without a guard, a page can reach the agent through a cross-origin request (CORS) or a redirect. Even with a guard, an attacker can point their own domain name at 127.0.0.1, your machine's own address, so the browser treats the agent as part of the attacker's site. That trick is called DNS rebinding.
 
-Then there are the features that make the agent fetch something on the caller's say-so. Push notifications mean the agent makes outbound HTTP requests to a URL the caller supplies. A `url` part in a message means the agent fetches a link. Both are server-side request forgery vectors: the caller picks where your agent goes.
+Some A2A features also make the agent fetch a web address that the caller chooses. With push notifications, the agent sends updates to an address the caller gives it. With a link attached to a message (a `url` part), the agent downloads it. Either way, the caller decides where your agent's requests go. That attack is called server-side request forgery (SSRF).
 
-And the stream itself can lie by omission. A client that prints text as it arrives can show a reader text that later fails the check. A stream that drops halfway leaves the client guessing whether the task finished. For an editing agent whose whole job is to keep facts intact, either one defeats the point.
+The streamed reply has its own problems. My agent, called unslop, copy-edits text and then runs a fact check to confirm the edit kept the original facts. If the client shows text while it streams in, a reader can see an edit that the fact check later rejects. And if the stream drops halfway, the client can't tell whether the task finished. For an agent meant to keep facts intact, both problems defeat the point.
 
-## The fix: a 300-line server that closes each edge
+## The fix: a 300-line server that handles each case
 
-The server is `packages/mesh/src/a2a.ts` in [agent-inbox](https://github.com/shariqh/agent-inbox), about 300 lines of Node's built-in `node:http` with no framework. It powers a local editing agent called unslop that runs on a homelab GPU box. The agent is opt-in: nothing starts unless `A2A_ENABLED=true`. For why the unslop agent exists and how it was built, the [companion post](/blog/unslop-a2a-agent) covers that. This post walks through the protocol layer piece by piece.
+The server is `packages/mesh/src/a2a.ts` in [agent-inbox](https://github.com/shariqh/agent-inbox), about 300 lines built on Node's own `node:http` module with no framework. It runs unslop, which copy-edits public text such as PR descriptions and blog posts against a set of style rules, on a computer with a GPU at my home. The A2A server is off by default: it starts only when `A2A_ENABLED=true` is set. The [companion post](/blog/unslop-a2a-agent) covers why unslop exists and how I built it. This post covers the part of the server that speaks A2A.
 
-**A2A 1.0 basics.** The normative spec is `a2a.proto`. It defines three official transport bindings: JSON-RPC over HTTP, gRPC, and plain HTTP+JSON. An agent card can declare any number of these (or custom bindings named by URI), and all declared bindings must be functionally equivalent. This server implements JSON-RPC only. That's a valid subset.
+**A2A 1.0 in brief.** The official definition of A2A 1.0 is a file called `a2a.proto`. It defines three standard ways to carry messages: JSON-RPC over HTTP, gRPC, and plain HTTP with JSON. An agent lists the ways it supports on its agent card (next section), and it can also name custom ones of its own. If it lists more than one, they must all offer the same operations and behave the same way. This server supports JSON-RPC only, which the spec allows.
 
-### The agent card and front-door security
+### The agent card and the checks on every request
 
-The Agent Card lives at `GET /.well-known/agent-card.json` with no authentication, like the menu taped to the door before you walk in. It tells a client what the agent supports: protocol version, capabilities, extensions, security scheme and skills. A client reads it first and decides whether to proceed.
+The agent card lives at `GET /.well-known/agent-card.json` and needs no password, like the menu taped to a restaurant door before you walk in. It tells a client what the agent supports: protocol version, capabilities, extensions, how to authenticate, and skills. A client reads it first and decides whether to send the agent any work.
 
 Here's the card for unslop, from [`packages/mesh/src/a2a.ts`](https://github.com/shariqh/agent-inbox/blob/main/packages/mesh/src/a2a.ts):
 
@@ -59,25 +59,25 @@ const card = (): Json => ({
 })
 ```
 
-`pushNotifications: false` is a deliberate policy, because push is the first SSRF vector above. The `extensions` block carries a custom URI (`urn:agent-inbox:ext:unslop:v1`) plus the SHA-256 of the editing rules file. A client can verify the agent's rules match expectations before it sends anything.
+`pushNotifications: false` turns off push notifications (the agent calling an address the caller supplies) on purpose, because of the SSRF risk above. The `extensions` block declares an unslop-specific add-on to A2A, named by a custom URI (`urn:agent-inbox:ext:unslop:v1`). Its settings include a SHA-256 fingerprint of the file of editing rules the agent follows. A client can compare that fingerprint with the one it expects and stop before sending anything if the rules have changed.
 
-Once the client decides to proceed, every other call passes through `handle()`. The validation chain runs in a fixed order before any method dispatch.
+After the card, every request goes through one function, `handle()`. It runs six checks, always in the same order, before it does anything the request asks for. They cover the `Origin` header, the `Host` header, a secret token, a version header, a size limit and a time limit.
 
-The `Origin` check is the one people ask about first. Browsers always add `Origin` on cross-origin requests; agents don't. Refusing any request that has an `Origin` header stops a web page from reaching a localhost agent through CORS or a redirect. No browser, no `Origin`.
+The `Origin` check blocks requests from web pages. Browsers always add an `Origin` header to cross-origin requests, and agent clients don't send one. So the server refuses every request that has an `Origin` header, which stops web pages from reaching the agent through CORS or a redirect.
 
-The `Host` check is the DNS rebinding defense. If an attacker poisons a DNS cache to point their domain at 127.0.0.1, the browser's request carries that domain in `Host`. Requiring `Host` to equal the literal IP string kills that path.
+The `Host` check stops DNS rebinding. In that attack, the browser thinks it is calling the attacker's domain, so its request names that domain in the `Host` header. The server accepts only `127.0.0.1` in `Host`, so it refuses the request.
 
-Bearer token comparison uses `timingSafeEqual` after a length check. A string `===` comparison can leak timing information that makes brute-force attacks more efficient. `timingSafeEqual` runs in constant time regardless of where the strings differ.
+For the token check, the client proves it's allowed in by sending a bearer token, a secret string, with each request. The server compares it with `timingSafeEqual` after checking that the lengths match. A plain `===` comparison can finish sooner when the first characters differ, and an attacker can time those answers to guess the token faster. `timingSafeEqual` takes the same time wherever the strings differ.
 
-Requiring `A2A-Version: 1.0` follows the spec; enforcing it also blocks accidental hits from non-A2A code. Beyond this, there's a 64 KiB body cap (prevents memory exhaustion from large uploads) and a 10-second request timeout (prevents stalled connections from accumulating).
+The server also requires an `A2A-Version: 1.0` header. The spec asks for it, and it stops programs that don't speak A2A from reaching the agent by accident. Last, request bodies are capped at 64 KiB so a huge upload can't use up memory, and requests time out after 10 seconds so stalled connections don't pile up.
 
 ### Tasks, states and the stream
 
-A `SendMessage` or `SendStreamingMessage` creates a Task. Tasks move through a closed set of states: `TASK_STATE_SUBMITTED`, `WORKING`, `COMPLETED`, `FAILED`, `CANCELED`, `REJECTED`, plus two interrupted states, `INPUT_REQUIRED` and `AUTH_REQUIRED`. The states are closed. Custom progress belongs in the status message text field. The spec allows a human-readable string on each update, so `"editing"` and `"checking"` and `"retrying"` are valid progress signals. Custom results go in a `data` part on the artifact.
+A client starts work by calling `SendMessage`, or `SendStreamingMessage` to get updates as the work goes. Either call creates a task. A task is always in one of a fixed list of states: `TASK_STATE_SUBMITTED`, `WORKING`, `COMPLETED`, `FAILED`, `CANCELED`, `REJECTED`, and two states that pause for the caller, `INPUT_REQUIRED` and `AUTH_REQUIRED`. An agent can't add states of its own. To report progress, it attaches a short message to each status update it sends, such as "editing", "checking" or "retrying". The task's output is called an artifact. Messages and artifacts are both made of parts, such as a `text` part or a `data` part, and anything the agent returns beyond the edited text goes in a `data` part of the artifact.
 
-This agent accepts exactly one text part from `ROLE_USER`. No `url` parts, which closes the second SSRF vector. If a caller wants to pass fetched content, they fetch it themselves and pass the text. Custom per-call parameters go in `message.metadata` under the extension URI rather than as new part types.
+This agent accepts exactly one piece of text from the caller: a single text part with the role `ROLE_USER`. It refuses `url` parts, which removes the second SSRF risk. A caller that wants a web page edited fetches the page itself and sends the text. Settings for a single call go in `message.metadata` under the extension URI, not in new kinds of parts.
 
-`SendStreamingMessage` returns Server-Sent Events. Each event is a JSON-RPC response.
+`SendStreamingMessage` answers with Server-Sent Events (SSE): a series of small messages sent over one HTTP response. Each message is a JSON-RPC response.
 
 ```ts
 res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' })
@@ -85,13 +85,13 @@ const write = (events: Json[]): boolean => res.write(events.map((result) => `dat
 write([{ task: view(t) }])
 ```
 
-The stream carries **status updates only**. The edited text never appears on the stream. It arrives exactly once, as an artifact alongside `COMPLETED`, with two parts: a `text` part containing the edited content and a `data` part containing the check report as JSON. A client cannot see text that later fails the check, because text and check report arrive together at the moment the task completes. This cuts a whole class of partial-result bugs where a client displays text before the check runs.
+The stream carries **status updates only**. The edited text never appears on it. The text arrives once, in the artifact sent with `COMPLETED`, which has two parts: a `text` part with the edited text and a `data` part with the fact-check report as JSON. Because the text and its report arrive together when the task completes, a client can never show edited text before the fact check has run.
 
 ### The client
 
-The client is [`src/unslop-client.ts`](https://github.com/shariqh/agent-inbox/blob/main/src/unslop-client.ts), written in Node core only (no `fetch`, no event-source library). The first thing it does is read the Agent Card and validate it, checking `protocolVersion`, confirming the extension URI is present, and verifying the `api` field matches. It exits before sending anything if the card doesn't check out.
+The client is [`src/unslop-client.ts`](https://github.com/shariqh/agent-inbox/blob/main/src/unslop-client.ts), written with Node's built-in modules only (no `fetch`, no SSE library). The first thing it does is read the agent card and check it: the `protocolVersion`, that the extension URI is present, and that the `api` field matches. If any of these is wrong, it stops before sending anything.
 
-SSE parsing splits on blank lines and buffers the remainder.
+To read the stream, the client splits the incoming text on blank lines and keeps any unfinished piece for later.
 
 ```ts
 onChunk: (chunk) => {
@@ -107,20 +107,25 @@ onChunk: (chunk) => {
 },
 ```
 
-Split on `\r?\n\r?\n` to handle both CRLF and LF. Pop the last fragment back into the buffer; that's the incomplete event. For each complete event, extract `data:` lines. Parse failures are silently swallowed, because the stream is advisory. If a network hiccup corrupts an event, `GetTask` holds the authoritative state.
+Splitting on `\r?\n\r?\n` handles both Windows and Unix line endings. The last piece after the split may be an event that hasn't fully arrived, so it goes back into the buffer. For each complete event, the client pulls out the `data:` lines. If an event can't be parsed, the client ignores it, because the stream is only a progress feed. `GetTask` always returns the task's real state, so a garbled event loses nothing.
 
-That's the answer to the dropped stream. If the stream drops before the task reaches a terminal state, the client falls back to polling `GetTask`, checking every five seconds, up to three consecutive misses, and stopping when it hits a terminal state or the deadline fires. If the deadline fires first, `CancelTask` goes out.
+`GetTask` is also how the client handles a stream that drops before the task has finished. The client asks `GetTask` every five seconds and gives up after three failed requests in a row. It stops when the task reaches a final state (completed, failed, canceled or rejected) or when the client's time limit runs out. If the time limit runs out first, the client sends `CancelTask`.
 
-The text is printed to stdout only on exit 0, so a shell caller can capture it with `$(...)`. 0 means rewritten, 10 kept original, 11 refused, 12 busy, 13 failed, 14 agent not running.
+The client prints the edited text only when it exits with code 0, so a shell script can capture it with `$(...)`. The other exit codes say why there's no text: 10 means the agent returned the original text unchanged, 11 that it refused the request, 12 that it was busy, 13 that the task failed, and 14 that the agent wasn't running.
 
 ## What's still open
 
-**What I deliberately skipped.** Push notifications (webhooks mean the agent fetches URLs, an SSRF vector). Multi-turn continuation (one call, one task; resumable tasks added complexity I didn't need for a text editor). When I started, the official `@a2a-js/sdk`'s server adapters pulled in Express and surfaced push notification and database surfaces I would have had to disable, so rolling `node:http` directly was faster. That said, SDK 1.3.0 introduced `JsonRpcTransportHandler` as a framework-agnostic transport core, so adopting it is backlogged on [issue #498](https://github.com/shariqh/agent-inbox/issues/498).
+**What I chose not to build.** Push notifications, because they make the agent fetch addresses the caller picks, which is the SSRF risk above. Multi-turn conversations, because each call here is one task, and resuming a task with follow-up messages adds work a text editor doesn't need. When I started, the server parts of the official `@a2a-js/sdk` pulled in Express and came with push notifications and database storage that I would have had to turn off, so writing on `node:http` directly was faster. Since then, SDK 1.3.0 added `JsonRpcTransportHandler`, which handles JSON-RPC without tying you to a framework, so switching to it is on my to-do list as [issue #498](https://github.com/shariqh/agent-inbox/issues/498).
 
-**What a security review found.** Four things, all fixed. An API key was leaking through a raw `TypeError` message. Node error messages sometimes include the value that caused the error; if that value is a URL with a key in a query string, the key ends up in logs. A backend URL had `//` in its path after string concatenation; some proxy configurations treat `//path` as a host-relative reference and swap the upstream host. A timer was firing after a synchronous throw; the error unwound the stack, but the timeout callback ran later against half-initialized state. Agent-supplied status text was printed to a terminal without stripping ANSI escape sequences; a malicious agent could include terminal control characters in a status update and manipulate the shell display.
+**What a security review found.** It found four bugs, and all four are fixed:
 
-One gap remains. There's no way to prove the agent's identity against a local port squatter. If something grabs the port before the agent starts, the client authenticates against the wrong process. That's [issue #492](https://github.com/shariqh/agent-inbox/issues/492).
+- **A leaked API key.** Some Node error messages include the value that caused the error. When that value was a URL with an API key in it, the key ended up in the logs.
+- **A double slash in a URL.** Joining two strings produced a backend URL with `//` in its path. Some proxies read `//path` as a new host name and send the request to a different server.
+- **A timer that fired too late.** After an error had already ended a request, a timeout could still fire and run against half-set-up state.
+- **Terminal control codes.** The client printed status messages from the agent without removing terminal control codes, so a malicious agent could change what the terminal shows.
 
-The full server is at [`packages/mesh/src/a2a.ts`](https://github.com/shariqh/agent-inbox/blob/main/packages/mesh/src/a2a.ts) and the client at [`src/unslop-client.ts`](https://github.com/shariqh/agent-inbox/blob/main/src/unslop-client.ts). User-facing docs for the unslop agent are in [`docs/unslop.md`](https://github.com/shariqh/agent-inbox/blob/main/docs/unslop.md).
+One gap remains. The client can't yet prove it's talking to the real agent. If another program takes the agent's port before the agent starts, the client sends its token to that program instead. That's [issue #492](https://github.com/shariqh/agent-inbox/issues/492).
 
-Stream status updates only, deliver the artifact once complete, refuse `url` parts at the protocol layer. Those are the three decisions I'd make the same way again, and all three cut failure modes before they reach application code rather than patching them afterward.
+The full server is at [`packages/mesh/src/a2a.ts`](https://github.com/shariqh/agent-inbox/blob/main/packages/mesh/src/a2a.ts) and the client at [`src/unslop-client.ts`](https://github.com/shariqh/agent-inbox/blob/main/src/unslop-client.ts). User docs for the unslop agent are in [`docs/unslop.md`](https://github.com/shariqh/agent-inbox/blob/main/docs/unslop.md).
+
+I'd make the same three choices again: send only status updates on the stream, deliver the edited text once when the task completes, and refuse `url` parts before a request reaches the editing code. Each one rules out a kind of failure up front instead of patching it later.
