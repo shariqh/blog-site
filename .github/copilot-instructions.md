@@ -30,7 +30,7 @@ Cover generation additionally requires `IMAGE_GATEWAY_URL` and `IMAGE_GATEWAY_TO
 
 ## Architecture
 
-This is a mostly static Astro 6 site using MDX, strict TypeScript, and Tailwind 4. Astro builds pages, RSS, the sitemap, and per-post Open Graph PNGs for Cloudflare Pages. The only request-time code is `functions/_middleware.ts`, which redirects `www.shariq.dev` to the apex domain. `main` deploys to production; pull requests receive Cloudflare preview deployments.
+This is a mostly static Astro 7 site using MDX, strict TypeScript, and Tailwind 4. Astro builds pages, RSS, the sitemap, and per-post Open Graph PNGs for Cloudflare Pages. The only request-time code is `functions/_middleware.ts`, which redirects `www.shariq.dev` to the apex domain and `/agent-inbox` to bundleapps.io. `main` deploys to production; pull requests receive Cloudflare preview deployments.
 
 ### Content and rendering
 
