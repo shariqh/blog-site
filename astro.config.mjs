@@ -20,7 +20,7 @@ export default defineConfig({
   compressHTML: true,
   integrations: [
     mdx(),
-    sitemap({ customPages: [`${SITE.url}/agent-inbox/`] }),
+    sitemap(),
   ],
   markdown: {
     // Astro 7 defaults to the Sätteri processor, which doesn't run

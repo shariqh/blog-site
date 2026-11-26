@@ -12,6 +12,7 @@ import {
 import { buildReadCountUrl } from '../src/lib/read-count'
 import { formatDate } from '../src/lib/formatDate'
 import { SITE } from '../src/lib/site'
+import { AGENT_INBOX_HOME } from '../src/lib/agent-inbox-redirect'
 
 function walkMdx(dir: string, prefix = ''): string[] {
   const out: string[] = []
@@ -35,7 +36,7 @@ const READ_COUNT_SLUG =
   'rewriting-our-engine-with-anthropic-claude-opus-4-8-and-dynamic-workflows'
 const READ_COUNT_PATH = `/blog/${READ_COUNT_SLUG}/`
 const READ_COUNT_ROUTE = /\/api\/read-count(?:\?|$)/
-const AGENT_INBOX_URL = `${SITE.url}/agent-inbox/`
+const AGENT_INBOX_URL = AGENT_INBOX_HOME
 
 function relativeRequestUrl(requestUrl: string): string {
   const url = new URL(requestUrl)
@@ -434,76 +435,17 @@ test('RSS feed serves', async ({ request }) => {
   expect(res.headers()['content-type']).toMatch(/xml/)
 })
 
-test('Agent Inbox landing is standalone and interactive', async ({ page }) => {
-  const response = await page.goto('/agent-inbox/')
-
-  expect(response?.status()).toBe(200)
-  await expect(page).toHaveTitle(
-    'Agent Inbox — An inbox for your coding agents',
-  )
-  await expect(
-    page.getByRole('heading', {
-      level: 1,
-      name: 'Stop checking every terminal.',
-    }),
-  ).toBeVisible()
-  await expect(page.locator('script[data-goatcounter]')).toHaveCount(0)
-
-  const plansTab = page.getByRole('tab', { name: 'Plans' })
-  await plansTab.click()
-  await expect(plansTab).toHaveAttribute('aria-selected', 'true')
-  await expect(
-    page.getByRole('tabpanel', { name: 'Plans' }),
-  ).toContainText('Ship the customer portal')
-
-  const agentsTab = page.getByRole('tab', { name: 'Agents' })
-  await agentsTab.click()
-  await expect(agentsTab).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('tabpanel', { name: 'Agents' })).toContainText(
-    "See who's working on what.",
-  )
-
-  const themeToggle = page.getByRole('button', {
-    name: 'Switch to dark mode',
-  })
-  await themeToggle.click()
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await expect(
-    page.getByRole('button', { name: 'Switch to light mode' }),
-  ).toBeVisible()
-})
-
-test('Agent Inbox landing avoids narrow horizontal overflow', async ({
-  page,
+test('the old Agent Inbox page is gone from the build and sitemap', async ({
+  request,
 }) => {
-  await page.setViewportSize({ width: 320, height: 800 })
-  await page.goto('/agent-inbox/')
+  // Live, functions/_middleware.ts answers /agent-inbox with a 301 to
+  // Bundle's site. astro preview doesn't run functions, so here the old
+  // path is simply no longer built.
+  expect((await request.get('/agent-inbox/')).status()).toBe(404)
 
-  const widths = await page.evaluate(() => ({
-    viewport: document.documentElement.clientWidth,
-    document: document.documentElement.scrollWidth,
-  }))
-  expect(widths.document).toBeLessThanOrEqual(widths.viewport)
-})
-
-test('Agent Inbox extensionless path resolves in preview', async ({ page }) => {
-  const response = await page.goto('/agent-inbox')
-
-  expect(response?.status()).toBe(200)
-  expect(['/agent-inbox', '/agent-inbox/']).toContain(
-    new URL(page.url()).pathname,
-  )
-  await expect(page).toHaveTitle(
-    'Agent Inbox — An inbox for your coding agents',
-  )
-})
-
-test('sitemap includes the Agent Inbox landing', async ({ request }) => {
   const response = await request.get('/sitemap-0.xml')
-
   expect(response.status()).toBe(200)
-  expect(response.headers()['content-type']).toMatch(/xml/)
-  expect(await response.text()).toContain(`<loc>${AGENT_INBOX_URL}</loc>`)
+  expect(await response.text()).not.toContain(`${SITE.url}/agent-inbox`)
 })
 
 test('custom site icons serve', async ({ request }) => {
@@ -663,11 +605,36 @@ test('projects remains the detailed project inventory', async ({ page }) => {
     agentInbox.getByRole('link', { name: 'Agent Inbox', exact: true }),
   ).toHaveAttribute('href', AGENT_INBOX_URL)
   await expect(
-    agentInbox.getByRole('link', { name: 'shariq.dev ↗', exact: true }),
+    agentInbox.getByRole('link', { name: `${new URL(AGENT_INBOX_HOME).host} ↗`, exact: true }),
   ).toHaveAttribute('href', AGENT_INBOX_URL)
   await expect(
     agentInbox.getByRole('link', { name: 'github ↗', exact: true }),
   ).toHaveAttribute('href', 'https://github.com/shariqh/agent-inbox')
+  const matryoshka = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Matryoshka', exact: true }),
+  })
+  await expect(
+    matryoshka.getByRole('link', { name: 'Matryoshka', exact: true }),
+  ).toHaveAttribute('href', testflight[0].site!)
+  await expect(
+    matryoshka.getByRole('link', { name: 'TestFlight ↗', exact: true }),
+  ).toHaveAttribute('href', testflight[0].beta!)
+  const reps = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Reps & Co.', exact: true }),
+  })
+  await expect(reps).toContainText('early TestFlight')
+  await expect(reps.getByRole('link')).toHaveCount(0)
+  const testRecorder = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Test Recorder', exact: true }),
+  })
+  await expect(testRecorder).toContainText('TestFlight')
+  await expect(testRecorder.getByRole('link')).toHaveCount(0)
+  const alfred = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'Browser Search for Alfred', exact: true }),
+  })
+  await expect(
+    alfred.getByRole('link', { name: 'github ↗', exact: true }),
+  ).toHaveAttribute('href', 'https://github.com/shariqh/browser-search-for-alfred')
   for (const retired of ['coffee-ui', 'unrivaledpro', 'myspace']) {
     await expect(page.getByText(retired, { exact: true })).toHaveCount(0)
   }
