@@ -14,6 +14,7 @@
     "dev": "astro dev",
     "gen:cover": "tsx scripts/cover/cli.ts",
     "gen:cover:all": "tsx scripts/cover/backfill.ts",
+    "lint:plain": "tsx scripts/check-plain-english.ts",
     "migrate:cms": "tsx scripts/agent/migrate-cms.ts",
     "post:thread": "tsx scripts/social/post-thread.ts",
     "preview": "astro preview",

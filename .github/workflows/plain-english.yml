@@ -1,0 +1,42 @@
+name: Plain English
+
+# Flags insider shorthand ("does the job", "got the time right") in the posts a
+# PR adds or changes. Rules and reasons: src/lib/plain-english.ts and
+# docs/EDITORIAL.md §Plain English. Errors fail the check; warnings only show
+# as annotations on the PR. Posts the PR doesn't touch aren't checked.
+
+on:
+  pull_request:
+    paths:
+      - "src/content/writing/**"
+      - "src/lib/plain-english.ts"
+      - "scripts/check-plain-english.ts"
+      - ".github/workflows/plain-english.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  plain-english:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Check changed posts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mapfile -t posts < <(git diff --name-only --diff-filter=AMR "$BASE_SHA"...HEAD -- 'src/content/writing/*.md' 'src/content/writing/*.mdx' 'src/content/writing/**/*.md' 'src/content/writing/**/*.mdx' | sort -u)
+          if [ ${#posts[@]} -eq 0 ]; then
+            echo "No posts changed."
+            exit 0
+          fi
+          npm run -s lint:plain -- "${posts[@]}"

@@ -105,6 +105,11 @@ Prose for public-facing pages (blog posts, about, projects) follows
 file as required reading — it documents voice, AI-tell phrases to
 avoid, em-dash cap, length-per-bucket, and the pre-publish checklist.
 
+Before a draft goes to Shariq: write it as PAS or STAR and keep it on its
+subject; run `npm run lint:plain -- <post>` (insider-shorthand check, also a
+CI check on post PRs); then run the cold read in `docs/EDITORIAL.md`
+§Plain English and fold in what holds up.
+
 Vale runs the pattern-based rules in CI (`.github/workflows/vale.yml`
 
 - `vale-styles/shariq/`). Lint locally:
