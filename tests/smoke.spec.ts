@@ -543,6 +543,9 @@ test('now owns the changing snapshot', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'Matryoshka', exact: true }),
   ).toHaveAttribute('href', 'https://matryoshka.bundleapps.io/')
+  await expect(
+    page.getByRole('link', { name: 'Reps & Co.', exact: true }),
+  ).toHaveAttribute('href', 'https://bundleapps.io/work/reps-and-co/')
   const betaLinks = page.getByRole('link', { name: 'Join the TestFlight', exact: true })
   await expect(betaLinks).toHaveCount(3)
   for (const [name, href] of [
@@ -635,7 +638,13 @@ test('projects remains the detailed project inventory', async ({ page }) => {
   })
   await expect(reps).toContainText('TestFlight')
   await expect(reps).not.toContainText('early TestFlight')
-  await expect(reps.getByRole('link')).toHaveCount(1)
+  await expect(reps.getByRole('link')).toHaveCount(3)
+  await expect(
+    reps.getByRole('link', { name: 'Reps & Co.', exact: true }),
+  ).toHaveAttribute('href', 'https://bundleapps.io/work/reps-and-co/')
+  await expect(
+    reps.getByRole('link', { name: 'bundleapps.io ↗', exact: true }),
+  ).toHaveAttribute('href', 'https://bundleapps.io/work/reps-and-co/')
   await expect(
     reps.getByRole('link', { name: 'TestFlight ↗', exact: true }),
   ).toHaveAttribute('href', 'https://testflight.apple.com/join/Hny7ksYg')

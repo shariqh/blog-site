@@ -95,6 +95,7 @@ export const testflight: Project[] = [
     blurb: "An iOS workout app where you bring your own AI keys.",
     description: "A workout app for iPhone where you bring your own AI API keys.",
     kind: "product",
+    site: "https://bundleapps.io/work/reps-and-co/",
     beta: "https://testflight.apple.com/join/Hny7ksYg",
     status: "TestFlight",
   },
