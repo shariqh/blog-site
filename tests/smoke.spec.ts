@@ -543,9 +543,20 @@ test('now owns the changing snapshot', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'Matryoshka', exact: true }),
   ).toHaveAttribute('href', 'https://matryoshka.bundleapps.io/')
-  await expect(
-    page.getByRole('link', { name: 'Join the TestFlight', exact: true }),
-  ).toHaveAttribute('href', 'https://testflight.apple.com/join/zbxDR9K9')
+  const betaLinks = page.getByRole('link', { name: 'Join the TestFlight', exact: true })
+  await expect(betaLinks).toHaveCount(3)
+  for (const [name, href] of [
+    ['Matryoshka', 'https://testflight.apple.com/join/zbxDR9K9'],
+    ['Reps & Co.', 'https://testflight.apple.com/join/Hny7ksYg'],
+    ['Test Recorder', 'https://testflight.apple.com/join/KMhUu3P9'],
+  ]) {
+    await expect(
+      page
+        .locator('.building')
+        .filter({ has: page.getByRole('heading', { name, exact: true }) })
+        .getByRole('link', { name: 'Join the TestFlight', exact: true }),
+    ).toHaveAttribute('href', href)
+  }
 
   const expectedTools = [
     { name: 'GitHub', icon: 'github' },
@@ -622,19 +633,32 @@ test('projects remains the detailed project inventory', async ({ page }) => {
   const reps = page.locator('.card').filter({
     has: page.getByRole('heading', { name: 'Reps & Co.', exact: true }),
   })
-  await expect(reps).toContainText('early TestFlight')
-  await expect(reps.getByRole('link')).toHaveCount(0)
+  await expect(reps).toContainText('TestFlight')
+  await expect(reps).not.toContainText('early TestFlight')
+  await expect(reps.getByRole('link')).toHaveCount(1)
+  await expect(
+    reps.getByRole('link', { name: 'TestFlight ↗', exact: true }),
+  ).toHaveAttribute('href', 'https://testflight.apple.com/join/Hny7ksYg')
   const testRecorder = page.locator('.card').filter({
     has: page.getByRole('heading', { name: 'Test Recorder', exact: true }),
   })
   await expect(testRecorder).toContainText('TestFlight')
-  await expect(testRecorder.getByRole('link')).toHaveCount(0)
+  await expect(testRecorder.getByRole('link')).toHaveCount(1)
+  await expect(
+    testRecorder.getByRole('link', { name: 'TestFlight ↗', exact: true }),
+  ).toHaveAttribute('href', 'https://testflight.apple.com/join/KMhUu3P9')
+  const marketplace = page.locator('.card').filter({
+    has: page.getByRole('heading', { name: 'A2A Marketplace', exact: true }),
+  })
+  await expect(marketplace).toContainText('Hosted A2A agents that plug into Agent Inbox.')
+  await expect(marketplace.getByRole('link')).toHaveCount(0)
   const alfred = page.locator('.card').filter({
     has: page.getByRole('heading', { name: 'Browser Search for Alfred', exact: true }),
   })
   await expect(
     alfred.getByRole('link', { name: 'github ↗', exact: true }),
   ).toHaveAttribute('href', 'https://github.com/shariqh/browser-search-for-alfred')
+  await expect(alfred).toContainText('awaiting approval')
   for (const retired of ['coffee-ui', 'unrivaledpro', 'myspace']) {
     await expect(page.getByText(retired, { exact: true })).toHaveCount(0)
   }

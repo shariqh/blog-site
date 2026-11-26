@@ -25,7 +25,7 @@ export const active: Project[] = [
     name: "Oris",
     blurb: "Local-first meeting notes for Mac.",
     description:
-      "A local-first Mac app that records meetings without a call bot, transcribes on-device with WhisperKit, and lands structured notes in Obsidian, Apple Notes, or a Markdown folder.",
+      "A local-first Mac app that records meetings without a call bot, transcribes on-device with WhisperKit, and lands structured notes in Obsidian, Apple Notes, Notion, or a Markdown folder.",
     kind: "product",
     site: "https://orisnotes.com",
     status: "active",
@@ -39,6 +39,14 @@ export const active: Project[] = [
     kind: "tool",
     site: AGENT_INBOX_HOME,
     repo: "https://github.com/shariqh/agent-inbox",
+    status: "building",
+  },
+  {
+    name: "A2A Marketplace",
+    blurb: "Hosted A2A agents that plug into Agent Inbox.",
+    description:
+      "Hosted A2A agent services for Agent Inbox: accounts, a catalog of hosted agents, billing and a relay. Agent Inbox itself stays open source and local-first.",
+    kind: "product",
     status: "building",
   },
   {
@@ -66,7 +74,7 @@ export const active: Project[] = [
       "An Alfred workflow that searches open tabs, bookmarks and history across Firefox, Safari and Chromium browsers.",
     kind: "tool",
     repo: "https://github.com/shariqh/browser-search-for-alfred",
-    status: "new",
+    status: "awaiting approval",
   },
 ];
 
@@ -87,7 +95,8 @@ export const testflight: Project[] = [
     blurb: "An iOS workout app where you bring your own AI keys.",
     description: "A workout app for iPhone where you bring your own AI API keys.",
     kind: "product",
-    status: "early TestFlight",
+    beta: "https://testflight.apple.com/join/Hny7ksYg",
+    status: "TestFlight",
   },
   {
     name: "Test Recorder",
@@ -95,6 +104,7 @@ export const testflight: Project[] = [
     description:
       "An iPhone app that records your screen and voice while you test an app, with marks, sections and an on-device transcript.",
     kind: "product",
+    beta: "https://testflight.apple.com/join/KMhUu3P9",
     status: "TestFlight",
   },
 ];
